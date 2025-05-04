@@ -1,6 +1,6 @@
 import React from "react";
 import Grid from "@mui/material/Grid2";
-import Logo from "../../assests/imgs/logo.png";
+import Logo from "../../assests/imgs/jamiah_logo.png";
 import {Chip, Divider, Typography} from "@mui/material";
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import XIcon from '@mui/icons-material/X';

@@ -15,4 +15,15 @@ export const ROUTES = {
     IMPRINT: 'imprint',
     MY_RISKS: 'my-risks',
     MY_BIDS: 'my-bids',
-}
+
+    // NEU für Jamiah
+    DASHBOARD: 'dashboard',
+    GROUPS: 'groups',
+    MEMBERS: 'members',
+    PAYMENTS: 'payments',
+    VOTES: 'votes',
+    DOCUMENTS: 'documents',
+    REPORTS: 'reports',
+    ONBOARDING: 'onboarding',
+
+};

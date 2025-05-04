@@ -14,7 +14,7 @@ import {auth} from "../../firebase_config";
 import {AppDispatch, RootState} from "../../store/store";
 import {MessageTypeEnum} from "../../enums/MessageTypeEnum";
 import {CHATBOT_UID} from "../../constants/chatbot";
-import Logo from "../../assests/imgs/logo.png";
+import Logo from "../../assests/imgs/jamiah_logo.png";
 
 export const ChatMessages = () => {
     const dispatch: AppDispatch = useDispatch();

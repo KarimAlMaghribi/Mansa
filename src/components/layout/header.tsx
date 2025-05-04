@@ -10,7 +10,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import Container from '@mui/material/Container';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
-import Logo from "../../assests/imgs/logo.png";
+import Logo from "../../assests/imgs/jamiah_logo.png";
 import {useLocation, useNavigate} from "react-router-dom";
 import {Page, pages} from "./pages";
 import {auth} from "../../firebase_config";

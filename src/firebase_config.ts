@@ -1,34 +1,65 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, setPersistence, browserSessionPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { GoogleAuthProvider } from "firebase/auth";
-import firebase from "firebase/compat";
+// firebase_config.ts (Mock-Version)
 
+import type { Auth, User, UserInfo, IdTokenResult, UserMetadata } from "firebase/auth";
+import type { Firestore } from "firebase/firestore";
 
-const firebaseConfig = {
-    apiKey: process.env.REACT_APP_API_KEY,
-    authDomain: process.env.REACT_APP_AUTH_DOMAIN,
-    projectId: process.env.REACT_APP_PROJECT_ID,
-    storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
-    messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
-    appId: process.env.REACT_APP_APP_ID,
-    measurementId:  process.env.REACT_APP_MEASUREMENT_ID
+// --- Auth-Mock ---
+// Eintrag für providerData
+const mockProviderData: UserInfo = {
+  providerId: "google.com",
+  uid: "mock-provider-uid",
+  displayName: null,
+  email: "mock@example.com",
+  phoneNumber: null,
+  photoURL: null
 };
 
-const app = initializeApp(firebaseConfig);
+// Vollständiges Mock-User-Objekt
+const mockUser: User = {
+  providerId: "google.com",       // erforderlich auf User
+  uid: "mock-uid",
+  email: "mock@example.com",
+  displayName: null,
+  emailVerified: false,
+  isAnonymous: false,
+  metadata: {} as UserMetadata,
+  phoneNumber: null,
+  photoURL: null,
+  providerData: [mockProviderData],
+  refreshToken: "mock-refresh-token",
+  tenantId: null,
 
+  delete: async () => {},
+  getIdToken: async () => "mock-token",
+  getIdTokenResult: async () => ({ token: "mock-token" } as IdTokenResult),
+  reload: async () => {},
+  toJSON: () => ({})
+};
 
+// Auth-Stub mit onAuthStateChanged
+export const auth = {
+  currentUser: mockUser,
+  onAuthStateChanged: (callback: (user: User | null) => void) => {
+    // simuliere Initial-Callback
+    callback(mockUser);
+    // Rückgabe einer "unsubscribe"-Funktion
+    return () => {};
+  }
+} as unknown as Auth;
 
-export const auth = getAuth(app);
+// Simulierter Google-Provider
+export const googleAuthProvider = {
+  providerId: "google.com"
+};
 
-setPersistence(auth, browserSessionPersistence)
-    .then(() => {
-        console.log("Persistence auf SESSION gesetzt.");
+// --- Firestore-Mock ---
+export const db = {
+  collection: (name: string) => ({
+    doc: (id: string) => ({
+      get: async () => ({ exists: false, data: () => null }),
+      set: async (data: any) => console.log(`Mock set in ${name}/${id}:`, data),
+      update: async (data: any) => console.log(`Mock update in ${name}/${id}:`, data),
+      delete: async () => console.log(`Mock delete ${name}/${id}`)
     })
-    .catch((error) => {
-        console.error("Fehler beim Setzen der Persistence:", error);
-    });
-
-export const db = getFirestore(app);
-export const googleAuthProvider = new GoogleAuthProvider();
-
+  })
+} as unknown as Firestore;
