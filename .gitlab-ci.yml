@@ -14,7 +14,7 @@ before_script:
 build:
   stage: build
   script:
-    - npm run build
+    - CI=false npm run build
   artifacts:
     paths:
       - build
