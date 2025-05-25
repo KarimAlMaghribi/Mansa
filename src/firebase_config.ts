@@ -1,65 +1,24 @@
-// firebase_config.ts (Mock-Version)
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getAnalytics } from "firebase/analytics";
 
-import type { Auth, User, UserInfo, IdTokenResult, UserMetadata } from "firebase/auth";
-import type { Firestore } from "firebase/firestore";
-
-// --- Auth-Mock ---
-// Eintrag für providerData
-const mockProviderData: UserInfo = {
-  providerId: "google.com",
-  uid: "mock-provider-uid",
-  displayName: null,
-  email: "mock@example.com",
-  phoneNumber: null,
-  photoURL: null
+// Dein Firebase Config-Objekt
+const firebaseConfig = {
+  apiKey: "AIzaSyBxna9F7QMNol-kwDzhg5_BRrtKHDUPNQI",
+  authDomain: "mansa-8fa80.firebaseapp.com",
+  projectId: "mansa-8fa80",
+  storageBucket: "mansa-8fa80.appspot.com",
+  messagingSenderId: "378871440542",
+  appId: "1:378871440542:web:21f0b3d374714f727e078f",
+  measurementId: "G-0CNESYXRBS"
 };
 
-// Vollständiges Mock-User-Objekt
-const mockUser: User = {
-  providerId: "google.com",       // erforderlich auf User
-  uid: "mock-uid",
-  email: "mock@example.com",
-  displayName: null,
-  emailVerified: false,
-  isAnonymous: false,
-  metadata: {} as UserMetadata,
-  phoneNumber: null,
-  photoURL: null,
-  providerData: [mockProviderData],
-  refreshToken: "mock-refresh-token",
-  tenantId: null,
+// Initialisiere Firebase
+const app = initializeApp(firebaseConfig);
+getAnalytics(app); // optional
 
-  delete: async () => {},
-  getIdToken: async () => "mock-token",
-  getIdTokenResult: async () => ({ token: "mock-token" } as IdTokenResult),
-  reload: async () => {},
-  toJSON: () => ({})
-};
-
-// Auth-Stub mit onAuthStateChanged
-export const auth = {
-  currentUser: mockUser,
-  onAuthStateChanged: (callback: (user: User | null) => void) => {
-    // simuliere Initial-Callback
-    callback(mockUser);
-    // Rückgabe einer "unsubscribe"-Funktion
-    return () => {};
-  }
-} as unknown as Auth;
-
-// Simulierter Google-Provider
-export const googleAuthProvider = {
-  providerId: "google.com"
-};
-
-// --- Firestore-Mock ---
-export const db = {
-  collection: (name: string) => ({
-    doc: (id: string) => ({
-      get: async () => ({ exists: false, data: () => null }),
-      set: async (data: any) => console.log(`Mock set in ${name}/${id}:`, data),
-      update: async (data: any) => console.log(`Mock update in ${name}/${id}:`, data),
-      delete: async () => console.log(`Mock delete ${name}/${id}`)
-    })
-  })
-} as unknown as Firestore;
+// Exporte für Nutzung im Projekt
+export const auth = getAuth(app);
+export const googleAuthProvider = new GoogleAuthProvider();
+export const db = getFirestore(app);

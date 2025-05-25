@@ -2,8 +2,8 @@ import React from 'react';
 import {Navigate, Route, Routes} from "react-router-dom";
 
 import {Landing} from "./pages/landing/landing";
-import {SignIn} from "./pages/authentication/sign-in";
-import {SignUp} from "./pages/authentication/sign-up";
+import {LoginForm} from "./pages/authentication/sign-in";
+import {RegistrationForm} from "./pages/authentication/sign-up";
 import {ForgotPassword} from "./pages/authentication/forgot-password";
 import {RiskOverview} from "./pages/risk-overview/risk-overview";
 import {Layout} from "./components/layout/layout";
@@ -31,15 +31,17 @@ import {Documents} from "./pages/documents/documents";
 import {Reports} from "./pages/reports/reports";
 import {Members} from "./pages/memebers/members";
 import {Onboarding} from "./pages/onboarding/onboarding";
+import {VerifyEmail} from "./pages/authentication/verifyEmail";
 
 function App() {
     return (
         <Layout>
             <Routes>
                 <Route path="/" element={<Landing />} />
-                <Route path={`/${ROUTES.SIGN_IN}`} element={<SignIn />} />
-                <Route path={`/${ROUTES.SIGN_UP}`} element={<SignUp />} />
+                <Route path={`/${ROUTES.SIGN_IN}`} element={<LoginForm />} />
+                <Route path={`/${ROUTES.SIGN_UP}`} element={<RegistrationForm />} />
                 <Route path={`/${ROUTES.FORGOT_PASSWORD}`} element={<ForgotPassword />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
 
                 {/* Private routes */}
                 <Route path={`/${ROUTES.DASHBOARD}`} element={<PrivateRoute><Dashboard /></PrivateRoute>} />
