@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "xrisks-frontend"
-  }
+    "default": "mansa-8fa80",
+    "mansa": "mansa-8fa80"
+  },
+  "targets": {},
+  "etags": {}
 }
