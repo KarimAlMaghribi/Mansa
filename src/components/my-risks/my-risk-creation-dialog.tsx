@@ -51,7 +51,6 @@ export const MyRiskCreationDialog = (props: RiskCreationDialogProps) => {
     const [title, setTitle] = useState<string>('');
     const [description, setDescription] = useState<string>('');
     const [nameRequiredError, setNameRequiredError] = useState<boolean>(false);
-    const today = dayjs();
 
     useEffect(() => {
         if (!title && !nameRequiredError) {
@@ -61,7 +60,7 @@ export const MyRiskCreationDialog = (props: RiskCreationDialogProps) => {
         if (title && nameRequiredError) {
             setNameRequiredError(false);
         }
-    }, [title]);
+    }, [title, nameRequiredError]);
 
     const handleValueChange = (newValue: number) => {
         if (!isNaN(newValue)) {

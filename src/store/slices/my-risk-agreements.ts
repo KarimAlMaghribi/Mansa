@@ -1,5 +1,4 @@
 import {createAsyncThunk, createSlice} from "@reduxjs/toolkit";
-import {Risk} from "../../models/Risk";
 import {addDoc, collection, deleteDoc, getDocs, query, updateDoc, where} from "firebase/firestore";
 import {FetchStatus} from "../../types/FetchStatus";
 import {FetchStatusEnum} from "../../enums/FetchStatus.enum";

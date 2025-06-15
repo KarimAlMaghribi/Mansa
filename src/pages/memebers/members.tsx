@@ -1,7 +1,7 @@
 
 import React from 'react';
 import {
-  Box, Typography, Grid, Paper, List, ListItem, ListItemText, Button, Divider, Switch, FormControlLabel, Avatar, Stack
+  Box, Typography, Grid, Paper, Button, Divider, Switch, FormControlLabel, Avatar, Stack
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/PersonRemove';

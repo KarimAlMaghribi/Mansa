@@ -18,7 +18,7 @@ export const MyRisks = () => {
 
     useEffect(() => {
         dispatch(fetchMyRisks());
-    }, []);
+    }, [dispatch]);
 
     const handleCloseDialog = () => {
         setOpenRiskCreationDialog(false);

@@ -1,8 +1,6 @@
 import {createAsyncThunk, createSlice} from "@reduxjs/toolkit";
 import {FetchStatus} from "../../types/FetchStatus";
-import {collection, onSnapshot} from "firebase/firestore";
-import {db} from "../../firebase_config";
-import {FirestoreCollectionEnum} from "../../enums/FirestoreCollectionEnum";
+
 import {FetchStatusEnum} from "../../enums/FetchStatus.enum";
 
 enum ActionTypes {
@@ -75,7 +73,5 @@ export const myBisSlice = createSlice({
 
 export const selectNotifications = (state: { notifications: NotificationsState }) => state.notifications.items;
 export const selectNotificationCount = (state: {notifications: NotificationsState }) => state.notifications.items.length;
-
-export const {  } = myBisSlice.actions;
 
 export default myBisSlice.reducer;
