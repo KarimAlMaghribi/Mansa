@@ -67,8 +67,7 @@ export const ChatMessages = () => {
                                                             {message.created ? (
                                                                 <Typography variant="body2" color="grey.400" mb={1}>
                                                                     {message.uid === CHATBOT_UID ? "XRisk-Chabot" : otherChatMemberName},{' '}
-                                                                    {formatLastActivity(message.created)}{' '}
-                                                                    her
+                                                                    {formatLastActivity(message.created)}
                                                                 </Typography>
                                                             ) : null}
                                                             {message.type === MessageTypeEnum.TEXT ? (
