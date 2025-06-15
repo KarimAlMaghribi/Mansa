@@ -1,15 +1,18 @@
 import React from "react";
 import {Navigate} from "react-router-dom";
 import {ROUTES} from "./routes";
-import {useAuthState} from "react-firebase-hooks/auth";
-import {auth} from "../firebase_config";
-import {CircularProgress} from "@mui/material";
+import { Box, CircularProgress } from "@mui/material";
+import { useAuth } from "../context/AuthContext";
 
 export const PrivateRoute = ({ children }: { children: JSX.Element }) => {
-    const [user, loading] = useAuthState(auth);
+    const { user, loading } = useAuth();
 
     if (loading) {
-        <CircularProgress />
+        return (
+            <Box display="flex" justifyContent="center" mt={4}>
+                <CircularProgress />
+            </Box>
+        );
     }
 
     return user ? children : <Navigate to={`/${ROUTES.SIGN_IN}`} />;

@@ -8,8 +8,18 @@ import {
 } from "firebase/auth";
 
 export const signInWithGoogle = async () => {
-    // TODO: Handle authenticated close pop-up window
-    return await signInWithPopup(auth, googleAuthProvider);
+    try {
+        const result = await signInWithPopup(auth, googleAuthProvider);
+        return result.user;
+    } catch (error: any) {
+        if (
+            error.code !== 'auth/cancelled-popup-request' &&
+            error.code !== 'auth/popup-closed-by-user'
+        ) {
+            console.error(error);
+        }
+        return null;
+    }
 };
 
 export const signOutUser = async () => {
@@ -18,7 +28,7 @@ export const signOutUser = async () => {
         return signOutObject;
     } catch (error) {
         console.error(error);
-        alert(error)
+        return null;
     }
 };
 
@@ -28,7 +38,6 @@ export const signUpWithEmail = async (email: string, password: string) => {
         return false;
     } catch (error) {
         console.error(error);
-        alert(error)
         return true;
     }
 
@@ -40,6 +49,6 @@ export const signInWithEmail = async (email: string, password: string) => {
         return userCredential.user;
     } catch (error) {
         console.error(error);
-        alert(error)
+        return null;
     }
 };

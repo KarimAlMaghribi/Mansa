@@ -12,6 +12,7 @@ import {theme} from "./theme";
 import {ThemeProvider} from "@mui/material";
 import "./index.scss";
 import {BrowserRouter} from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
 
 const root = ReactDOM.createRoot(
     document.getElementById('root') as HTMLElement
@@ -20,7 +21,9 @@ root.render(
     <Provider store={store}>
         <ThemeProvider theme={theme}>
             <BrowserRouter>
-                <App/>
+                <AuthProvider>
+                    <App/>
+                </AuthProvider>
             </BrowserRouter>
         </ThemeProvider>
     </Provider>

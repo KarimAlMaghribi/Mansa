@@ -36,6 +36,7 @@ export const LoginForm: React.FC = () => {
       const user = userCredential.user;
       if (!user.emailVerified) {
         await sendEmailVerification(user);
+        await auth.signOut();
         showError("Bitte bestätige deine E-Mail-Adresse. Wir haben dir eine neue E-Mail geschickt.");
         setLoading(false);
         return;
@@ -61,6 +62,7 @@ export const LoginForm: React.FC = () => {
       const user = result.user;
       if (!user.emailVerified) {
         await sendEmailVerification(user);
+        await auth.signOut();
         showError("Bitte bestätige deine E-Mail-Adresse. Wir haben dir eine E-Mail geschickt.");
         return;
       }
