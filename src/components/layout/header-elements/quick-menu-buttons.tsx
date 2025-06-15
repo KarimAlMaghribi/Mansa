@@ -1,5 +1,4 @@
 import Box from "@mui/material/Box";
-import Tooltip from "@mui/material/Tooltip";
 import IconButton from "@mui/material/IconButton";
 import Avatar from "@mui/material/Avatar";
 import Menu from "@mui/material/Menu";
@@ -18,7 +17,6 @@ import {Divider, Fade, ListItemIcon} from "@mui/material";
 import {auth} from "../../../firebase_config";
 import {selectName} from "../../../store/slices/user-profile";
 import {useSelector} from "react-redux";
-import {NotificationButton} from "./notification-button";
 
 export interface AuthenticationButtonsProps {
     isLoggedIn: boolean;

@@ -2,7 +2,7 @@ import {createAsyncThunk, createSlice, PayloadAction} from "@reduxjs/toolkit";
 import {MessageType} from "../../types/MessageType";
 import {FetchStatusEnum} from "../../enums/FetchStatus.enum";
 import {FetchStatus} from "../../types/FetchStatus";
-import {collection, doc, getDocs, limit, onSnapshot, orderBy, query, setDoc, where} from "firebase/firestore";
+import {collection, doc, getDocs, onSnapshot, orderBy, query, setDoc, where} from "firebase/firestore";
 import {auth, db} from "../../firebase_config";
 import {ChatStatus} from "../../types/ChatStatus";
 import {FirestoreCollectionEnum} from "../../enums/FirestoreCollectionEnum";

@@ -21,7 +21,7 @@ import {auth} from "../../firebase_config";
 import AssistantIcon from '@mui/icons-material/Assistant';
 import OpenAI from "openai";
 import {Chatbot} from "./chatbot";
-import {selectRiskById, selectRisks} from "../../store/slices/risks";
+import {selectRisks} from "../../store/slices/risks";
 import {Risk} from "../../models/Risk";
 import {CHATBOT_UID} from "../../constants/chatbot";
 
@@ -35,7 +35,7 @@ export const ChatSender = () => {
     const [chosenEmoji, setChosenEmoji] = React.useState<any>();
     const [msg, setMsg] = React.useState<any>('');
     const [aiLoading, setAILoading] = React.useState<boolean>(false);
-    const [msgType, setMsgType] = React.useState<MessageTypeEnum>(MessageTypeEnum.TEXT);
+    const [msgType] = React.useState<MessageTypeEnum>(MessageTypeEnum.TEXT);
     const openai = new OpenAI({apiKey: process.env.REACT_APP_OPENAI_API_KEY, dangerouslyAllowBrowser: true});
 
     const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {

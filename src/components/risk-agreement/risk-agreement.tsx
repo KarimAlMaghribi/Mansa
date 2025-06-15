@@ -1,7 +1,6 @@
-import React, {useEffect, useState} from "react";
+import React, {useState} from "react";
 import {Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField} from "@mui/material";
 import Button from "@mui/material/Button";
-import dayjs, {Dayjs} from "dayjs";
 import {NumericFormat} from 'react-number-format';
 import {useDispatch} from "react-redux";
 import {AppDispatch} from "../../store/store";
@@ -9,8 +8,7 @@ import {v4 as uuidv4} from 'uuid';
 import {addMyRiskAgreement} from "../../store/slices/my-risk-agreements";
 import {useNavigate} from "react-router-dom";
 import {ROUTES} from "../../routing/routes";
-import {RiskStatusEnum} from "../../enums/RiskStatus.enum";
-import {RiskTypeSelector} from "../my-risks/risk-type-selector";
+
 import { RiskAgreement } from "../../models/RiskAgreement";
 
 export interface RiskAgreementDialogProps {
@@ -43,14 +41,13 @@ export const MyRiskAgreementDialog = (props: RiskAgreementDialogProps) => {
     const navigate = useNavigate();
     const dispatch: AppDispatch = useDispatch();
     //const [date, setDate] = useState<Dayjs | null>(dayjs());
-    const [riskType, setRiskType] = useState<string>("");
+    const [riskType] = useState<string>("");
     const [costs, setCosts] = useState<number>(0);
-    const [evidence, setEvidence] = useState<string>('');
+    const [evidence] = useState<string>('');
     const [insuranceSum, setInsuranceSum] = useState<number>(0);
     //const [nameRequiredError, setNameRequiredError] = useState<boolean>(false);
-    const [insuranceSumRequiredError, setInsuranceSumRequiredError] = useState<boolean>(false);
-    const [costsRequiredError, setCostsRequiredError] = useState<boolean>(false);
-    const today = dayjs();
+    const [insuranceSumRequiredError] = useState<boolean>(false);
+    const [costsRequiredError] = useState<boolean>(false);
 
     //useEffect(() => {
     //    if (!title && !nameRequiredError) {
