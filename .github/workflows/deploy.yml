@@ -57,6 +57,15 @@ jobs:
           name: build
           path: build
 
+      - name: Check Firebase Token
+        run: |
+          if [ -z "${{ secrets.FIREBASE_TOKEN }}" ]; then
+            echo "🔥 FIREBASE_TOKEN is NOT SET!"
+            exit 1
+          else
+            echo "✅ FIREBASE_TOKEN is set"
+          fi     
+
       - name: Deploy to Firebase
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
