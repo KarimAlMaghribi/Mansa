@@ -9,7 +9,7 @@ import {
   signInWithPopup,
   sendEmailVerification
 } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDocs, collection, query, where } from "firebase/firestore";
 import { auth, db } from "../../firebase_config";
 import { useNavigate } from "react-router-dom";
 
@@ -17,7 +17,7 @@ const helperTexts: Record<string, string> = {
   firstName: "Mindestens 2 Zeichen.",
   lastName: "Mindestens 2 Zeichen.",
   email: "Gültige E-Mail-Adresse erforderlich.",
-  password: "Mindestens 6 Zeichen.",
+  password: "Mindestens 8 Zeichen, Groß- und Kleinbuchstaben, Zahl und Sonderzeichen.",
   birthDate: "Du musst mindestens 18 Jahre alt sein.",
   address: "Mindestens 2 Zeichen.",
   phone: "Nur Ziffern, mind. 7 Stellen.",
@@ -38,7 +38,8 @@ const calculateAge = (birthDate: string): number => {
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const isValidPhone = (phone: string) => /^\+?[0-9]{7,15}$/.test(phone);
-const isValidPassword = (password: string) => password.length >= 6;
+const isValidPassword = (password: string) =>
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/.test(password);
 
 export const RegistrationForm: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -119,6 +120,19 @@ export const RegistrationForm: React.FC = () => {
 
     if (hasError) return;
 
+    // Prüfen, ob der Benutzername bereits existiert
+    const usernameQuery = query(
+      collection(db, "users"),
+      where("username", "==", formData.username)
+    );
+    const usernameSnapshot = await getDocs(usernameQuery);
+    if (!usernameSnapshot.empty) {
+      setError("Benutzername bereits vergeben.");
+      setSnackbarMessage("Benutzername bereits vergeben.");
+      setSnackbarOpen(true);
+      return;
+    }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
@@ -129,6 +143,7 @@ export const RegistrationForm: React.FC = () => {
         createdAt: new Date().toISOString()
       });
       await sendEmailVerification(user);
+      await auth.signOut();
       setSnackbarMessage("Registrierung erfolgreich. Bitte bestätige deine E-Mail-Adresse.");
       setSnackbarOpen(true);
       setTimeout(() => navigate("/verify-email"), 3000);
@@ -139,7 +154,7 @@ export const RegistrationForm: React.FC = () => {
       } else if (err.code === 'auth/invalid-email') {
         friendlyMessage = "Die eingegebene E-Mail-Adresse ist ungültig.";
       } else if (err.code === 'auth/weak-password') {
-        friendlyMessage = "Das Passwort ist zu schwach. Bitte verwende mindestens 6 Zeichen.";
+        friendlyMessage = "Das Passwort ist zu schwach. Es muss mindestens 8 Zeichen sowie Groß- und Kleinbuchstaben, eine Zahl und ein Sonderzeichen enthalten.";
       } else {
         friendlyMessage = err.message;
       }
@@ -156,6 +171,7 @@ export const RegistrationForm: React.FC = () => {
       const user = result.user;
       if (!user.emailVerified) {
         await sendEmailVerification(user);
+        await auth.signOut();
         setSnackbarMessage("Bitte bestätige deine E-Mail-Adresse. Wir haben dir eine E-Mail geschickt.");
         setSnackbarOpen(true);
         return;

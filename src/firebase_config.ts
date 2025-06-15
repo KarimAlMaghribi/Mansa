@@ -3,15 +3,14 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 
-// Dein Firebase Config-Objekt
 const firebaseConfig = {
-  apiKey: "AIzaSyBxna9F7QMNol-kwDzhg5_BRrtKHDUPNQI",
-  authDomain: "mansa-8fa80.firebaseapp.com",
-  projectId: "mansa-8fa80",
-  storageBucket: "mansa-8fa80.appspot.com",
-  messagingSenderId: "378871440542",
-  appId: "1:378871440542:web:21f0b3d374714f727e078f",
-  measurementId: "G-0CNESYXRBS"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialisiere Firebase
