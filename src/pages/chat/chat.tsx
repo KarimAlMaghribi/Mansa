@@ -16,7 +16,7 @@ export const Chat = () => {
 
     useEffect(() => {
         dispatch(fetchMyChats());
-    }, [])
+    }, [dispatch])
 
     return (
         <Container maxWidth={false}>
