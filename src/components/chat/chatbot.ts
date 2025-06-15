@@ -46,13 +46,16 @@ export class Chatbot {
             return;
         }
 
+        const publisherName = risk.publisher?.name || "Unbekannter Anbieter";
+        const riskTypes = Array.isArray(risk.type) ? risk.type.join(', ') : risk.type;
+
         this.basePrompt += "Risiko: {" +
             "Name: " + risk.name + ", " +
             "Beschreibung: " + risk.description + ", " +
-            "Typ: " + risk.type + ", " +
+            "Typ: " + riskTypes + ", " +
             "Wert: " + risk.value + ", " +
             "Veröffentlichungsdatum: " + risk.publishedAt + ", " +
-            "Veröffentlicher: " + risk.publisher + ", " +
+            "Veröffentlicher: " + publisherName + ", " +
             "Ablaufdatum: " + risk.declinationDate + ", " +
             "Erstellt am: " + risk.createdAt + ", " +
             "Aktualisiert am: " + risk.updatedAt + "}; "
