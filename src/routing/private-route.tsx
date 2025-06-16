@@ -42,7 +42,7 @@ export const PrivateRoute = ({ children }: { children: JSX.Element }) => {
     }
 
     if (!user) return <Navigate to={`/${ROUTES.SIGN_IN}`} />;
-    const allowed = [`/${ROUTES.DASHBOARD}`, `/${ROUTES.PROFILE}`, `/${ROUTES.COMPLETE_PROFILE}`];
+    const allowed = [`/${ROUTES.COMPLETE_PROFILE}`];
     if (!profileComplete && !allowed.includes(location.pathname)) {
         return <Navigate to={`/${ROUTES.COMPLETE_PROFILE}`} />;
     }

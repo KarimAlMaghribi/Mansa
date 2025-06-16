@@ -106,26 +106,6 @@ export const CompleteProfile: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    let hasError = false;
-
-    const checks: [keyof typeof formData, () => boolean][] = [
-      ["birthDate", () => calculateAge(formData.birthDate) < 18],
-      ["phone", () => !isValidPhone(formData.phone)],
-      ["username", () => formData.username.trim().length < 3],
-      ["firstName", () => formData.firstName.trim().length < 2],
-      ["lastName", () => formData.lastName.trim().length < 2],
-      ["address", () => formData.address.trim().length < 2],
-      ["gender", () => !formData.gender],
-      ["nationality", () => !formData.nationality],
-      ["language", () => !formData.language]
-    ];
-
-    for (const [key, condition] of checks) {
-      if (condition()) {
-        setFieldErrors(prev => ({ ...prev, [key]: true }));
-        hasError = true;
-      }
-    }
 
     if (!agreed) {
       setSnackbarMessage("Du musst den AGB und der Datenschutzerklärung zustimmen.");
@@ -133,29 +113,43 @@ export const CompleteProfile: React.FC = () => {
       return;
     }
 
-    if (hasError) return;
-
     if (!user) return;
 
-    // Prüfen, ob der Benutzername bereits existiert
-    const usernameQuery = query(
-      collection(db, "userProfiles"),
-      where("profile.username", "==", formData.username),
-      where("uid", "!=", user.uid)
-    );
-    const usernameSnapshot = await getDocs(usernameQuery);
-    if (!usernameSnapshot.empty) {
-      setSnackbarMessage("Benutzername bereits vergeben.");
-      setSnackbarOpen(true);
-      return;
+    const errors: Record<string, boolean> = {};
+    if (formData.birthDate && calculateAge(formData.birthDate) < 18) errors.birthDate = true;
+    if (formData.phone && !isValidPhone(formData.phone)) errors.phone = true;
+    if (formData.username && formData.username.trim().length < 3) errors.username = true;
+    if (formData.firstName && formData.firstName.trim().length < 2) errors.firstName = true;
+    if (formData.lastName && formData.lastName.trim().length < 2) errors.lastName = true;
+    if (formData.address && formData.address.trim().length < 2) errors.address = true;
+    setFieldErrors(prev => ({ ...prev, ...errors }));
+
+    if (Object.keys(errors).length > 0) return;
+
+    if (formData.username) {
+      const usernameQuery = query(
+        collection(db, "userProfiles"),
+        where("profile.username", "==", formData.username),
+        where("uid", "!=", user.uid)
+      );
+      const usernameSnapshot = await getDocs(usernameQuery);
+      if (!usernameSnapshot.empty) {
+        setSnackbarMessage("Benutzername bereits vergeben.");
+        setSnackbarOpen(true);
+        return;
+      }
     }
 
-    await setDoc(doc(db, "userProfiles", user.uid), {
-      id: user.uid,
-      uid: user.uid,
-      profile: formData,
-      createdAt: new Date().toISOString()
-    }, { merge: true });
+    await setDoc(
+      doc(db, "userProfiles", user.uid),
+      {
+        id: user.uid,
+        uid: user.uid,
+        profile: formData,
+        createdAt: new Date().toISOString()
+      },
+      { merge: true }
+    );
 
     navigate("/");
   };
@@ -171,7 +165,7 @@ export const CompleteProfile: React.FC = () => {
               <Grid item xs={12} key={key}>
                 <TextField
                     fullWidth
-                    required={key !== "interests"}
+                    required={false}
                     name={key}
                     label={{
                       firstName: "Vorname",
