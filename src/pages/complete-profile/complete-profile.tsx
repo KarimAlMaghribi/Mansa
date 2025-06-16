@@ -14,7 +14,6 @@ import {
 import { collection, getDocs, query, where, setDoc, doc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase_config";
-import { ROUTES } from "../../routing/routes";
 
 const helperTexts: Record<string, string> = {
   firstName: "Mindestens 2 Zeichen.",
