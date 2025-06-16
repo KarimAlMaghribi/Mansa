@@ -8,10 +8,12 @@ export interface LayoutProps {
 
 export const Layout = (props: LayoutProps) => {
     return (
-        <React.Fragment>
+        <div className="layout">
             <Header/>
+            <main className="main-content">
                 {props.children}
+            </main>
             <Footer />
-        </React.Fragment>
+        </div>
     )
 }
