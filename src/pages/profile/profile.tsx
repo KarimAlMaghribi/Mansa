@@ -85,12 +85,16 @@ export const Profile: React.FC = () => {
       case "firstName":
       case "lastName":
       case "address":
-        fail(trimmed.length < 2); break;
+        if (trimmed) fail(trimmed.length < 2);
+        break;
       case "birthDate":
-        fail(calculateAge(trimmed) < 18); break;
+        if (trimmed) fail(calculateAge(trimmed) < 18);
+        break;
       case "phone":
-        fail(!isValidPhone(trimmed)); break;
+        if (trimmed) fail(!isValidPhone(trimmed));
+        break;
       case "username":
+        if (!trimmed) break;
         if (trimmed.length < 3) {
           fail(true);
           break;
@@ -112,34 +116,23 @@ export const Profile: React.FC = () => {
       case "gender":
       case "nationality":
       case "language":
-        fail(trimmed.length === 0); break;
+        break;
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    let hasError = false;
 
-    const checks: [keyof typeof formData, () => boolean][] = [
-      ["birthDate", () => calculateAge(formData.birthDate) < 18],
-      ["phone", () => !isValidPhone(formData.phone)],
-      ["username", () => formData.username.trim().length < 3],
-      ["firstName", () => formData.firstName.trim().length < 2],
-      ["lastName", () => formData.lastName.trim().length < 2],
-      ["address", () => formData.address.trim().length < 2],
-      ["gender", () => !formData.gender],
-      ["nationality", () => !formData.nationality],
-      ["language", () => !formData.language]
-    ];
+    const errors: Record<string, boolean> = {};
+    if (formData.birthDate && calculateAge(formData.birthDate) < 18) errors.birthDate = true;
+    if (formData.phone && !isValidPhone(formData.phone)) errors.phone = true;
+    if (formData.username && formData.username.trim().length < 3) errors.username = true;
+    if (formData.firstName && formData.firstName.trim().length < 2) errors.firstName = true;
+    if (formData.lastName && formData.lastName.trim().length < 2) errors.lastName = true;
+    if (formData.address && formData.address.trim().length < 2) errors.address = true;
+    setFieldErrors(prev => ({ ...prev, ...errors }));
 
-    for (const [key, condition] of checks) {
-      if (condition()) {
-        setFieldErrors(prev => ({ ...prev, [key]: true }));
-        hasError = true;
-      }
-    }
-
-    if (hasError) return;
+    if (Object.keys(errors).length > 0) return;
     if (!auth.currentUser) return;
 
     const usernameQuery = query(
@@ -179,7 +172,7 @@ export const Profile: React.FC = () => {
           <Grid item xs={12} key={key}>
             <TextField
               fullWidth
-              required={key !== "interests"}
+              required={false}
               name={key}
               label={{
                 firstName: "Vorname",
