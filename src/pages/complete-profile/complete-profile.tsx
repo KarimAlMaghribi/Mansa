@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import { collection, getDocs, query, where, setDoc, doc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { auth, db } from "../../firebase_config";
+import { db } from "../../firebase_config";
 import { useAuth } from "../../context/AuthContext";
 
 const helperTexts: Record<string, string> = {
