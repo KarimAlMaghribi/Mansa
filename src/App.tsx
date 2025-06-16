@@ -3,8 +3,8 @@ import {Navigate, Route, Routes} from "react-router-dom";
 
 import {Landing} from "./pages/landing/landing";
 import {LoginForm} from "./pages/authentication/sign-in";
-import {RegistrationForm} from "./pages/authentication/sign-up";
 import {ForgotPassword} from "./pages/authentication/forgot-password";
+import { CompleteProfile } from "./pages/complete-profile/complete-profile";
 import {RiskOverview} from "./pages/risk-overview/risk-overview";
 import {Layout} from "./components/layout/layout";
 import {Legal} from "./pages/formalities/legal";
@@ -39,9 +39,9 @@ function App() {
             <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path={`/${ROUTES.SIGN_IN}`} element={<LoginForm />} />
-                <Route path={`/${ROUTES.SIGN_UP}`} element={<RegistrationForm />} />
                 <Route path={`/${ROUTES.FORGOT_PASSWORD}`} element={<ForgotPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path={`/${ROUTES.COMPLETE_PROFILE}`} element={<CompleteProfile />} />
 
                 {/* Private routes */}
                 <Route path={`/${ROUTES.DASHBOARD}`} element={<PrivateRoute><Dashboard /></PrivateRoute>} />
