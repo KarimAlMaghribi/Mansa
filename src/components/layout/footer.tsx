@@ -8,7 +8,7 @@ import XIcon from '@mui/icons-material/X';
 export const Footer = () => {
     return (
         <React.Fragment>
-            <Grid container style={{backgroundColor: "#1F271B", padding: "60px 80px 100px 80px"}}>
+            <Grid container style={{backgroundColor: "#1F271B", padding: "60px 80px 100px 80px", position: "fixed", bottom: 0, left: 0, width: "100%"}}>
                 <Grid size={2}>
                     <img src={Logo} style={{width: "60px", height: "50px"}} alt="logo"/>
                 </Grid>
