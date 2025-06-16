@@ -105,18 +105,7 @@ export const QuickMenuButtons = (props: AuthenticationButtonsProps) => {
                                 Log In
                             </Button>
                         </Grid>
-                        <Grid size={6}>
-                            <Button
-                                onClick={() => navigate(ROUTES.SIGN_UP)}
-                                variant="contained"
-                                style={{
-                                    minWidth: "100px",
-                                    visibility: location.pathname === `/${ROUTES.SIGN_UP}` ? "hidden" : "visible"
-                                }}
-                                endIcon={<East/>}>
-                                Registrieren
-                            </Button>
-                        </Grid>
+                        {/* Registration removed */}
                     </Grid>
                 )
             }
