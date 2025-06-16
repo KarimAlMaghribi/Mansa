@@ -14,6 +14,7 @@ import {
 import { collection, getDocs, query, where, setDoc, doc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase_config";
+import { useAuth } from "../../context/AuthContext";
 
 const helperTexts: Record<string, string> = {
   firstName: "Mindestens 2 Zeichen.",
@@ -21,7 +22,7 @@ const helperTexts: Record<string, string> = {
   birthDate: "Du musst mindestens 18 Jahre alt sein.",
   address: "Mindestens 2 Zeichen.",
   phone: "Nur Ziffern, mind. 7 Stellen.",
-  username: "Mindestens 3 Zeichen.",
+  username: "Mindestens 3 Zeichen. Benutzername muss einzigartig sein.",
   gender: "Bitte auswählen.",
   nationality: "Bitte auswählen.",
   language: "Bitte auswählen."
@@ -56,6 +57,7 @@ export const CompleteProfile: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const handleSnackbarClose = () => setSnackbarOpen(false);
 
@@ -64,7 +66,7 @@ export const CompleteProfile: React.FC = () => {
     setFieldErrors({ ...fieldErrors, [e.target.name]: false });
   };
 
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleBlur = async (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     const trimmed = value.trim();
     const fail = (condition: boolean) => condition && setFieldErrors(prev => ({ ...prev, [name]: true }));
@@ -79,7 +81,22 @@ export const CompleteProfile: React.FC = () => {
       case "phone":
         fail(!isValidPhone(trimmed)); break;
       case "username":
-        fail(trimmed.length < 3); break;
+        if (trimmed.length < 3) {
+          fail(true);
+          break;
+        }
+        const q = query(
+          collection(db, "userProfiles"),
+          where("profile.username", "==", trimmed),
+          where("uid", "!=", user?.uid || "")
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          setFieldErrors(prev => ({ ...prev, [name]: true }));
+          setSnackbarMessage("Benutzername bereits vergeben.");
+          setSnackbarOpen(true);
+        }
+        break;
       case "gender":
       case "nationality":
       case "language":
@@ -118,12 +135,13 @@ export const CompleteProfile: React.FC = () => {
 
     if (hasError) return;
 
-    if (!auth.currentUser) return;
+    if (!user) return;
 
     // Prüfen, ob der Benutzername bereits existiert
     const usernameQuery = query(
       collection(db, "userProfiles"),
-      where("profile.username", "==", formData.username)
+      where("profile.username", "==", formData.username),
+      where("uid", "!=", user.uid)
     );
     const usernameSnapshot = await getDocs(usernameQuery);
     if (!usernameSnapshot.empty) {
@@ -132,9 +150,9 @@ export const CompleteProfile: React.FC = () => {
       return;
     }
 
-    await setDoc(doc(db, "userProfiles", auth.currentUser.uid), {
-      id: auth.currentUser.uid,
-      uid: auth.currentUser.uid,
+    await setDoc(doc(db, "userProfiles", user.uid), {
+      id: user.uid,
+      uid: user.uid,
       profile: formData,
       createdAt: new Date().toISOString()
     }, { merge: true });

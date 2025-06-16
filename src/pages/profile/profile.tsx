@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import { doc, getDoc, setDoc, query, collection, where, getDocs } from "firebase/firestore";
 import { auth, db } from "../../firebase_config";
+import { useAuth } from "../../context/AuthContext";
 
 const helperTexts: Record<string, string> = {
   firstName: "Mindestens 2 Zeichen.",
@@ -18,7 +19,7 @@ const helperTexts: Record<string, string> = {
   birthDate: "Du musst mindestens 18 Jahre alt sein.",
   address: "Mindestens 2 Zeichen.",
   phone: "Nur Ziffern, mind. 7 Stellen.",
-  username: "Mindestens 3 Zeichen.",
+  username: "Mindestens 3 Zeichen. Benutzername muss einzigartig sein.",
   gender: "Bitte auswählen.",
   nationality: "Bitte auswählen.",
   language: "Bitte auswählen."
@@ -51,19 +52,22 @@ export const Profile: React.FC = () => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!auth.currentUser) return;
-      const docRef = doc(db, "userProfiles", auth.currentUser.uid);
+      if (!user) return;
+      const docRef = doc(db, "userProfiles", user.uid);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const data = docSnap.data().profile || {};
         setFormData(prev => ({ ...prev, ...data }));
       }
     };
-    fetchProfile();
-  }, []);
+    if (user) {
+      fetchProfile();
+    }
+  }, [user]);
 
   const handleSnackbarClose = () => setSnackbarOpen(false);
 
@@ -72,7 +76,7 @@ export const Profile: React.FC = () => {
     setFieldErrors({ ...fieldErrors, [e.target.name]: false });
   };
 
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleBlur = async (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     const trimmed = value.trim();
     const fail = (condition: boolean) => condition && setFieldErrors(prev => ({ ...prev, [name]: true }));
@@ -87,7 +91,24 @@ export const Profile: React.FC = () => {
       case "phone":
         fail(!isValidPhone(trimmed)); break;
       case "username":
-        fail(trimmed.length < 3); break;
+        if (trimmed.length < 3) {
+          fail(true);
+          break;
+        }
+        if (user) {
+          const q = query(
+            collection(db, "userProfiles"),
+            where("profile.username", "==", trimmed),
+            where("uid", "!=", user.uid)
+          );
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            setFieldErrors(prev => ({ ...prev, [name]: true }));
+            setSnackbarMessage("Benutzername bereits vergeben.");
+            setSnackbarOpen(true);
+          }
+        }
+        break;
       case "gender":
       case "nationality":
       case "language":
