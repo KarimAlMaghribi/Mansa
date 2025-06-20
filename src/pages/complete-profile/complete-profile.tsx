@@ -11,6 +11,11 @@ import {
   Snackbar,
   Alert
 } from "@mui/material";
+import Avatar from "@mui/material/Avatar";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "../../store/store";
+import { saveProfileImage, removeProfileImage } from "../../store/slices/user-profile";
+import { uploadProfileImage, deleteProfileImage } from "../../firebase/firebase-service";
 import { collection, getDocs, query, where, setDoc, doc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../firebase_config";
@@ -50,14 +55,18 @@ export const CompleteProfile: React.FC = () => {
     phone: "",
     username: "",
     language: "",
-    interests: ""
+    interests: "",
+    image: ""
   });
   const [agreed, setAgreed] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
   const navigate = useNavigate();
   const { user } = useAuth();
+  const dispatch: AppDispatch = useDispatch();
 
   const handleSnackbarClose = () => setSnackbarOpen(false);
 
@@ -104,6 +113,31 @@ export const CompleteProfile: React.FC = () => {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+      setSnackbarMessage('Nur PNG oder JPG erlaubt.');
+      setSnackbarOpen(true);
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setSnackbarMessage('Die Datei darf maximal 5 MB groß sein.');
+      setSnackbarOpen(true);
+      return;
+    }
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleDeleteImage = async () => {
+    if (!user) return;
+    await deleteProfileImage(user.uid);
+    dispatch(removeProfileImage());
+    setSelectedFile(null);
+    setPreviewUrl('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -140,12 +174,21 @@ export const CompleteProfile: React.FC = () => {
       }
     }
 
+    let imageUrl = previewUrl;
+    if (selectedFile && user) {
+      const uploaded = await uploadProfileImage(user.uid, selectedFile);
+      if (uploaded) {
+        imageUrl = uploaded;
+        dispatch(saveProfileImage(uploaded));
+      }
+    }
+
     await setDoc(
       doc(db, "userProfiles", user.uid),
       {
         id: user.uid,
         uid: user.uid,
-        profile: formData,
+        profile: { ...formData, image: imageUrl },
         createdAt: new Date().toISOString()
       },
       { merge: true }
@@ -161,7 +204,9 @@ export const CompleteProfile: React.FC = () => {
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3, px: 2, maxWidth: 600, mx: "auto" }}>
         <Typography variant="h5" gutterBottom>Profil vervollständigen</Typography>
         <Grid container spacing={2}>
-          {Object.entries(formData).map(([key, value]) => (
+          {Object.entries(formData)
+            .filter(([key]) => key !== "image")
+            .map(([key, value]) => (
               <Grid item xs={12} key={key}>
                 <TextField
                     fullWidth
@@ -209,6 +254,18 @@ export const CompleteProfile: React.FC = () => {
                 </TextField>
               </Grid>
           ))}
+          <Grid item xs={12}>
+            <Box display="flex" alignItems="center" gap={2}>
+              {previewUrl && <Avatar src={previewUrl} />}
+              <Button variant="outlined" component="label">
+                Bild wählen
+                <input hidden type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleFileChange} />
+              </Button>
+              {previewUrl && (
+                <Button color="error" onClick={handleDeleteImage}>Bild löschen</Button>
+              )}
+            </Box>
+          </Grid>
           <Grid item xs={12}>
             <FormControlLabel
                 control={<Checkbox checked={agreed} onChange={() => setAgreed(!agreed)} />}

@@ -15,7 +15,7 @@ import * as React from "react";
 import {useLocation, useNavigate} from "react-router-dom";
 import {Divider, Fade, ListItemIcon} from "@mui/material";
 import {auth} from "../../../firebase_config";
-import {selectName} from "../../../store/slices/user-profile";
+import {selectName, selectImage} from "../../../store/slices/user-profile";
 import {useSelector} from "react-redux";
 
 export interface AuthenticationButtonsProps {
@@ -29,6 +29,7 @@ export const QuickMenuButtons = (props: AuthenticationButtonsProps) => {
     const location = useLocation();
     const navigate = useNavigate();
     const userName: string = useSelector(selectName);
+    const imageUrl: string | undefined = useSelector(selectImage);
 
     return (
         <>
@@ -37,7 +38,7 @@ export const QuickMenuButtons = (props: AuthenticationButtonsProps) => {
                     <Box sx={{flexGrow: 0}}>
                         {/*<NotificationButton />*/}
                         <IconButton onClick={props.handleOpenUserMenu} sx={{p: 0}}>
-                            <Avatar src=""/>
+                            <Avatar src={imageUrl || ''}/>
                         </IconButton>
                         <Menu
                             sx={{mt: '45px'}}
