@@ -1,6 +1,6 @@
 import {createAsyncThunk, createSlice} from "@reduxjs/toolkit";
 import {auth, db} from "../../firebase_config";
-import {addDoc, collection, getDocs, query, updateDoc, where} from "firebase/firestore";
+import {addDoc, collection, getDocs, query, updateDoc, where, deleteField} from "firebase/firestore";
 import {FetchStatus} from "../../types/FetchStatus";
 import {FetchStatusEnum} from "../../enums/FetchStatus.enum";
 import {FirestoreCollectionEnum} from "../../enums/FirestoreCollectionEnum";
@@ -9,6 +9,8 @@ enum ActionTypes {
     FETCH_PROFILE = "userProfile/fetchProfile",
     ADD_PROFILE = "userProfile/addProfile",
     UPDATE_PROFILE = "userProfile/updateProfile",
+    SAVE_IMAGE = "userProfile/saveImage",
+    REMOVE_IMAGE = "userProfile/removeImage",
 }
 
 export interface Address {
@@ -153,6 +155,72 @@ export const updateProfile = createAsyncThunk(
     }
 );
 
+export const saveProfileImage = createAsyncThunk(
+    ActionTypes.SAVE_IMAGE,
+    async (url: string, {rejectWithValue}) => {
+        try {
+            const user = auth.currentUser;
+
+            if (!user) {
+                return rejectWithValue("User not authenticated");
+            }
+
+            const userProfilesCollection = collection(db, FirestoreCollectionEnum.USER_PROFILES);
+            const userProfileQuery = query(userProfilesCollection, where("uid", "==", user.uid));
+
+            const userProfileDocs = await getDocs(userProfileQuery);
+
+            if (userProfileDocs.empty) {
+                return rejectWithValue("Profile not found");
+            }
+
+            const userProfileDocRef = userProfileDocs.docs[0].ref;
+            await updateDoc(userProfileDocRef, {
+                "profile.image": url,
+                updatedAt: new Date().toISOString()
+            });
+
+            return url;
+        } catch (error) {
+            console.error("Error saving profile image:", error);
+            return rejectWithValue(error as string);
+        }
+    }
+);
+
+export const removeProfileImage = createAsyncThunk(
+    ActionTypes.REMOVE_IMAGE,
+    async (_, {rejectWithValue}) => {
+        try {
+            const user = auth.currentUser;
+
+            if (!user) {
+                return rejectWithValue("User not authenticated");
+            }
+
+            const userProfilesCollection = collection(db, FirestoreCollectionEnum.USER_PROFILES);
+            const userProfileQuery = query(userProfilesCollection, where("uid", "==", user.uid));
+
+            const userProfileDocs = await getDocs(userProfileQuery);
+
+            if (userProfileDocs.empty) {
+                return rejectWithValue("Profile not found");
+            }
+
+            const userProfileDocRef = userProfileDocs.docs[0].ref;
+            await updateDoc(userProfileDocRef, {
+                "profile.image": deleteField(),
+                updatedAt: new Date().toISOString()
+            });
+
+            return true;
+        } catch (error) {
+            console.error("Error removing profile image:", error);
+            return rejectWithValue(error as string);
+        }
+    }
+);
+
 export const userProfileSlice = createSlice({
         name: "userProfile",
         initialState: initialState,
@@ -206,6 +274,32 @@ export const userProfileSlice = createSlice({
                     state.error = action.payload as string;
                     state.status = FetchStatusEnum.FAILED;
                 })
+                .addCase(saveProfileImage.pending, (state) => {
+                    state.status = FetchStatusEnum.PENDING;
+                    state.error = undefined;
+                })
+                .addCase(saveProfileImage.fulfilled, (state, action) => {
+                    state.profile.image = action.payload;
+                    state.updatedAt = new Date().toISOString();
+                    state.status = FetchStatusEnum.SUCCEEDED;
+                })
+                .addCase(saveProfileImage.rejected, (state, action) => {
+                    state.error = action.payload as string;
+                    state.status = FetchStatusEnum.FAILED;
+                })
+                .addCase(removeProfileImage.pending, (state) => {
+                    state.status = FetchStatusEnum.PENDING;
+                    state.error = undefined;
+                })
+                .addCase(removeProfileImage.fulfilled, (state) => {
+                    state.profile.image = undefined;
+                    state.updatedAt = new Date().toISOString();
+                    state.status = FetchStatusEnum.SUCCEEDED;
+                })
+                .addCase(removeProfileImage.rejected, (state, action) => {
+                    state.error = action.payload as string;
+                    state.status = FetchStatusEnum.FAILED;
+                })
         }
     }
 );
@@ -215,5 +309,6 @@ export const selectMail = (state: { userProfile: UserProfile }) => state?.userPr
 export const selectStatus = (state: { userProfile: UserProfile }) => state?.userProfile?.status;
 export const selectUserProfile = (state: { userProfile: UserProfile }) => state?.userProfile;
 export const selectProfileInformation = (state: { userProfile: UserProfile }) => state.userProfile.profile;
+export const selectImage = (state: { userProfile: UserProfile }) => state?.userProfile?.profile?.image;
 
 export default userProfileSlice.reducer;

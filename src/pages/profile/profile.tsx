@@ -9,6 +9,11 @@ import {
   Snackbar,
   Alert
 } from "@mui/material";
+import Avatar from "@mui/material/Avatar";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "../../store/store";
+import { saveProfileImage, removeProfileImage } from "../../store/slices/user-profile";
+import { uploadProfileImage, deleteProfileImage } from "../../firebase/firebase-service";
 import { doc, getDoc, setDoc, query, collection, where, getDocs } from "firebase/firestore";
 import { auth, db } from "../../firebase_config";
 import { useAuth } from "../../context/AuthContext";
@@ -47,12 +52,16 @@ export const Profile: React.FC = () => {
     phone: "",
     username: "",
     language: "",
-    interests: ""
+    interests: "",
+    image: ""
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
   const { user } = useAuth();
+  const dispatch: AppDispatch = useDispatch();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -62,6 +71,9 @@ export const Profile: React.FC = () => {
       if (docSnap.exists()) {
         const data = docSnap.data().profile || {};
         setFormData(prev => ({ ...prev, ...data }));
+        if (data.image) {
+          setPreviewUrl(data.image);
+        }
       }
     };
     if (user) {
@@ -120,6 +132,31 @@ export const Profile: React.FC = () => {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+      setSnackbarMessage('Nur PNG oder JPG erlaubt.');
+      setSnackbarOpen(true);
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setSnackbarMessage('Die Datei darf maximal 5 MB groß sein.');
+      setSnackbarOpen(true);
+      return;
+    }
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleDeleteImage = async () => {
+    if (!user) return;
+    await deleteProfileImage(user.uid);
+    dispatch(removeProfileImage());
+    setSelectedFile(null);
+    setPreviewUrl('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -147,12 +184,21 @@ export const Profile: React.FC = () => {
       return;
     }
 
+    let imageUrl = previewUrl;
+    if (selectedFile && user) {
+      const uploaded = await uploadProfileImage(user.uid, selectedFile);
+      if (uploaded) {
+        imageUrl = uploaded;
+        dispatch(saveProfileImage(uploaded));
+      }
+    }
+
     await setDoc(
       doc(db, "userProfiles", auth.currentUser.uid),
       {
         id: auth.currentUser.uid,
         uid: auth.currentUser.uid,
-        profile: formData,
+        profile: { ...formData, image: imageUrl },
         updatedAt: new Date().toISOString()
       },
       { merge: true }
@@ -168,7 +214,9 @@ export const Profile: React.FC = () => {
     <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3, px: 2, maxWidth: 600, mx: "auto" }}>
       <Typography variant="h5" gutterBottom>Profil bearbeiten</Typography>
       <Grid container spacing={2}>
-        {Object.entries(formData).map(([key, value]) => (
+        {Object.entries(formData)
+          .filter(([key]) => key !== "image")
+          .map(([key, value]) => (
           <Grid item xs={12} key={key}>
             <TextField
               fullWidth
@@ -216,6 +264,18 @@ export const Profile: React.FC = () => {
             </TextField>
           </Grid>
         ))}
+        <Grid item xs={12}>
+          <Box display="flex" alignItems="center" gap={2}>
+            {previewUrl && <Avatar src={previewUrl} />}
+            <Button variant="outlined" component="label">
+              Bild wählen
+              <input hidden type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleFileChange} />
+            </Button>
+            {previewUrl && (
+              <Button color="error" onClick={handleDeleteImage}>Bild löschen</Button>
+            )}
+          </Box>
+        </Grid>
       </Grid>
       <Button type="submit" variant="contained" color="primary" sx={{ mt: 2 }}>
         Speichern

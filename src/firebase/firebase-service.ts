@@ -1,4 +1,4 @@
-import { auth, googleAuthProvider } from '../firebase_config';
+import { auth, googleAuthProvider, storage } from '../firebase_config';
 import {
     signInWithPopup,
     signOut,
@@ -6,6 +6,7 @@ import {
     signInWithEmailAndPassword,
 
 } from "firebase/auth";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 export const signInWithGoogle = async () => {
     try {
@@ -50,5 +51,28 @@ export const signInWithEmail = async (email: string, password: string) => {
     } catch (error) {
         console.error(error);
         return null;
+    }
+};
+
+export const uploadProfileImage = async (uid: string, file: File): Promise<string | null> => {
+    try {
+        const imageRef = ref(storage, `profile_images/${uid}`);
+        await uploadBytes(imageRef, file);
+        const url = await getDownloadURL(imageRef);
+        return url;
+    } catch (error) {
+        console.error('Error uploading profile image:', error);
+        return null;
+    }
+};
+
+export const deleteProfileImage = async (uid: string): Promise<boolean> => {
+    try {
+        const imageRef = ref(storage, `profile_images/${uid}`);
+        await deleteObject(imageRef);
+        return true;
+    } catch (error) {
+        console.error('Error deleting profile image:', error);
+        return false;
     }
 };
