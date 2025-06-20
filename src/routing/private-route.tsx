@@ -5,6 +5,7 @@
  * logic to enforce protected routes.
  */
 
+
 export const PrivateRoute = ({ children }: { children: JSX.Element }) => {
     return children;
 };
