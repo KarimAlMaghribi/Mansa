@@ -20,3 +20,16 @@ FIREBASE_TOKEN=YOUR_TOKEN_HERE
 ```
 
 The token must not be committed to the repository.
+
+## Backend (Spring Boot)
+
+A simple Spring Boot backend lives in the `backend` directory. It exposes a demo endpoint at `/api/hello` returning a greeting string.
+
+To start the backend locally:
+
+```bash
+cd backend
+./mvnw spring-boot:run
+```
+
+The frontend component at `/hello-backend` fetches this endpoint from `http://localhost:8080`.

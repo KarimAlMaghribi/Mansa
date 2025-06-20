@@ -26,4 +26,6 @@ export const ROUTES = {
     ONBOARDING: 'onboarding',
     COMPLETE_PROFILE: 'complete-profile',
 
+    HELLO_BACKEND: 'hello-backend',
+
 };
