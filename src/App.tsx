@@ -32,6 +32,7 @@ import {Reports} from "./pages/reports/reports";
 import {Members} from "./pages/memebers/members";
 import {Onboarding} from "./pages/onboarding/onboarding";
 import {VerifyEmail} from "./pages/authentication/verifyEmail";
+import {HelloBackend} from "./pages/hello-backend/hello-backend";
 
 function App() {
     return (
@@ -68,6 +69,7 @@ function App() {
                 <Route path={`/${ROUTES.LEGAL}`} element={<Legal />} />
                 <Route path={`/${ROUTES.PRIVACY}`} element={<Privacy />} />
                 <Route path={`/${ROUTES.IMPRINT}`} element={<Imprint />} />
+                <Route path={`/${ROUTES.HELLO_BACKEND}`} element={<HelloBackend />} />
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" />} />
