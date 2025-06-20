@@ -112,13 +112,9 @@ export const Profile: React.FC = () => {
           break;
         }
         if (user) {
-          const q = query(
-            collection(db, "userProfiles"),
-            where("profile.username", "==", trimmed),
-            where("uid", "!=", user.uid)
-          );
-          const snap = await getDocs(q);
-          if (!snap.empty) {
+          const resp = await fetch(`http://localhost:8080/api/userProfiles/check?username=${encodeURIComponent(trimmed)}`);
+          const available = await resp.json();
+          if (!available) {
             setFieldErrors(prev => ({ ...prev, [name]: true }));
             setSnackbarMessage("Benutzername bereits vergeben.");
             setSnackbarOpen(true);
@@ -203,6 +199,17 @@ export const Profile: React.FC = () => {
       },
       { merge: true }
     );
+
+    const resp = await fetch(`http://localhost:8080/api/userProfiles/uid/${auth.currentUser.uid}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: auth.currentUser.uid, ...formData })
+    });
+    if (!resp.ok) {
+      setSnackbarMessage("Benutzername bereits vergeben.");
+      setSnackbarOpen(true);
+      return;
+    }
     setSnackbarMessage("Profil aktualisiert.");
     setSnackbarOpen(true);
   };
