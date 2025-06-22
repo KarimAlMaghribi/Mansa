@@ -23,13 +23,11 @@
   </properties>
 
   <dependencies>
-    <!-- Spring Web -->
+    <!-- Spring Web & JPA -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
-
-    <!-- Spring Data JPA -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -41,11 +39,11 @@
       <artifactId>mysql-connector-j</artifactId>
     </dependency>
 
-    <!-- Cloud SQL Socket Factory for MySQL -->
+    <!-- Cloud SQL Socket Factory for MySQL Connector/J 8.x -->
     <dependency>
       <groupId>com.google.cloud.sql</groupId>
-      <artifactId>mysql-socket-factory</artifactId>
-      <version>1.10.4</version>
+      <artifactId>mysql-socket-factory-connector-j-8</artifactId>
+      <version>1.25.1</version>
     </dependency>
 
     <!-- Testing -->
@@ -71,6 +69,5 @@
       </plugin>
     </plugins>
   </build>
-
 
 </project>
