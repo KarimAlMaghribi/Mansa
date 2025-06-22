@@ -74,7 +74,7 @@ export const Groups = () => {
                       <CardContent>
                         <Box display="flex" justifyContent="space-between" alignItems="center">
                           <Typography variant="h6">{group.name}</Typography>
-                          {group.type === 'public' ? (
+                          {group.isPublic ? (
                               <Tooltip title="Öffentliche Jamiah"><PublicIcon fontSize="small" /></Tooltip>
                           ) : (
                               <Tooltip title="Private Jamiah"><LockIcon fontSize="small" /></Tooltip>
