@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography } from '@mui/material';
+import { API_BASE_URL } from '../../constants/api';
 
 export const HelloBackend = () => {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/hello')
+    fetch(`${API_BASE_URL}/api/hello`)
       .then(res => res.text())
       .then(setMessage)
       .catch(() => setMessage('Backend request failed'));

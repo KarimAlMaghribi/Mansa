@@ -18,6 +18,7 @@ import { saveProfileImage, removeProfileImage } from "../../store/slices/user-pr
 import { uploadProfileImage, deleteProfileImage } from "../../firebase/firebase-service";
 import { collection, getDocs, query, where, setDoc, doc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../../constants/api";
 import { db } from "../../firebase_config";
 import { useAuth } from "../../context/AuthContext";
 
@@ -94,7 +95,7 @@ export const CompleteProfile: React.FC = () => {
           fail(true);
           break;
         }
-        const resp = await fetch(`http://localhost:8080/api/userProfiles/check?username=${encodeURIComponent(trimmed)}`);
+        const resp = await fetch(`${API_BASE_URL}/api/userProfiles/check?username=${encodeURIComponent(trimmed)}`);
         const available = await resp.json();
         if (!available) {
           setFieldErrors(prev => ({ ...prev, [name]: true }));
@@ -190,7 +191,7 @@ export const CompleteProfile: React.FC = () => {
       { merge: true }
     );
 
-    const resp = await fetch("http://localhost:8080/api/userProfiles", {
+    const resp = await fetch(`${API_BASE_URL}/api/userProfiles`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ uid: user.uid, ...formData })
