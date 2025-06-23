@@ -24,6 +24,7 @@ import KeyIcon from '@mui/icons-material/VpnKey';
 import PublicIcon from '@mui/icons-material/Public';
 import LockIcon from '@mui/icons-material/Lock';
 import { Jamiah } from '../../models/Jamiah';
+import { API_BASE_URL } from '../../constants/api';
 
 export const Groups = () => {
   const [groups, setGroups] = useState<Jamiah[]>([]);
@@ -34,7 +35,7 @@ export const Groups = () => {
   const [newGroup, setNewGroup] = useState<Partial<Jamiah>>({ name: '', monthlyContribution: undefined, isPublic: false });
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/jamiahs')
+    fetch(`${API_BASE_URL}/api/jamiahs`)
       .then(res => res.json())
       .then(setGroups)
       .catch(() => setGroups([]));
@@ -137,7 +138,7 @@ export const Groups = () => {
                 <Button onClick={handleCloseModal}>Abbrechen</Button>
                 <Button
                   onClick={() => {
-                    fetch(`http://localhost:8080/api/jamiahs/${selectedGroup.id}`, {
+                    fetch(`${API_BASE_URL}/api/jamiahs/${selectedGroup.id}`, {
                       method: 'PUT',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify(selectedGroup)
@@ -186,7 +187,7 @@ export const Groups = () => {
             <Button onClick={() => setOpenCreateModal(false)}>Abbrechen</Button>
             <Button
               onClick={() => {
-                fetch('http://localhost:8080/api/jamiahs', {
+                fetch(`${API_BASE_URL}/api/jamiahs`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(newGroup)

@@ -17,6 +17,7 @@ import { uploadProfileImage, deleteProfileImage } from "../../firebase/firebase-
 import { doc, getDoc, setDoc, query, collection, where, getDocs } from "firebase/firestore";
 import { auth, db } from "../../firebase_config";
 import { useAuth } from "../../context/AuthContext";
+import { API_BASE_URL } from "../../constants/api";
 
 const helperTexts: Record<string, string> = {
   firstName: "Mindestens 2 Zeichen.",
@@ -112,7 +113,7 @@ export const Profile: React.FC = () => {
           break;
         }
         if (user) {
-          const resp = await fetch(`http://localhost:8080/api/userProfiles/check?username=${encodeURIComponent(trimmed)}`);
+          const resp = await fetch(`${API_BASE_URL}/api/userProfiles/check?username=${encodeURIComponent(trimmed)}`);
           const available = await resp.json();
           if (!available) {
             setFieldErrors(prev => ({ ...prev, [name]: true }));
@@ -200,7 +201,7 @@ export const Profile: React.FC = () => {
       { merge: true }
     );
 
-    const resp = await fetch(`http://localhost:8080/api/userProfiles/uid/${auth.currentUser.uid}`, {
+    const resp = await fetch(`${API_BASE_URL}/api/userProfiles/uid/${auth.currentUser.uid}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ uid: auth.currentUser.uid, ...formData })
