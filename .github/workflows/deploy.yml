@@ -92,12 +92,14 @@ jobs:
           docker push gcr.io/${{ secrets.GCP_PROJECT }}/mansa-backend:latest
 
       - name: Deploy to Cloud Run with Cloud SQL Proxy
-        run: |
-          gcloud run deploy mansa-backend \
-            --image=gcr.io/${{ secrets.GCP_PROJECT }}/mansa-backend:latest \
-            --region=europe-west3 \
-            --platform=managed \
-            --allow-unauthenticated \
-            --update-env-vars=SPRING_DATASOURCE_URL="jdbc:mysql://google/mansa?cloudSqlInstance=${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db&socketFactory=com.google.cloud.sql.mysql.SocketFactory&useSSL=false" \
-            --update-secrets=SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest \
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: mansa-backend
+          region: europe-west3
+          image: gcr.io/${{ secrets.GCP_PROJECT }}/mansa-backend:latest
+          flags: >-
+            --platform=managed
+            --allow-unauthenticated
+            --update-env-vars=SPRING_DATASOURCE_URL="jdbc:mysql://google/mansa?cloudSqlInstance=${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db&socketFactory=com.google.cloud.sql.mysql.SocketFactory&useSSL=false"
+            --update-secrets=SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest
             --add-cloudsql-instances=${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db
