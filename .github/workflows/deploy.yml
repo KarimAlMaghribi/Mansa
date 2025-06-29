@@ -106,4 +106,4 @@ jobs:
           flags: |
             --platform=managed
             --allow-unauthenticated
-            --add-cloudsql-instances=${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db
+            --add-cloudsql-instances=${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db 
