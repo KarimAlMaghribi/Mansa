@@ -99,7 +99,7 @@ jobs:
           image: gcr.io/${{ secrets.GCP_PROJECT }}/mansa-backend:latest
           project_id: ${{ secrets.GCP_PROJECT }}
           env_vars: |
-            SPRING_DATASOURCE_URL="jdbc:mysql://google/mansa?cloudSqlInstance=${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db&socketFactory=com.google.cloud.sql.mysql.SocketFactory&useSSL=false"
+            SPRING_DATASOURCE_URL="jdbc:mysql:///mansa?cloudSqlInstance=${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db&socketFactory=com.google.cloud.sql.mysql.SocketFactory&useSSL=false"
           secrets: |
             SPRING_DATASOURCE_USERNAME=spring-datasource-username:latest
             SPRING_DATASOURCE_PASSWORD=spring-datasource-password:latest
