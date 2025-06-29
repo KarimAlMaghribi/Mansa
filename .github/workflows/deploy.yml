@@ -65,7 +65,7 @@ jobs:
           export_default_credentials: true
 
       - name: Configure Docker for GCR
-        run: gcloud auth configure-docker --quiet
+        run: gcloud auth configure-docker gcr.io --quiet
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
