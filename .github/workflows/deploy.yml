@@ -97,9 +97,12 @@ jobs:
           service: mansa-backend
           region: europe-west3
           image: gcr.io/${{ secrets.GCP_PROJECT }}/mansa-backend:latest
-          flags: >-
-            --platform=managed
-            --allow-unauthenticated
-            --update-env-vars=SPRING_DATASOURCE_URL="jdbc:mysql://google/mansa?cloudSqlInstance=${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db&socketFactory=com.google.cloud.sql.mysql.SocketFactory&useSSL=false"
-            --update-secrets=SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest
-            --add-cloudsql-instances=${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db
+          project_id: ${{ secrets.GCP_PROJECT }}
+          platform: managed
+          allow_unauthenticated: true
+          env_vars: |
+            SPRING_DATASOURCE_URL="jdbc:mysql://google/mansa?cloudSqlInstance=${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db&socketFactory=com.google.cloud.sql.mysql.SocketFactory&useSSL=false"
+          secrets: |
+            SPRING_DATASOURCE_USERNAME=projects/${{ secrets.GCP_PROJECT }}/secrets/SPRING_DATASOURCE_USERNAME:latest,
+            SPRING_DATASOURCE_PASSWORD=projects/${{ secrets.GCP_PROJECT }}/secrets/SPRING_DATASOURCE_PASSWORD:latest
+          cloudsql_instances: ${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db
