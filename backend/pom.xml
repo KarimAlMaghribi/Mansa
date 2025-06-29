@@ -24,7 +24,6 @@
 
   <dependencyManagement>
     <dependencies>
-      <!-- aktuelles Spring Cloud GCP BOM für Spring Boot 3.3.x -->
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>spring-cloud-gcp-dependencies</artifactId>
@@ -36,7 +35,6 @@
   </dependencyManagement>
 
   <dependencies>
-    <!-- Spring Web & JPA -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
@@ -46,14 +44,12 @@
       <artifactId>spring-boot-starter-data-jpa</artifactId>
     </dependency>
 
-    <!-- Cloud SQL MySQL Starter (enthält Connector und Driver transitiv) -->
     <dependency>
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-gcp-starter-sql-mysql</artifactId>
       <version>1.2.8.RELEASE</version>
     </dependency>
 
-    <!-- Testing -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
