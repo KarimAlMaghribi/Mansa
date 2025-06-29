@@ -22,6 +22,19 @@
     <java.version>17</java.version>
   </properties>
 
+  <dependencyManagement>
+    <dependencies>
+      <!-- Spring Cloud GCP BOM (passt zu Spring Boot 3.3.x) -->
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>spring-cloud-gcp-dependencies</artifactId>
+        <version>5.0.2</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <dependencies>
     <!-- Spring Web & JPA -->
     <dependency>
