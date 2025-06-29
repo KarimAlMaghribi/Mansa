@@ -65,7 +65,7 @@ jobs:
       - name: Set up gcloud SDK
         uses: google-github-actions/setup-gcloud@v1
         with:
-          project_id:        ${{ secrets.GCP_PROJECT }}
+          project_id: ${{ secrets.GCP_PROJECT }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -86,7 +86,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-
       - name: Push backend to GCR
         run: |
           docker push gcr.io/${{ secrets.GCP_PROJECT }}/mansa-backend:latest
@@ -96,9 +95,10 @@ jobs:
         with:
           service: mansa-backend
           region: europe-west3
-          image: gcr.io/${{ secrets.GCP_PROJECT }}/mansa-backend:latest
           project_id: ${{ secrets.GCP_PROJECT }}
+          image: gcr.io/${{ secrets.GCP_PROJECT }}/mansa-backend:latest
           env_vars: |
+            # ohne Anführungszeichen, damit die URL korrekt geparst wird
             SPRING_DATASOURCE_URL=jdbc:mysql:///mansa?cloudSqlInstance=${{ secrets.GCP_PROJECT }}:europe-west3:mansa-db&socketFactory=com.google.cloud.sql.mysql.SocketFactory&useSSL=false
           secrets: |
             SPRING_DATASOURCE_USERNAME=spring-datasource-username:latest
