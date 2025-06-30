@@ -1,5 +1,6 @@
 package com.example.backend.jamiah;
 
+import com.example.backend.jamiah.dto.JamiahDto;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
