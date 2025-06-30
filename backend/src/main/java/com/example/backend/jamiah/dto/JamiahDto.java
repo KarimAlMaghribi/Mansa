@@ -1,23 +1,19 @@
-package com.example.backend.jamiah;
+package com.example.backend.jamiah.dto;
 
-import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
+import com.example.backend.jamiah.RateInterval;
 import lombok.Data;
 
+import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Data
-@Entity
-@Table(name = "jamiah")
-public class Jamiah {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class JamiahDto {
+    private UUID id;
 
     @NotBlank
     @Size(min = 3)
-    @Column(nullable = false)
     private String name;
 
     private BigDecimal monthlyContribution;
@@ -35,7 +31,6 @@ public class Jamiah {
     private BigDecimal rateAmount;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
     private RateInterval rateInterval;
 
     @FutureOrPresent

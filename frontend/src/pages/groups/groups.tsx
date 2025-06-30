@@ -32,7 +32,16 @@ export const Groups = () => {
   const [selectedGroup, setSelectedGroup] = useState<Jamiah | null>(null);
   const [openCreateModal, setOpenCreateModal] = useState(false);
   const [openJoinModal, setOpenJoinModal] = useState(false);
-  const [newGroup, setNewGroup] = useState<Partial<Jamiah>>({ name: '', monthlyContribution: undefined, isPublic: false });
+  const [newGroup, setNewGroup] = useState<Partial<Jamiah>>({
+    name: '',
+    monthlyContribution: undefined,
+    isPublic: false,
+    maxGroupSize: undefined,
+    cycleCount: undefined,
+    rateAmount: undefined,
+    rateInterval: 'MONTHLY',
+    startDate: undefined
+  });
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/jamiahs`)
@@ -125,6 +134,40 @@ export const Groups = () => {
                   InputProps={{ endAdornment: <InputAdornment position="end">€</InputAdornment> }}
                 />
                 <TextField
+                  label="Maximale Gruppengröße"
+                  type="number"
+                  value={selectedGroup.maxGroupSize ?? ''}
+                  onChange={e => setSelectedGroup({ ...selectedGroup, maxGroupSize: Number(e.target.value) })}
+                />
+                <TextField
+                  label="Anzahl Zyklen"
+                  type="number"
+                  value={selectedGroup.cycleCount ?? ''}
+                  onChange={e => setSelectedGroup({ ...selectedGroup, cycleCount: Number(e.target.value) })}
+                />
+                <TextField
+                  label="Ratenhöhe"
+                  type="number"
+                  value={selectedGroup.rateAmount ?? ''}
+                  onChange={e => setSelectedGroup({ ...selectedGroup, rateAmount: Number(e.target.value) })}
+                />
+                <TextField
+                  select
+                  label="Raten-Rhythmus"
+                  value={selectedGroup.rateInterval}
+                  onChange={e => setSelectedGroup({ ...selectedGroup, rateInterval: e.target.value as 'WEEKLY' | 'MONTHLY' })}
+                >
+                  <MenuItem value="WEEKLY">Wöchentlich</MenuItem>
+                  <MenuItem value="MONTHLY">Monatlich</MenuItem>
+                </TextField>
+                <TextField
+                  label="Startdatum"
+                  type="date"
+                  InputLabelProps={{ shrink: true }}
+                  value={selectedGroup.startDate ?? ''}
+                  onChange={e => setSelectedGroup({ ...selectedGroup, startDate: e.target.value })}
+                />
+                <TextField
                   select
                   label="Typ"
                   value={selectedGroup.isPublic ? 'public' : 'private'}
@@ -174,6 +217,44 @@ export const Groups = () => {
               InputProps={{ endAdornment: <InputAdornment position="end">€</InputAdornment> }}
             />
             <TextField
+              label="Maximale Gruppengröße"
+              type="number"
+              fullWidth
+              value={newGroup.maxGroupSize ?? ''}
+              onChange={e => setNewGroup({ ...newGroup, maxGroupSize: Number(e.target.value) })}
+            />
+            <TextField
+              label="Anzahl Zyklen"
+              type="number"
+              fullWidth
+              value={newGroup.cycleCount ?? ''}
+              onChange={e => setNewGroup({ ...newGroup, cycleCount: Number(e.target.value) })}
+            />
+            <TextField
+              label="Ratenhöhe"
+              type="number"
+              fullWidth
+              value={newGroup.rateAmount ?? ''}
+              onChange={e => setNewGroup({ ...newGroup, rateAmount: Number(e.target.value) })}
+            />
+            <TextField
+              select
+              label="Raten-Rhythmus"
+              value={newGroup.rateInterval}
+              onChange={e => setNewGroup({ ...newGroup, rateInterval: e.target.value as 'WEEKLY' | 'MONTHLY' })}
+            >
+              <MenuItem value="WEEKLY">Wöchentlich</MenuItem>
+              <MenuItem value="MONTHLY">Monatlich</MenuItem>
+            </TextField>
+            <TextField
+              label="Startdatum"
+              type="date"
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              value={newGroup.startDate ?? ''}
+              onChange={e => setNewGroup({ ...newGroup, startDate: e.target.value })}
+            />
+            <TextField
               select
               label="Typ"
               value={newGroup.isPublic ? 'public' : 'private'}
@@ -196,7 +277,16 @@ export const Groups = () => {
                   .then(j => {
                     setGroups([...groups, j]);
                     setOpenCreateModal(false);
-                    setNewGroup({ name: '', monthlyContribution: undefined, isPublic: false });
+                    setNewGroup({
+                      name: '',
+                      monthlyContribution: undefined,
+                      isPublic: false,
+                      maxGroupSize: undefined,
+                      cycleCount: undefined,
+                      rateAmount: undefined,
+                      rateInterval: 'MONTHLY',
+                      startDate: undefined
+                    });
                   });
               }}
             >

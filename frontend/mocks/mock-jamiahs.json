@@ -1,0 +1,24 @@
+[
+  {
+    "id": "1",
+    "name": "Berlin Jamiah",
+    "monthlyContribution": 20,
+    "isPublic": true,
+    "maxGroupSize": 10,
+    "cycleCount": 12,
+    "rateAmount": 50,
+    "rateInterval": "MONTHLY",
+    "startDate": "2025-01-01"
+  },
+  {
+    "id": "2",
+    "name": "Hamburg Jamiah",
+    "monthlyContribution": 15,
+    "isPublic": false,
+    "maxGroupSize": 8,
+    "cycleCount": 6,
+    "rateAmount": 40,
+    "rateInterval": "WEEKLY",
+    "startDate": "2025-02-01"
+  }
+]
