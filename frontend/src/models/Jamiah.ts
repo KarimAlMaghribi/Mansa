@@ -1,11 +1,11 @@
 export interface Jamiah {
-  id: number;
+  id?: string;
   name: string;
   monthlyContribution?: number;
-  isPublic?: boolean;
+  isPublic: boolean;
   maxGroupSize?: number;
-  cycles?: number;
-  rate?: number;
+  cycleCount?: number;
+  rateAmount?: number;
   rateInterval?: 'WEEKLY' | 'MONTHLY';
-  plannedStartDate?: string;
+  startDate?: string;
 }
