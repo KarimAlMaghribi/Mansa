@@ -26,6 +26,10 @@ Damit werden drei Container gestartet:
 2. **frontend** – React-App ausgeliefert durch nginx auf Port 3000
 3. **db** – MySQL 8 mit dem Schema `mansa`
 
+Das Compose-Setup setzt die Umgebungsvariable `REACT_APP_BACKEND_URL` im
+Frontend-Container auf `http://backend:8080`, sodass API-Aufrufe korrekt an die
+Backend-Service-Adresse geleitet werden.
+
 Zugangsdaten für die Datenbank sind in `docker-compose.yml` hinterlegt und können per Umgebungsvariablen überschrieben werden.
 
 ## Cloud Architektur
