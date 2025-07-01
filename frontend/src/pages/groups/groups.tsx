@@ -155,6 +155,7 @@ export const Groups = () => {
             label="Alle / Öffentliche / Private Jamiahs"
             value={visibilityFilter}
             onChange={e => setVisibilityFilter(e.target.value as 'all' | 'public' | 'private')}
+            sx={{ minWidth: 280 }}
           >
             <MenuItem value="all">Alle</MenuItem>
             <MenuItem value="public">Öffentliche</MenuItem>
@@ -165,6 +166,7 @@ export const Groups = () => {
             label="Aktiver Zyklus / Abgeschlossen"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'completed')}
+            sx={{ minWidth: 280 }}
           >
             <MenuItem value="all">Alle</MenuItem>
             <MenuItem value="active">Aktiver Zyklus</MenuItem>
