@@ -16,8 +16,6 @@ public class JamiahDto {
     @Size(min = 3)
     private String name;
 
-    private BigDecimal monthlyContribution;
-
     @NotNull
     private Boolean isPublic;
 

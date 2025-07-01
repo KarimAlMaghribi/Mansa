@@ -20,8 +20,6 @@ public class Jamiah {
     @Column(nullable = false)
     private String name;
 
-    private BigDecimal monthlyContribution;
-
     @NotNull
     private Boolean isPublic;
 
