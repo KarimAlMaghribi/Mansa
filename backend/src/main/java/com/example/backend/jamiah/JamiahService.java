@@ -53,6 +53,8 @@ public class JamiahService {
         Jamiah entity = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         entity.setName(dto.getName());
+        entity.setDescription(dto.getDescription());
+        entity.setLanguage(dto.getLanguage());
         entity.setIsPublic(dto.getIsPublic());
         entity.setMaxGroupSize(dto.getMaxGroupSize());
         entity.setCycleCount(dto.getCycleCount());
@@ -66,6 +68,8 @@ public class JamiahService {
         validateParameters(dto);
         Jamiah entity = getByPublicId(publicId);
         entity.setName(dto.getName());
+        entity.setDescription(dto.getDescription());
+        entity.setLanguage(dto.getLanguage());
         entity.setIsPublic(dto.getIsPublic());
         entity.setMaxGroupSize(dto.getMaxGroupSize());
         entity.setCycleCount(dto.getCycleCount());

@@ -18,6 +18,7 @@ import com.example.backend.jamiah.Jamiah;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -130,6 +131,8 @@ class JamiahControllerTest {
     void getJamiahById() throws Exception {
         JamiahDto dto = new JamiahDto();
         dto.setName("Detail");
+        dto.setDescription("A group");
+        dto.setLanguage("de");
         dto.setIsPublic(true);
         dto.setMaxGroupSize(3);
         dto.setCycleCount(2);
@@ -144,6 +147,8 @@ class JamiahControllerTest {
         JamiahDto created = objectMapper.readValue(response, JamiahDto.class);
 
         mockMvc.perform(get("/api/jamiahs/" + created.getId()))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("A group"))
+                .andExpect(jsonPath("$.language").value("de"));
     }
 }

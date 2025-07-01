@@ -16,6 +16,10 @@ public class JamiahDto {
     @Size(min = 3)
     private String name;
 
+    private String description;
+
+    private String language;
+
     @NotNull
     private Boolean isPublic;
 
