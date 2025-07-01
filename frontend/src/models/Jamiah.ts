@@ -1,6 +1,8 @@
 export interface Jamiah {
   id?: string;
   name: string;
+  description?: string;
+  language?: string;
   monthlyContribution?: number;
   isPublic: boolean;
   maxGroupSize?: number;

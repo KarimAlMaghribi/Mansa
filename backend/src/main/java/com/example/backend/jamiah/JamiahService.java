@@ -90,6 +90,11 @@ public class JamiahService {
         return mapper.toDto(repository.save(entity));
     }
 
+    public JamiahDto findByPublicId(String publicId) {
+        Jamiah entity = getByPublicId(publicId);
+        return mapper.toDto(entity);
+    }
+
     public JamiahDto joinByInvitation(String code) {
         log.info("Join attempt with code {}", code);
         if (isRateLimited(code)) {

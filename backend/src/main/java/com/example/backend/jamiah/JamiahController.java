@@ -24,6 +24,11 @@ public class JamiahController {
         return service.findAll();
     }
 
+    @GetMapping("/{id}")
+    public JamiahDto get(@PathVariable String id) {
+        return service.findByPublicId(id);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public JamiahDto create(@Valid @RequestBody JamiahDto dto) {
