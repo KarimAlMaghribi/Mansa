@@ -62,9 +62,29 @@ public class JamiahService {
         return mapper.toDto(repository.save(entity));
     }
 
+    public JamiahDto update(String publicId, JamiahDto dto) {
+        validateParameters(dto);
+        Jamiah entity = getByPublicId(publicId);
+        entity.setName(dto.getName());
+        entity.setIsPublic(dto.getIsPublic());
+        entity.setMaxGroupSize(dto.getMaxGroupSize());
+        entity.setCycleCount(dto.getCycleCount());
+        entity.setRateAmount(dto.getRateAmount());
+        entity.setRateInterval(dto.getRateInterval());
+        entity.setStartDate(dto.getStartDate());
+        return mapper.toDto(repository.save(entity));
+    }
+
     public JamiahDto createOrRefreshInvitation(Long id) {
         Jamiah entity = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        entity.setInvitationCode(InviteCodeGenerator.generate());
+        entity.setInvitationExpiry(LocalDate.now().plusDays(1));
+        return mapper.toDto(repository.save(entity));
+    }
+
+    public JamiahDto createOrRefreshInvitation(String publicId) {
+        Jamiah entity = getByPublicId(publicId);
         entity.setInvitationCode(InviteCodeGenerator.generate());
         entity.setInvitationExpiry(LocalDate.now().plusDays(1));
         return mapper.toDto(repository.save(entity));
@@ -94,6 +114,14 @@ public class JamiahService {
             entry.count++;
             return entry.count > MAX_ATTEMPTS;
         }
+    }
+
+    private Jamiah getByPublicId(String publicId) {
+        java.util.UUID uuid = java.util.UUID.fromString(publicId);
+        return repository.findAll().stream()
+                .filter(j -> java.util.UUID.nameUUIDFromBytes(j.getId().toString().getBytes()).equals(uuid))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     void validateParameters(JamiahDto dto) {
