@@ -34,4 +34,14 @@ public class JamiahController {
     public JamiahDto update(@PathVariable Long id, @Valid @RequestBody JamiahDto dto) {
         return service.update(id, dto);
     }
+
+    @PostMapping("/{id}/invite")
+    public JamiahDto invite(@PathVariable Long id) {
+        return service.createOrRefreshInvitation(id);
+    }
+
+    @PostMapping("/join")
+    public JamiahDto join(@RequestParam String code) {
+        return service.joinByInvitation(code);
+    }
 }

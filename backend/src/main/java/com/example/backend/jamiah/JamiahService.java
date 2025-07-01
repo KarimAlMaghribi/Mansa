@@ -1,6 +1,9 @@
 package com.example.backend.jamiah;
 
 import com.example.backend.jamiah.dto.JamiahDto;
+import com.example.backend.jamiah.util.InviteCodeGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +18,17 @@ import java.util.stream.Collectors;
 public class JamiahService {
     private final JamiahRepository repository;
     private final JamiahMapper mapper;
+
+    private static final Logger log = LoggerFactory.getLogger(JamiahService.class);
+
+    private static final int MAX_ATTEMPTS = 5;
+    private static final long WINDOW_MS = 60_000L;
+    private final java.util.concurrent.ConcurrentHashMap<String, RateLimitEntry> attempts = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static class RateLimitEntry {
+        long windowStart = System.currentTimeMillis();
+        int count = 0;
+    }
 
     public JamiahService(JamiahRepository repository, JamiahMapper mapper) {
         this.repository = repository;
@@ -46,6 +60,40 @@ public class JamiahService {
         entity.setRateInterval(dto.getRateInterval());
         entity.setStartDate(dto.getStartDate());
         return mapper.toDto(repository.save(entity));
+    }
+
+    public JamiahDto createOrRefreshInvitation(Long id) {
+        Jamiah entity = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        entity.setInvitationCode(InviteCodeGenerator.generate());
+        entity.setInvitationExpiry(LocalDate.now().plusDays(1));
+        return mapper.toDto(repository.save(entity));
+    }
+
+    public JamiahDto joinByInvitation(String code) {
+        log.info("Join attempt with code {}", code);
+        if (isRateLimited(code)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS);
+        }
+        Jamiah entity = repository.findByInvitationCode(code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (entity.getInvitationExpiry() != null && entity.getInvitationExpiry().isBefore(LocalDate.now())) {
+            throw new ResponseStatusException(HttpStatus.GONE);
+        }
+        return mapper.toDto(entity);
+    }
+
+    private boolean isRateLimited(String key) {
+        long now = System.currentTimeMillis();
+        RateLimitEntry entry = attempts.computeIfAbsent(key, k -> new RateLimitEntry());
+        synchronized (entry) {
+            if (now - entry.windowStart > WINDOW_MS) {
+                entry.windowStart = now;
+                entry.count = 0;
+            }
+            entry.count++;
+            return entry.count > MAX_ATTEMPTS;
+        }
     }
 
     void validateParameters(JamiahDto dto) {
