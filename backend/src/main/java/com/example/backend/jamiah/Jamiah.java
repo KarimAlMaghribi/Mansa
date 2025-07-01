@@ -38,4 +38,8 @@ public class Jamiah {
 
     @FutureOrPresent
     private LocalDate startDate;
+
+    private String invitationCode;
+
+    private LocalDate invitationExpiry;
 }
