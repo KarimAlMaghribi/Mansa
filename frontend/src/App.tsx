@@ -32,6 +32,7 @@ import {Reports} from "./pages/reports/reports";
 import {Members} from "./pages/memebers/members";
 import {Onboarding} from "./pages/onboarding/onboarding";
 import { JoinJamiahPage } from "./pages/join-jamiah/join-jamiah";
+import { GroupDetails } from "./pages/group-details/group-details";
 import {VerifyEmail} from "./pages/authentication/verifyEmail";
 import {HelloBackend} from "./pages/hello-backend/hello-backend";
 
@@ -62,6 +63,7 @@ function App() {
                 <Route path={`/${ROUTES.MY_BIDS}`} element={<PrivateRoute><MyBids /></PrivateRoute>} />
                 <Route path={`/${ROUTES.ONBOARDING}`} element={<PrivateRoute><Onboarding /></PrivateRoute>} />
                 <Route path={`/${ROUTES.JOIN_JAMIAH}`} element={<PrivateRoute><JoinJamiahPage /></PrivateRoute>} />
+                <Route path={`/${ROUTES.GROUP_DETAILS}/:id`} element={<PrivateRoute><GroupDetails /></PrivateRoute>} />
 
 
                 {/* Public routes */}

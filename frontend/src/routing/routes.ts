@@ -28,6 +28,8 @@ export const ROUTES = {
 
     JOIN_JAMIAH: 'join-jamiah',
 
+    GROUP_DETAILS: 'group-details',
+
     HELLO_BACKEND: 'hello-backend',
 
 };

@@ -16,7 +16,9 @@ import com.example.backend.jamiah.JamiahRepository;
 import com.example.backend.jamiah.Jamiah;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -123,5 +125,30 @@ class JamiahControllerTest {
     void joinJamiahInvalid() throws Exception {
         mockMvc.perform(post("/api/jamiahs/join?code=INVALID"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getJamiahById() throws Exception {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("Detail");
+        dto.setDescription("A group");
+        dto.setLanguage("de");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(2);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        String response = mockMvc.perform(post("/api/jamiahs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andReturn().getResponse().getContentAsString();
+        JamiahDto created = objectMapper.readValue(response, JamiahDto.class);
+
+        mockMvc.perform(get("/api/jamiahs/" + created.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("A group"))
+                .andExpect(jsonPath("$.language").value("de"));
     }
 }

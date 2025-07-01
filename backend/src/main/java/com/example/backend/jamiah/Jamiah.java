@@ -20,6 +20,10 @@ public class Jamiah {
     @Column(nullable = false)
     private String name;
 
+    private String description;
+
+    private String language;
+
     @NotNull
     private Boolean isPublic;
 
