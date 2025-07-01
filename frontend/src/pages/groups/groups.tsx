@@ -14,7 +14,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  InputAdornment,
   MenuItem,
   Tooltip
 } from '@mui/material';
@@ -36,7 +35,7 @@ export const Groups = () => {
   const [openCreateModal, setOpenCreateModal] = useState(false);
   const [newGroup, setNewGroup] = useState<Partial<Jamiah>>({
     name: '',
-    monthlyContribution: undefined,
+    description: '',
     isPublic: false,
     maxGroupSize: undefined,
     cycleCount: undefined,
@@ -44,6 +43,7 @@ export const Groups = () => {
     rateInterval: 'MONTHLY',
     startDate: undefined
   });
+  const [createErrors, setCreateErrors] = useState<{ name?: boolean }>({});
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/jamiahs`)
@@ -97,8 +97,8 @@ export const Groups = () => {
                         {group.maxGroupSize && (
                           <Typography variant="body2">Max Mitglieder: <b>{group.maxGroupSize}</b></Typography>
                         )}
-                        {group.monthlyContribution !== undefined && (
-                          <Typography variant="body2">Beitrag: <b>{group.monthlyContribution}€</b></Typography>
+                        {group.description && (
+                          <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{group.description}</Typography>
                         )}
                       </CardContent>
                       <CardActions sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -133,28 +133,30 @@ export const Groups = () => {
                   onChange={e => setSelectedGroup({ ...selectedGroup, name: e.target.value })}
                 />
                 <TextField
-                  label="Monatlicher Beitrag (€)"
-                  type="number"
-                  value={selectedGroup.monthlyContribution ?? ''}
-                  onChange={e => setSelectedGroup({ ...selectedGroup, monthlyContribution: Number(e.target.value) })}
-                  InputProps={{ endAdornment: <InputAdornment position="end">€</InputAdornment> }}
+                  label="Beschreibung"
+                  value={selectedGroup.description ?? ''}
+                  onChange={e => setSelectedGroup({ ...selectedGroup, description: e.target.value })}
+                  multiline
                 />
                 <TextField
                   label="Maximale Gruppengröße"
                   type="number"
                   value={selectedGroup.maxGroupSize ?? ''}
+                  inputProps={{ min: 2 }}
                   onChange={e => setSelectedGroup({ ...selectedGroup, maxGroupSize: Number(e.target.value) })}
                 />
                 <TextField
                   label="Anzahl Zyklen"
                   type="number"
                   value={selectedGroup.cycleCount ?? ''}
+                  inputProps={{ min: 1 }}
                   onChange={e => setSelectedGroup({ ...selectedGroup, cycleCount: Number(e.target.value) })}
                 />
                 <TextField
                   label="Ratenhöhe"
                   type="number"
                   value={selectedGroup.rateAmount ?? ''}
+                  inputProps={{ min: 1 }}
                   onChange={e => setSelectedGroup({ ...selectedGroup, rateAmount: Number(e.target.value) })}
                 />
                 <TextField
@@ -202,6 +204,19 @@ export const Groups = () => {
                 >
                   Speichern
                 </Button>
+                <Button
+                  color="error"
+                  onClick={() => {
+                    fetch(`${API_BASE_URL}/api/jamiahs/${selectedGroup.id}`, {
+                      method: 'DELETE'
+                    }).then(() => {
+                      setGroups(groups.filter(g => g.id !== selectedGroup.id));
+                      setOpenModal(false);
+                    });
+                  }}
+                >
+                  Löschen
+                </Button>
               </DialogActions>
             </>
           )}
@@ -214,22 +229,25 @@ export const Groups = () => {
             <TextField
               label="Name der Jamiah"
               fullWidth
+              required
+              error={createErrors.name && !newGroup.name}
+              helperText={createErrors.name && !newGroup.name ? 'Name erforderlich' : ''}
               value={newGroup.name}
               onChange={e => setNewGroup({ ...newGroup, name: e.target.value })}
             />
             <TextField
-              label="Monatlicher Beitrag (€)"
-              type="number"
+              label="Beschreibung"
               fullWidth
-              value={newGroup.monthlyContribution ?? ''}
-              onChange={e => setNewGroup({ ...newGroup, monthlyContribution: Number(e.target.value) })}
-              InputProps={{ endAdornment: <InputAdornment position="end">€</InputAdornment> }}
+              multiline
+              value={newGroup.description}
+              onChange={e => setNewGroup({ ...newGroup, description: e.target.value })}
             />
             <TextField
               label="Maximale Gruppengröße"
               type="number"
               fullWidth
               value={newGroup.maxGroupSize ?? ''}
+              inputProps={{ min: 2 }}
               onChange={e => setNewGroup({ ...newGroup, maxGroupSize: Number(e.target.value) })}
             />
             <TextField
@@ -237,6 +255,7 @@ export const Groups = () => {
               type="number"
               fullWidth
               value={newGroup.cycleCount ?? ''}
+              inputProps={{ min: 1 }}
               onChange={e => setNewGroup({ ...newGroup, cycleCount: Number(e.target.value) })}
             />
             <TextField
@@ -244,6 +263,7 @@ export const Groups = () => {
               type="number"
               fullWidth
               value={newGroup.rateAmount ?? ''}
+              inputProps={{ min: 1 }}
               onChange={e => setNewGroup({ ...newGroup, rateAmount: Number(e.target.value) })}
             />
             <TextField
@@ -277,6 +297,10 @@ export const Groups = () => {
             <Button onClick={() => setOpenCreateModal(false)}>Abbrechen</Button>
             <Button
               onClick={() => {
+                if (!newGroup.name) {
+                  setCreateErrors({ name: true });
+                  return;
+                }
                 fetch(`${API_BASE_URL}/api/jamiahs`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -286,9 +310,10 @@ export const Groups = () => {
                   .then(j => {
                     setGroups([...groups, j]);
                     setOpenCreateModal(false);
+                    setCreateErrors({});
                     setNewGroup({
                       name: '',
-                      monthlyContribution: undefined,
+                      description: '',
                       isPublic: false,
                       maxGroupSize: undefined,
                       cycleCount: undefined,

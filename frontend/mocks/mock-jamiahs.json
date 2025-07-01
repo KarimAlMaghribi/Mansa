@@ -2,7 +2,7 @@
   {
     "id": "1",
     "name": "Berlin Jamiah",
-    "monthlyContribution": 20,
+    "description": "Beispielgruppe in Berlin",
     "isPublic": true,
     "maxGroupSize": 10,
     "cycleCount": 12,
@@ -13,7 +13,7 @@
   {
     "id": "2",
     "name": "Hamburg Jamiah",
-    "monthlyContribution": 15,
+    "description": "Beispielgruppe in Hamburg",
     "isPublic": false,
     "maxGroupSize": 8,
     "cycleCount": 6,
