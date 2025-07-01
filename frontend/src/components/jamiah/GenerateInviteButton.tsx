@@ -13,7 +13,7 @@ export const GenerateInviteButton: React.FC<GenerateInviteButtonProps> = ({ jami
   const [code, setCode] = useState<string | null>(null);
 
   const handleClick = () => {
-    fetch(`${API_BASE_URL}/api/jamiahs/${jamiahId}/invitation`, { method: 'POST' })
+    fetch(`${API_BASE_URL}/api/jamiahs/${jamiahId}/invite`, { method: 'POST' })
       .then(res => res.text())
       .then(setCode)
       .catch(() => setCode('Fehler'))
