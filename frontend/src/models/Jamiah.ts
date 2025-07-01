@@ -3,7 +3,6 @@ export interface Jamiah {
   name: string;
   description?: string;
   language?: string;
-  monthlyContribution?: number;
   isPublic: boolean;
   maxGroupSize?: number;
   cycleCount?: number;
