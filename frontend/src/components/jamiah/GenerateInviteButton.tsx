@@ -10,13 +10,13 @@ interface GenerateInviteButtonProps {
 
 export const GenerateInviteButton: React.FC<GenerateInviteButtonProps> = ({ jamiahId }) => {
   const [open, setOpen] = useState(false);
-  const [code, setCode] = useState<string | null>(null);
+  const [invite, setInvite] = useState<{ invitationCode: string; invitationExpiry: string } | null>(null);
 
   const handleClick = () => {
     fetch(`${API_BASE_URL}/api/jamiahs/${jamiahId}/invite`, { method: 'POST' })
-      .then(res => res.text())
-      .then(setCode)
-      .catch(() => setCode('Fehler'))
+      .then(res => res.json())
+      .then(data => setInvite({ invitationCode: data.invitationCode, invitationExpiry: data.invitationExpiry }))
+      .catch(() => setInvite({ invitationCode: 'Fehler', invitationExpiry: new Date().toISOString() }))
       .finally(() => setOpen(true));
   };
 
@@ -25,7 +25,12 @@ export const GenerateInviteButton: React.FC<GenerateInviteButtonProps> = ({ jami
       <Button size="small" variant="outlined" fullWidth startIcon={<KeyIcon />} onClick={handleClick}>
         Einladungscode
       </Button>
-      <InviteCodeDialog open={open} code={code} onClose={() => setOpen(false)} />
+      <InviteCodeDialog
+        open={open}
+        code={invite?.invitationCode ?? null}
+        expiry={invite?.invitationExpiry ?? null}
+        onClose={() => setOpen(false)}
+      />
     </>
   );
 };

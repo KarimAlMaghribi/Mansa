@@ -5,10 +5,31 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 interface InviteCodeDialogProps {
   open: boolean;
   code: string | null;
+  expiry: string | null;
   onClose: () => void;
 }
 
-export const InviteCodeDialog: React.FC<InviteCodeDialogProps> = ({ open, code, onClose }) => {
+export const InviteCodeDialog: React.FC<InviteCodeDialogProps> = ({ open, code, expiry, onClose }) => {
+  const [remaining, setRemaining] = React.useState<number>(0);
+
+  React.useEffect(() => {
+    if (!expiry) return;
+    const target = new Date(expiry).getTime();
+    const update = () => setRemaining(target - Date.now());
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [expiry]);
+
+  const format = (ms: number) => {
+    if (ms <= 0) return '00:00:00';
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+  };
+
   const handleCopy = () => {
     if (code) {
       navigator.clipboard.writeText(code);
@@ -28,6 +49,11 @@ export const InviteCodeDialog: React.FC<InviteCodeDialogProps> = ({ open, code, 
               <ContentCopyIcon fontSize="small" />
             </IconButton>
           </Tooltip>
+        )}
+        {expiry && (
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+            Läuft ab in: {format(remaining)}
+          </Typography>
         )}
       </DialogContent>
       <DialogActions>
