@@ -25,13 +25,15 @@ import PublicIcon from '@mui/icons-material/Public';
 import LockIcon from '@mui/icons-material/Lock';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
+import { GenerateInviteButton } from '../../components/jamiah/GenerateInviteButton';
+import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../../routing/routes';
 
 export const Groups = () => {
   const [groups, setGroups] = useState<Jamiah[]>([]);
   const [openModal, setOpenModal] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Jamiah | null>(null);
   const [openCreateModal, setOpenCreateModal] = useState(false);
-  const [openJoinModal, setOpenJoinModal] = useState(false);
   const [newGroup, setNewGroup] = useState<Partial<Jamiah>>({
     name: '',
     monthlyContribution: undefined,
@@ -50,8 +52,9 @@ export const Groups = () => {
       .catch(() => setGroups([]));
   }, []);
 
+  const navigate = useNavigate();
   const handleCreateOpen = () => setOpenCreateModal(true);
-  const handleJoinOpen = () => setOpenJoinModal(true);
+  const handleJoinOpen = () => navigate(`/${ROUTES.JOIN_JAMIAH}`);
   const handleCloseModal = () => setOpenModal(false);
   const handleDetails = (group: Jamiah) => {
     setSelectedGroup(group);
@@ -98,7 +101,7 @@ export const Groups = () => {
                           <Typography variant="body2">Beitrag: <b>{group.monthlyContribution}€</b></Typography>
                         )}
                       </CardContent>
-                      <CardActions>
+                      <CardActions sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         <Button
                             size="small"
                             variant="outlined"
@@ -108,6 +111,9 @@ export const Groups = () => {
                         >
                           Details ansehen
                         </Button>
+                        {!group.isPublic && group.id && (
+                            <GenerateInviteButton jamiahId={group.id} />
+                        )}
                       </CardActions>
                     </Card>
                   </Grid>
@@ -177,8 +183,11 @@ export const Groups = () => {
                   <MenuItem value="public">Öffentlich (sichtbar für alle)</MenuItem>
                 </TextField>
               </DialogContent>
-              <DialogActions>
+              <DialogActions sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 1 }}>
                 <Button onClick={handleCloseModal}>Abbrechen</Button>
+                {!selectedGroup.isPublic && selectedGroup.id && (
+                  <GenerateInviteButton jamiahId={selectedGroup.id} />
+                )}
                 <Button
                   onClick={() => {
                     fetch(`${API_BASE_URL}/api/jamiahs/${selectedGroup.id}`, {
@@ -295,20 +304,6 @@ export const Groups = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Join Modal */}
-        <Dialog open={openJoinModal} onClose={() => setOpenJoinModal(false)} maxWidth="xs" fullWidth>
-          <DialogTitle>Jamiah beitreten</DialogTitle>
-          <DialogContent sx={{ mt: 1 }}>
-            <TextField label="Einladungscode" fullWidth />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setOpenJoinModal(false)}>Abbrechen</Button>
-            <Button onClick={() => {
-              alert('Beitrittsanfrage gesendet!');
-              setOpenJoinModal(false);
-            }}>Beitreten</Button>
-          </DialogActions>
-        </Dialog>
       </Box>
   );
 };
