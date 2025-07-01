@@ -31,12 +31,12 @@ public class JamiahController {
     }
 
     @PutMapping("/{id}")
-    public JamiahDto update(@PathVariable Long id, @Valid @RequestBody JamiahDto dto) {
+    public JamiahDto update(@PathVariable String id, @Valid @RequestBody JamiahDto dto) {
         return service.update(id, dto);
     }
 
     @PostMapping("/{id}/invite")
-    public JamiahDto invite(@PathVariable Long id) {
+    public JamiahDto invite(@PathVariable String id) {
         return service.createOrRefreshInvitation(id);
     }
 
