@@ -98,4 +98,20 @@ class JamiahServiceTest {
         assertThrows(ResponseStatusException.class,
                 () -> service.joinByInvitation("INVALID"));
     }
+
+    @Test
+    void deleteJamiah() {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("ToDelete");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(2);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        JamiahDto created = service.create(dto);
+        service.delete(created.getId().toString());
+        assertEquals(0, repository.count());
+    }
 }

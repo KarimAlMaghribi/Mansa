@@ -112,6 +112,11 @@ public class JamiahService {
         return mapper.toDto(entity);
     }
 
+    public void delete(String publicId) {
+        Jamiah entity = getByPublicId(publicId);
+        repository.delete(entity);
+    }
+
     private boolean isRateLimited(String key) {
         long now = System.currentTimeMillis();
         RateLimitEntry entry = attempts.computeIfAbsent(key, k -> new RateLimitEntry());

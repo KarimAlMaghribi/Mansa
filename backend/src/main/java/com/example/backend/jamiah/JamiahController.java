@@ -49,4 +49,10 @@ public class JamiahController {
     public JamiahDto join(@RequestParam String code) {
         return service.joinByInvitation(code);
     }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable String id) {
+        service.delete(id);
+    }
 }
