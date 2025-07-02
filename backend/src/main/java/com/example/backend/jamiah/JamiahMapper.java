@@ -6,9 +6,11 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface JamiahMapper {
+    @Mapping(target = "currentMembers", expression = "java(jamiah.getMembers() == null ? 0 : jamiah.getMembers().size())")
     JamiahDto toDto(Jamiah jamiah);
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "members", ignore = true)
     Jamiah toEntity(JamiahDto dto);
 
     /**

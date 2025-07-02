@@ -26,6 +26,10 @@ public class JamiahDto {
     @Min(2)
     private Integer maxGroupSize;
 
+    private Integer maxMembers;
+
+    private Integer currentMembers;
+
     @Min(1)
     private Integer cycleCount;
 

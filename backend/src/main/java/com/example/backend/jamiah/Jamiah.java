@@ -6,6 +6,8 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 @Entity
@@ -31,6 +33,9 @@ public class Jamiah {
     private Integer maxGroupSize;
 
     @Min(1)
+    private Integer maxMembers;
+
+    @Min(1)
     private Integer cycleCount;
 
     @Positive
@@ -46,4 +51,10 @@ public class Jamiah {
     private String invitationCode;
 
     private LocalDate invitationExpiry;
+
+    @ManyToMany
+    @JoinTable(name = "jamiah_members",
+            joinColumns = @JoinColumn(name = "jamiah_id"),
+            inverseJoinColumns = @JoinColumn(name = "user_profile_id"))
+    private Set<com.example.backend.UserProfile> members = new HashSet<>();
 }

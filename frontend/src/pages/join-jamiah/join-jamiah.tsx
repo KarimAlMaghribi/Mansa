@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Button, TextField, Typography, Snackbar, Alert } from '@mui/material';
 import { API_BASE_URL } from '../../constants/api';
+import { auth } from '../../firebase_config';
 
 export const JoinJamiahPage = () => {
   const [code, setCode] = useState('');
@@ -9,15 +10,17 @@ export const JoinJamiahPage = () => {
   const [error, setError] = useState(false);
 
   const handleSubmit = () => {
-    fetch(`${API_BASE_URL}/api/jamiahs/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
+    const uid = auth.currentUser?.uid || '';
+    fetch(`${API_BASE_URL}/api/jamiahs/join?code=${encodeURIComponent(code)}&uid=${encodeURIComponent(uid)}`, {
+      method: 'POST'
     })
       .then(res => {
         if (res.ok) {
           setMessage('Beitritt erfolgreich angefragt.');
           setError(false);
+        } else if (res.status === 400) {
+          setMessage('Maximale Teilnehmerzahl erreicht.');
+          setError(true);
         } else {
           setMessage('Einladungscode ungültig.');
           setError(true);

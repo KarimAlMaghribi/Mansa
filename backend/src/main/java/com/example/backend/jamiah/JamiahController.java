@@ -46,8 +46,8 @@ public class JamiahController {
     }
 
     @PostMapping("/join")
-    public JamiahDto join(@RequestParam String code) {
-        return service.joinByInvitation(code);
+    public JamiahDto join(@RequestParam String code, @RequestParam String uid) {
+        return service.joinByInvitation(code, uid);
     }
 
     @DeleteMapping("/{id}")

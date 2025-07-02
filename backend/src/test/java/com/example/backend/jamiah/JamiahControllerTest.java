@@ -8,6 +8,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import com.example.backend.UserProfile;
+import com.example.backend.UserProfileRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -32,6 +34,9 @@ class JamiahControllerTest {
 
     @Autowired
     JamiahRepository repository;
+
+    @Autowired
+    UserProfileRepository userRepository;
 
     @Test
     void createJamiahSuccess() throws Exception {
@@ -88,7 +93,12 @@ class JamiahControllerTest {
                 .andReturn().getResponse().getContentAsString();
         JamiahDto invite = objectMapper.readValue(inviteResp, JamiahDto.class);
 
-        mockMvc.perform(post("/api/jamiahs/join?code=" + invite.getInvitationCode()))
+        UserProfile user = new UserProfile();
+        user.setUsername("user1");
+        user.setUid("u1");
+        userRepository.save(user);
+
+        mockMvc.perform(post("/api/jamiahs/join?code=" + invite.getInvitationCode() + "&uid=u1"))
                 .andExpect(status().isOk());
     }
 
@@ -117,13 +127,18 @@ class JamiahControllerTest {
         entity.setInvitationExpiry(LocalDate.now().minusDays(1));
         repository.save(entity);
 
-        mockMvc.perform(post("/api/jamiahs/join?code=" + invite.getInvitationCode()))
+        UserProfile user = new UserProfile();
+        user.setUsername("user1");
+        user.setUid("u1");
+        userRepository.save(user);
+
+        mockMvc.perform(post("/api/jamiahs/join?code=" + invite.getInvitationCode() + "&uid=u1"))
                 .andExpect(status().isGone());
     }
 
     @Test
     void joinJamiahInvalid() throws Exception {
-        mockMvc.perform(post("/api/jamiahs/join?code=INVALID"))
+        mockMvc.perform(post("/api/jamiahs/join?code=INVALID&uid=u1"))
                 .andExpect(status().isNotFound());
     }
 
@@ -135,6 +150,7 @@ class JamiahControllerTest {
         dto.setLanguage("de");
         dto.setIsPublic(true);
         dto.setMaxGroupSize(3);
+        dto.setMaxMembers(5);
         dto.setCycleCount(2);
         dto.setRateAmount(new BigDecimal("5"));
         dto.setRateInterval(RateInterval.MONTHLY);
@@ -149,7 +165,9 @@ class JamiahControllerTest {
         mockMvc.perform(get("/api/jamiahs/" + created.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("A group"))
-                .andExpect(jsonPath("$.language").value("de"));
+                .andExpect(jsonPath("$.language").value("de"))
+                .andExpect(jsonPath("$.maxMembers").value(5))
+                .andExpect(jsonPath("$.currentMembers").value(0));
     }
 
     @Test
