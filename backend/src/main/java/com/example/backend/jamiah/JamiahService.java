@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 public class JamiahService {
     private final JamiahRepository repository;
     private final JamiahMapper mapper;
+    private final com.example.backend.UserProfileRepository userRepository;
 
     private static final Logger log = LoggerFactory.getLogger(JamiahService.class);
 
@@ -30,9 +31,10 @@ public class JamiahService {
         int count = 0;
     }
 
-    public JamiahService(JamiahRepository repository, JamiahMapper mapper) {
+    public JamiahService(JamiahRepository repository, JamiahMapper mapper, com.example.backend.UserProfileRepository userRepository) {
         this.repository = repository;
         this.mapper = mapper;
+        this.userRepository = userRepository;
     }
 
     public List<JamiahDto> findAll() {
@@ -57,6 +59,7 @@ public class JamiahService {
         entity.setLanguage(dto.getLanguage());
         entity.setIsPublic(dto.getIsPublic());
         entity.setMaxGroupSize(dto.getMaxGroupSize());
+        entity.setMaxMembers(dto.getMaxMembers());
         entity.setCycleCount(dto.getCycleCount());
         entity.setRateAmount(dto.getRateAmount());
         entity.setRateInterval(dto.getRateInterval());
@@ -72,6 +75,7 @@ public class JamiahService {
         entity.setLanguage(dto.getLanguage());
         entity.setIsPublic(dto.getIsPublic());
         entity.setMaxGroupSize(dto.getMaxGroupSize());
+        entity.setMaxMembers(dto.getMaxMembers());
         entity.setCycleCount(dto.getCycleCount());
         entity.setRateAmount(dto.getRateAmount());
         entity.setRateInterval(dto.getRateInterval());
@@ -99,17 +103,23 @@ public class JamiahService {
         return mapper.toDto(entity);
     }
 
-    public JamiahDto joinByInvitation(String code) {
-        log.info("Join attempt with code {}", code);
+    public JamiahDto joinByInvitation(String code, String uid) {
+        log.info("Join attempt with code {} for uid {}", code, uid);
         if (isRateLimited(code)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS);
         }
-        Jamiah entity = repository.findByInvitationCode(code)
+        Jamiah entity = repository.findWithMembersByInvitationCode(code)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (entity.getInvitationExpiry() != null && entity.getInvitationExpiry().isBefore(LocalDate.now())) {
             throw new ResponseStatusException(HttpStatus.GONE);
         }
-        return mapper.toDto(entity);
+        if (entity.getMaxMembers() != null && entity.getMembers().size() >= entity.getMaxMembers()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member limit reached");
+        }
+        com.example.backend.UserProfile user = userRepository.findByUid(uid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        entity.getMembers().add(user);
+        return mapper.toDto(repository.save(entity));
     }
 
     public void delete(String publicId) {
@@ -141,6 +151,9 @@ public class JamiahService {
     void validateParameters(JamiahDto dto) {
         if (dto.getMaxGroupSize() != null && dto.getMaxGroupSize() < 2) {
             throw new IllegalArgumentException("maxGroupSize must be >= 2");
+        }
+        if (dto.getMaxMembers() != null && dto.getMaxMembers() < 1) {
+            throw new IllegalArgumentException("maxMembers must be >= 1");
         }
         if (dto.getCycleCount() != null && dto.getCycleCount() < 1) {
             throw new IllegalArgumentException("cycleCount must be >= 1");

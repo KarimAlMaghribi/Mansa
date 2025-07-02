@@ -33,8 +33,8 @@ export const GroupDetails = () => {
           {group.language && (
             <Typography variant="body2">Sprache: <b>{group.language}</b></Typography>
           )}
-          {group.maxGroupSize !== undefined && (
-            <Typography variant="body2">Gruppengröße: <b>{group.maxGroupSize}</b></Typography>
+          {group.currentMembers !== undefined && group.maxMembers !== undefined && (
+            <Typography variant="body2">Mitglieder: <b>{group.currentMembers} / {group.maxMembers}</b></Typography>
           )}
           {group.rateAmount !== undefined && (
             <Typography variant="body2">Ratenhöhe: <b>{group.rateAmount}€</b></Typography>
@@ -50,7 +50,9 @@ export const GroupDetails = () => {
           </Typography>
           <Box mt={3}>
             {group.isPublic ? (
-              <Button variant="contained">Jetzt bewerben</Button>
+              <Button variant="contained" disabled={group.maxMembers !== undefined && group.currentMembers !== undefined && group.currentMembers >= group.maxMembers}>
+                Jetzt bewerben
+              </Button>
             ) : (
               <Typography color="textSecondary">Beitritt nur per Einladung</Typography>
             )}

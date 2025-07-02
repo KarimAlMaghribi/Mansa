@@ -234,8 +234,8 @@ export const Groups = () => {
                           <Typography variant="body2" gutterBottom>Nächste Abrechnung in {info.nextIn} Tagen</Typography>
                         )}
                         <Divider sx={{ my: 1 }} />
-                        {group.maxGroupSize && (
-                          <Typography variant="body2">Max Mitglieder: <b>{group.maxGroupSize}</b></Typography>
+                        {group.currentMembers !== undefined && group.maxMembers !== undefined && (
+                          <Typography variant="body2">Mitglieder: <b>{group.currentMembers} / {group.maxMembers}</b></Typography>
                         )}
                         {group.description && (
                           <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{group.description}</Typography>
