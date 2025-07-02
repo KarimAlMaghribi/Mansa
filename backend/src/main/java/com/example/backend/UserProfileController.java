@@ -66,22 +66,31 @@ public class UserProfileController {
 
     @PutMapping("/uid/{uid}")
     public UserProfile updateByUid(@PathVariable String uid, @RequestBody UserProfile profile) {
-        UserProfile existing = repository.findByUid(uid).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!existing.getUsername().equals(profile.getUsername()) && repository.existsByUsername(profile.getUsername())) {
+        UserProfile entity = repository.findByUid(uid).orElse(null);
+
+        // create new profile if none exists for the uid
+        if (entity == null) {
+            if (repository.existsByUsername(profile.getUsername())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username already taken");
+            }
+            entity = new UserProfile();
+        } else if (!entity.getUsername().equals(profile.getUsername()) && repository.existsByUsername(profile.getUsername())) {
+            // update path but new username already taken
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username already taken");
         }
-        existing.setUsername(profile.getUsername());
-        existing.setUid(uid);
-        existing.setFirstName(profile.getFirstName());
-        existing.setLastName(profile.getLastName());
-        existing.setBirthDate(profile.getBirthDate());
-        existing.setGender(profile.getGender());
-        existing.setNationality(profile.getNationality());
-        existing.setAddress(profile.getAddress());
-        existing.setPhone(profile.getPhone());
-        existing.setLanguage(profile.getLanguage());
-        existing.setInterests(profile.getInterests());
-        return repository.save(existing);
+
+        entity.setUsername(profile.getUsername());
+        entity.setUid(uid);
+        entity.setFirstName(profile.getFirstName());
+        entity.setLastName(profile.getLastName());
+        entity.setBirthDate(profile.getBirthDate());
+        entity.setGender(profile.getGender());
+        entity.setNationality(profile.getNationality());
+        entity.setAddress(profile.getAddress());
+        entity.setPhone(profile.getPhone());
+        entity.setLanguage(profile.getLanguage());
+        entity.setInterests(profile.getInterests());
+        return repository.save(entity);
     }
 
     @GetMapping("/uid/{uid}/jamiahs")
