@@ -1,6 +1,8 @@
 package com.example.backend;
 
 import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "user_profiles", uniqueConstraints = @UniqueConstraint(columnNames = "username"))
@@ -24,6 +26,9 @@ public class UserProfile {
     private String language;
     @Column(length = 2048)
     private String interests;
+
+    @ManyToMany(mappedBy = "members")
+    private Set<com.example.backend.jamiah.Jamiah> jamiahs = new HashSet<>();
 
     public UserProfile() {
     }
@@ -118,5 +123,13 @@ public class UserProfile {
 
     public void setInterests(String interests) {
         this.interests = interests;
+    }
+
+    public Set<com.example.backend.jamiah.Jamiah> getJamiahs() {
+        return jamiahs;
+    }
+
+    public void setJamiahs(Set<com.example.backend.jamiah.Jamiah> jamiahs) {
+        this.jamiahs = jamiahs;
     }
 }

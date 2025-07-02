@@ -3,6 +3,8 @@ package com.example.backend;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import com.example.backend.jamiah.JamiahMapper;
+import java.util.stream.Collectors;
 
 import java.util.List;
 
@@ -11,9 +13,11 @@ import java.util.List;
 @CrossOrigin(origins = "*")
 public class UserProfileController {
     private final UserProfileRepository repository;
+    private final JamiahMapper jamiahMapper;
 
-    public UserProfileController(UserProfileRepository repository) {
+    public UserProfileController(UserProfileRepository repository, JamiahMapper jamiahMapper) {
         this.repository = repository;
+        this.jamiahMapper = jamiahMapper;
     }
 
     @GetMapping
@@ -78,6 +82,15 @@ public class UserProfileController {
         existing.setLanguage(profile.getLanguage());
         existing.setInterests(profile.getInterests());
         return repository.save(existing);
+    }
+
+    @GetMapping("/uid/{uid}/jamiahs")
+    public List<com.example.backend.jamiah.dto.JamiahDto> getJamiahs(@PathVariable String uid) {
+        return repository.findWithJamiahsByUid(uid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND))
+                .getJamiahs().stream()
+                .map(jamiahMapper::toDto)
+                .collect(Collectors.toList());
     }
 
     @DeleteMapping("/{id}")
