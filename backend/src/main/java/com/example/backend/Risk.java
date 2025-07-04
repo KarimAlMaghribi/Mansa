@@ -5,8 +5,6 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "risks")
@@ -20,10 +18,6 @@ public class Risk {
     @Column(length = 2048)
     private String description;
 
-    @ElementCollection
-    @CollectionTable(name = "risk_types", joinColumns = @JoinColumn(name = "risk_id"))
-    @Column(name = "type")
-    private List<String> type = new ArrayList<>();
 
     private BigDecimal value;
 
@@ -69,13 +63,6 @@ public class Risk {
         this.description = description;
     }
 
-    public List<String> getType() {
-        return type;
-    }
-
-    public void setType(List<String> type) {
-        this.type = type;
-    }
 
     public BigDecimal getValue() {
         return value;
