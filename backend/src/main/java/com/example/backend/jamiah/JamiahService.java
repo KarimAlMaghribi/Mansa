@@ -44,8 +44,18 @@ public class JamiahService {
     }
 
     public JamiahDto create(JamiahDto dto) {
+        return create(dto, null);
+    }
+
+    public JamiahDto create(JamiahDto dto, String uid) {
         validateParameters(dto);
         Jamiah entity = mapper.toEntity(dto);
+        if (uid != null) {
+            com.example.backend.UserProfile user = userRepository.findByUid(uid)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+            entity.getMembers().add(user);
+            user.getJamiahs().add(entity);
+        }
         Jamiah saved = repository.save(entity);
         return mapper.toDto(saved);
     }
