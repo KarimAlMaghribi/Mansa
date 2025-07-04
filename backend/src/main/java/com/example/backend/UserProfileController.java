@@ -93,6 +93,11 @@ public class UserProfileController {
         return repository.save(entity);
     }
 
+    @PutMapping("/profile/{uid}")
+    public UserProfile saveProfile(@PathVariable String uid, @RequestBody UserProfile profile) {
+        return updateByUid(uid, profile);
+    }
+
     @GetMapping("/uid/{uid}/jamiahs")
     public List<com.example.backend.jamiah.dto.JamiahDto> getJamiahs(@PathVariable String uid) {
         return repository.findWithJamiahsByUid(uid)

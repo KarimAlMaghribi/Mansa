@@ -43,7 +43,6 @@ public class RiskController {
         Risk existing = riskRepository.findById(id).orElseThrow(() -> new RuntimeException("Risk not found"));
         existing.setName(risk.getName());
         existing.setDescription(risk.getDescription());
-        existing.setType(risk.getType());
         existing.setValue(risk.getValue());
         existing.setDeclinationDate(risk.getDeclinationDate());
         existing.setStatus(risk.getStatus());
