@@ -12,14 +12,12 @@ import {
   Alert
 } from "@mui/material";
 import Avatar from "@mui/material/Avatar";
-import { useDispatch } from "react-redux";
-import { AppDispatch } from "../../store/store";
-import { saveProfileImage, removeProfileImage } from "../../store/slices/user-profile";
+
 import { uploadProfileImage, deleteProfileImage } from "../../firebase/firebase-service";
-import { collection, getDocs, query, where, setDoc, doc } from "firebase/firestore";
+
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../constants/api";
-import { db } from "../../firebase_config";
+
 import { useAuth } from "../../context/AuthContext";
 
 const helperTexts: Record<string, string> = {
@@ -67,7 +65,6 @@ export const CompleteProfile: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const navigate = useNavigate();
   const { user } = useAuth();
-  const dispatch: AppDispatch = useDispatch();
 
   const handleSnackbarClose = () => setSnackbarOpen(false);
 
@@ -130,7 +127,6 @@ export const CompleteProfile: React.FC = () => {
   const handleDeleteImage = async () => {
     if (!user) return;
     await deleteProfileImage(user.uid);
-    dispatch(removeProfileImage());
     setSelectedFile(null);
     setPreviewUrl('');
   };
@@ -157,47 +153,24 @@ export const CompleteProfile: React.FC = () => {
 
     if (Object.keys(errors).length > 0) return;
 
-    if (formData.username) {
-      const usernameQuery = query(
-        collection(db, "userProfiles"),
-        where("profile.username", "==", formData.username),
-        where("uid", "!=", user.uid)
-      );
-      const usernameSnapshot = await getDocs(usernameQuery);
-      if (!usernameSnapshot.empty) {
-        setSnackbarMessage("Benutzername bereits vergeben.");
-        setSnackbarOpen(true);
-        return;
-      }
-    }
+
 
     let imageUrl = previewUrl;
     if (selectedFile && user) {
       const uploaded = await uploadProfileImage(user.uid, selectedFile);
       if (uploaded) {
         imageUrl = uploaded;
-        dispatch(saveProfileImage(uploaded));
       }
     }
 
-    await setDoc(
-      doc(db, "userProfiles", user.uid),
-      {
-        id: user.uid,
-        uid: user.uid,
-        profile: { ...formData, image: imageUrl },
-        createdAt: new Date().toISOString()
-      },
-      { merge: true }
-    );
-
+    const { image, ...payload } = formData;
     const resp = await fetch(`${API_BASE_URL}/api/userProfiles`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid: user.uid, ...formData })
+      body: JSON.stringify({ uid: user.uid, ...payload })
     });
     if (!resp.ok) {
-      setSnackbarMessage("Benutzername bereits vergeben.");
+      setSnackbarMessage("Fehler beim Speichern des Profils.");
       setSnackbarOpen(true);
       return;
     }

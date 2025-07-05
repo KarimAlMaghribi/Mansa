@@ -10,12 +10,8 @@ import {
   Alert
 } from "@mui/material";
 import Avatar from "@mui/material/Avatar";
-import { useDispatch } from "react-redux";
-import { AppDispatch } from "../../store/store";
-import { saveProfileImage, removeProfileImage } from "../../store/slices/user-profile";
 import { uploadProfileImage, deleteProfileImage } from "../../firebase/firebase-service";
-import { doc, getDoc, setDoc, query, collection, where, getDocs } from "firebase/firestore";
-import { auth, db } from "../../firebase_config";
+import { auth } from "../../firebase_config";
 import { useAuth } from "../../context/AuthContext";
 import { API_BASE_URL } from "../../constants/api";
 
@@ -62,19 +58,30 @@ export const Profile: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const { user } = useAuth();
-  const dispatch: AppDispatch = useDispatch();
 
   useEffect(() => {
     const fetchProfile = async () => {
       if (!user) return;
-      const docRef = doc(db, "userProfiles", user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data().profile || {};
-        setFormData(prev => ({ ...prev, ...data }));
-        if (data.image) {
-          setPreviewUrl(data.image);
+      try {
+        const resp = await fetch(`${API_BASE_URL}/api/userProfiles/uid/${user.uid}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          setFormData(prev => ({
+            ...prev,
+            firstName: data.firstName || "",
+            lastName: data.lastName || "",
+            birthDate: data.birthDate || "",
+            gender: data.gender || "",
+            nationality: data.nationality || "",
+            address: data.address || "",
+            phone: data.phone || "",
+            username: data.username || "",
+            language: data.language || "",
+            interests: data.interests || ""
+          }));
         }
+      } catch (err) {
+        console.error(err);
       }
     };
     if (user) {
@@ -149,7 +156,6 @@ export const Profile: React.FC = () => {
   const handleDeleteImage = async () => {
     if (!user) return;
     await deleteProfileImage(user.uid);
-    dispatch(removeProfileImage());
     setSelectedFile(null);
     setPreviewUrl('');
   };
@@ -169,45 +175,22 @@ export const Profile: React.FC = () => {
     if (Object.keys(errors).length > 0) return;
     if (!auth.currentUser) return;
 
-    const usernameQuery = query(
-      collection(db, "userProfiles"),
-      where("profile.username", "==", formData.username),
-      where("uid", "!=", auth.currentUser.uid)
-    );
-    const usernameSnapshot = await getDocs(usernameQuery);
-    if (!usernameSnapshot.empty) {
-      setSnackbarMessage("Benutzername bereits vergeben.");
-      setSnackbarOpen(true);
-      return;
-    }
-
     let imageUrl = previewUrl;
     if (selectedFile && user) {
       const uploaded = await uploadProfileImage(user.uid, selectedFile);
       if (uploaded) {
         imageUrl = uploaded;
-        dispatch(saveProfileImage(uploaded));
       }
     }
 
-    await setDoc(
-      doc(db, "userProfiles", auth.currentUser.uid),
-      {
-        id: auth.currentUser.uid,
-        uid: auth.currentUser.uid,
-        profile: { ...formData, image: imageUrl },
-        updatedAt: new Date().toISOString()
-      },
-      { merge: true }
-    );
-
+    const { image, ...payload } = formData;
     const resp = await fetch(`${API_BASE_URL}/api/userProfiles/uid/${auth.currentUser.uid}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid: auth.currentUser.uid, ...formData })
+      body: JSON.stringify({ uid: auth.currentUser.uid, ...payload })
     });
     if (!resp.ok) {
-      setSnackbarMessage("Benutzername bereits vergeben.");
+      setSnackbarMessage("Fehler beim Speichern des Profils.");
       setSnackbarOpen(true);
       return;
     }

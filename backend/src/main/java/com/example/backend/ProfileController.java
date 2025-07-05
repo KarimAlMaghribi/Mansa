@@ -16,6 +16,11 @@ public class ProfileController {
         this.delegate = delegate;
     }
 
+    @GetMapping("/{uid}")
+    public UserProfile getProfile(@PathVariable String uid) {
+        return delegate.getByUid(uid);
+    }
+
     @PutMapping("/{uid}")
     public UserProfile saveProfile(@PathVariable String uid, @RequestBody UserProfile profile) {
         return delegate.updateByUid(uid, profile);
