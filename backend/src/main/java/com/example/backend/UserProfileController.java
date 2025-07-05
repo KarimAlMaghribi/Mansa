@@ -25,6 +25,12 @@ public class UserProfileController {
         return repository.findAll();
     }
 
+    @GetMapping("/uid/{uid}")
+    public UserProfile getByUid(@PathVariable String uid) {
+        return repository.findByUid(uid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
     @GetMapping("/{id}")
     public UserProfile get(@PathVariable Long id) {
         return repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));

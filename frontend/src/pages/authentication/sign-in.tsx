@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Box, Button, Typography, Snackbar, Alert, CircularProgress } from "@mui/material";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { auth, db } from "../../firebase_config";
+import { auth } from "../../firebase_config";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, query, where } from "firebase/firestore";
 import { ROUTES } from "../../routing/routes";
+import { API_BASE_URL } from "../../constants/api";
 
 export const LoginForm: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -26,12 +26,13 @@ export const LoginForm: React.FC = () => {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      const profileQuery = query(collection(db, "userProfiles"), where("uid", "==", user.uid));
-      const profileSnapshot = await getDocs(profileQuery);
-      if (profileSnapshot.empty) {
+      const resp = await fetch(`${API_BASE_URL}/api/userProfiles/uid/${user.uid}`);
+      if (resp.status === 404) {
         navigate(`/${ROUTES.COMPLETE_PROFILE}`);
-      } else {
+      } else if (resp.ok) {
         navigate("/");
+      } else {
+        showError("Profil konnte nicht geladen werden.");
       }
     } catch (err: any) {
       showError("Google-Anmeldung fehlgeschlagen.");
