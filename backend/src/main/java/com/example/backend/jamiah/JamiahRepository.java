@@ -14,4 +14,9 @@ public interface JamiahRepository extends JpaRepository<Jamiah, Long> {
 
     @Query("select count(m) from Jamiah j join j.members m where j.id = :id")
     long countMembers(@Param("id") Long id);
+
+    /**
+     * Find all Jamiahs created by the given user.
+     */
+    java.util.List<Jamiah> findByOwnerId(String ownerId);
 }
