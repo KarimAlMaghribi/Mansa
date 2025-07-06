@@ -104,6 +104,44 @@ public class UserProfileController {
         return updateByUid(uid, profile);
     }
 
+    @PostMapping(value = "/uid/{uid}/image", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public void uploadImage(@PathVariable String uid, @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        UserProfile user = repository.findByUid(uid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        try {
+            user.setProfileImage(file.getBytes());
+            user.setProfileImageType(file.getContentType());
+            repository.save(user);
+        } catch (java.io.IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not store file", e);
+        }
+    }
+
+    @GetMapping("/uid/{uid}/image")
+    public org.springframework.http.ResponseEntity<byte[]> getImage(@PathVariable String uid) {
+        UserProfile user = repository.findByUid(uid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (user.getProfileImage() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        org.springframework.http.MediaType type = user.getProfileImageType() != null ?
+                org.springframework.http.MediaType.parseMediaType(user.getProfileImageType()) :
+                org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(type)
+                .body(user.getProfileImage());
+    }
+
+    @DeleteMapping("/uid/{uid}/image")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteImage(@PathVariable String uid) {
+        UserProfile user = repository.findByUid(uid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        user.setProfileImage(null);
+        user.setProfileImageType(null);
+        repository.save(user);
+    }
+
     @GetMapping("/uid/{uid}/jamiahs")
     public List<com.example.backend.jamiah.dto.JamiahDto> getJamiahs(@PathVariable String uid) {
         return repository.findWithJamiahsByUid(uid)
