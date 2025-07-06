@@ -89,6 +89,22 @@ export const Profile: React.FC = () => {
     }
   }, [user]);
 
+  useEffect(() => {
+    const loadImage = async () => {
+      if (!user) return;
+      try {
+        const resp = await fetch(`${API_BASE_URL}/api/userProfiles/uid/${user.uid}/image`);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          setPreviewUrl(URL.createObjectURL(blob));
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    loadImage();
+  }, [user]);
+
   const handleSnackbarClose = () => setSnackbarOpen(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -158,6 +174,7 @@ export const Profile: React.FC = () => {
     await deleteProfileImage(user.uid);
     setSelectedFile(null);
     setPreviewUrl('');
+    window.dispatchEvent(new Event('profileImageUpdated'));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -180,6 +197,7 @@ export const Profile: React.FC = () => {
       const uploaded = await uploadProfileImage(user.uid, selectedFile);
       if (uploaded) {
         imageUrl = uploaded;
+        window.dispatchEvent(new Event('profileImageUpdated'));
       }
     }
 
@@ -196,6 +214,10 @@ export const Profile: React.FC = () => {
     }
     setSnackbarMessage("Profil aktualisiert.");
     setSnackbarOpen(true);
+    if (!selectedFile) {
+      // ensure other components refresh even if no file was uploaded
+      window.dispatchEvent(new Event('profileImageUpdated'));
+    }
   };
 
   const getError = (field: keyof typeof formData) => fieldErrors[field] || false;

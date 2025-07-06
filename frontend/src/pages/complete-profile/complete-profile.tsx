@@ -129,6 +129,7 @@ export const CompleteProfile: React.FC = () => {
     await deleteProfileImage(user.uid);
     setSelectedFile(null);
     setPreviewUrl('');
+    window.dispatchEvent(new Event('profileImageUpdated'));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -160,6 +161,7 @@ export const CompleteProfile: React.FC = () => {
       const uploaded = await uploadProfileImage(user.uid, selectedFile);
       if (uploaded) {
         imageUrl = uploaded;
+        window.dispatchEvent(new Event('profileImageUpdated'));
       }
     }
 
@@ -176,6 +178,9 @@ export const CompleteProfile: React.FC = () => {
     }
 
     navigate("/");
+    if (!selectedFile) {
+      window.dispatchEvent(new Event('profileImageUpdated'));
+    }
   };
 
   const getError = (field: keyof typeof formData) => fieldErrors[field] || false;

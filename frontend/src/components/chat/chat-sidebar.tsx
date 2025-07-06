@@ -9,6 +9,8 @@ import {useDispatch, useSelector} from "react-redux";
 import {AppDispatch} from "../../store/store";
 import {searchChats} from "../../store/slices/my-bids";
 import {selectMail, selectName} from "../../store/slices/user-profile";
+import {auth} from "../../firebase_config";
+import {fetchProfileImage} from "../../firebase/firebase-service";
 
 const drawerWidth = 320;
 
@@ -16,6 +18,22 @@ export const ChatSidebar = () => {
     const dispatch: AppDispatch = useDispatch();
     const username: string = useSelector(selectName);
     const userMail: string = useSelector(selectMail);
+    const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(undefined);
+
+    React.useEffect(() => {
+        const loadImage = async () => {
+            if (auth.currentUser) {
+                const url = await fetchProfileImage(auth.currentUser.uid);
+                if (url) {
+                    setAvatarUrl(url);
+                }
+            }
+        };
+        loadImage();
+        const handler = () => loadImage();
+        window.addEventListener('profileImageUpdated', handler);
+        return () => window.removeEventListener('profileImageUpdated', handler);
+    }, []);
 
     return (
         <Drawer
@@ -35,7 +53,7 @@ export const ChatSidebar = () => {
                     }}
                     overlap="circular"
                     color="success">
-                    <Avatar src="" sx={{width: 54, height: 54}}/>
+                    <Avatar src={avatarUrl || ''} sx={{width: 54, height: 54}}/>
                 </Badge>
                 <Box>
                     <Typography variant="body1" fontWeight={600}>

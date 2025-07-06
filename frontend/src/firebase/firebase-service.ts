@@ -83,3 +83,17 @@ export const deleteProfileImage = async (uid: string): Promise<boolean> => {
         return false;
     }
 };
+
+export const fetchProfileImage = async (uid: string): Promise<string | null> => {
+    try {
+        const resp = await fetch(`${API_BASE_URL}/api/userProfiles/uid/${uid}/image?t=${Date.now()}`);
+        if (!resp.ok) {
+            return null;
+        }
+        const blob = await resp.blob();
+        return URL.createObjectURL(blob);
+    } catch (error) {
+        console.error('Error fetching profile image:', error);
+        return null;
+    }
+};
