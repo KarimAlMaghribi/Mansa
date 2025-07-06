@@ -182,4 +182,27 @@ class JamiahServiceTest {
 
         assertEquals(1, repository.countMembers(entity.getId()));
     }
+
+    @Test
+    void createJamiahAddsCreator() {
+        UserProfile user = new UserProfile();
+        user.setUsername("creator");
+        user.setUid("uid123");
+        userRepository.save(user);
+
+        JamiahDto dto = new JamiahDto();
+        dto.setName("Creators Group");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(1);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        service.create(dto, "uid123");
+        Jamiah jamiah = repository.findAll().get(0);
+
+        assertEquals(1, jamiah.getMembers().size());
+        assertTrue(jamiah.getMembers().contains(user));
+    }
 }

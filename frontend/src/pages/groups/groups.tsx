@@ -521,7 +521,11 @@ export const Groups = () => {
                     setCreateErrors({ name: true });
                     return;
                   }
-                  fetch(`${API_BASE_URL}/api/jamiahs`, {
+                  const uid = auth.currentUser?.uid;
+                  const url = uid
+                    ? `${API_BASE_URL}/api/jamiahs?uid=${encodeURIComponent(uid)}`
+                    : `${API_BASE_URL}/api/jamiahs`;
+                  fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(newGroup)
