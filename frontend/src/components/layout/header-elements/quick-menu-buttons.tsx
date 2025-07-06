@@ -6,7 +6,7 @@ import {settings} from "../pages";
 import MenuItem from "@mui/material/MenuItem";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
-import {signOutUser} from "../../../firebase/firebase-service";
+import {signOutUser, fetchProfileImage} from "../../../firebase/firebase-service";
 import West from "@mui/icons-material/West";
 import Grid from "@mui/material/Grid2";
 import {ROUTES} from "../../../routing/routes";
@@ -30,6 +30,24 @@ export const QuickMenuButtons = (props: AuthenticationButtonsProps) => {
     const navigate = useNavigate();
     const userName: string = useSelector(selectName);
     const imageUrl: string | undefined = useSelector(selectImage);
+    const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(undefined);
+
+    React.useEffect(() => {
+        const loadImage = async () => {
+            if (props.isLoggedIn && auth.currentUser) {
+                const url = await fetchProfileImage(auth.currentUser.uid);
+                if (url) {
+                    setAvatarUrl(url);
+                }
+            } else {
+                setAvatarUrl(undefined);
+            }
+        };
+        loadImage();
+        const handler = () => loadImage();
+        window.addEventListener('profileImageUpdated', handler);
+        return () => window.removeEventListener('profileImageUpdated', handler);
+    }, [props.isLoggedIn]);
 
     return (
         <>
@@ -38,7 +56,7 @@ export const QuickMenuButtons = (props: AuthenticationButtonsProps) => {
                     <Box sx={{flexGrow: 0}}>
                         {/*<NotificationButton />*/}
                         <IconButton onClick={props.handleOpenUserMenu} sx={{p: 0}}>
-                            <Avatar src={imageUrl || ''}/>
+                            <Avatar src={avatarUrl || imageUrl || ''}/>
                         </IconButton>
                         <Menu
                             sx={{mt: '45px'}}
