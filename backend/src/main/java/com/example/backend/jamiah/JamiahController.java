@@ -31,11 +31,8 @@ public class JamiahController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public JamiahDto create(@Valid @RequestBody JamiahDto dto,
-                            @org.springframework.security.core.annotation.AuthenticationPrincipal
-                                    org.springframework.security.oauth2.jwt.Jwt jwt) {
-        String uid = jwt != null ? jwt.getSubject() : null;
-        return service.createJamiah(uid, dto);
+    public JamiahDto create(@Valid @RequestBody JamiahDto dto) {
+        return service.createJamiah(null, dto);
     }
 
     @PutMapping("/{id}")
