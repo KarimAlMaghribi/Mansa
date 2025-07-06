@@ -199,10 +199,35 @@ class JamiahServiceTest {
         dto.setRateInterval(RateInterval.MONTHLY);
         dto.setStartDate(LocalDate.now());
 
-        service.create(dto, "uid123");
+        service.createJamiah("uid123", dto);
         Jamiah jamiah = repository.findAll().get(0);
 
         assertEquals(1, jamiah.getMembers().size());
         assertTrue(jamiah.getMembers().contains(user));
+        assertEquals("uid123", jamiah.getOwnerId());
+    }
+
+    @Test
+    void getJamiahsForUserReturnsOwnedJamiahs() {
+        UserProfile user = new UserProfile();
+        user.setUsername("owner");
+        user.setUid("owner1");
+        userRepository.save(user);
+
+        JamiahDto dto = new JamiahDto();
+        dto.setName("Owned Group");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(1);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        service.createJamiah("owner1", dto);
+
+        List<JamiahDto> jamiahs = service.getJamiahsForUser("owner1");
+
+        assertEquals(1, jamiahs.size());
+        assertEquals("Owned Group", jamiahs.get(0).getName());
     }
 }

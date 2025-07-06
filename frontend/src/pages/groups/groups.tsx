@@ -44,6 +44,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
 import { auth } from '../../firebase_config';
+import { useAuth } from '../../context/AuthContext';
 import { GenerateInviteButton } from '../../components/jamiah/GenerateInviteButton';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../routing/routes';
@@ -78,9 +79,10 @@ export const Groups = () => {
   const isMobile = useMediaQuery('(max-width:600px)');
   const steps = ['Name & Typ', 'Beitrag & Zyklus', 'Gruppengröße & Startdatum'];
   const [activeStep, setActiveStep] = useState(0);
+  const { user } = useAuth();
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
+    const uid = user?.uid;
     if (!uid) {
       setGroups([]);
       setLoading(false);
@@ -521,7 +523,7 @@ export const Groups = () => {
                     setCreateErrors({ name: true });
                     return;
                   }
-                  const uid = auth.currentUser?.uid;
+                  const uid = user?.uid;
                   const url = uid
                     ? `${API_BASE_URL}/api/jamiahs?uid=${encodeURIComponent(uid)}`
                     : `${API_BASE_URL}/api/jamiahs`;

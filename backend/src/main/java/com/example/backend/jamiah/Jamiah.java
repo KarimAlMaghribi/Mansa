@@ -17,6 +17,11 @@ public class Jamiah {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * UID of the user who created this Jamiah.
+     */
+    private String ownerId;
+
     @NotBlank
     @Size(min = 3)
     @Column(nullable = false)
@@ -57,4 +62,12 @@ public class Jamiah {
             joinColumns = @JoinColumn(name = "jamiah_id"),
             inverseJoinColumns = @JoinColumn(name = "user_profile_id"))
     private Set<com.example.backend.UserProfile> members = new HashSet<>();
+
+    public String getOwnerId() {
+        return ownerId;
+    }
+
+    public void setOwnerId(String ownerId) {
+        this.ownerId = ownerId;
+    }
 }

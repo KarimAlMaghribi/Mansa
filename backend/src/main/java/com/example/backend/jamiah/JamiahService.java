@@ -60,6 +60,23 @@ public class JamiahService {
         return mapper.toDto(saved);
     }
 
+    /**
+     * Create a new Jamiah for the given owner.
+     */
+    public JamiahDto createJamiah(String ownerUid, JamiahDto dto) {
+        validateParameters(dto);
+        Jamiah j = mapper.toEntity(dto);
+        j.setOwnerId(ownerUid);
+        if (ownerUid != null) {
+            com.example.backend.UserProfile user = userRepository.findByUid(ownerUid)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+            j.getMembers().add(user);
+            user.getJamiahs().add(j);
+        }
+        Jamiah saved = repository.save(j);
+        return mapper.toDto(saved);
+    }
+
     public JamiahDto update(Long id, JamiahDto dto) {
         validateParameters(dto);
         Jamiah entity = repository.findById(id)
@@ -111,6 +128,15 @@ public class JamiahService {
     public JamiahDto findByPublicId(String publicId) {
         Jamiah entity = getByPublicId(publicId);
         return mapper.toDto(entity);
+    }
+
+    /**
+     * Retrieve all Jamiahs owned by the specified user.
+     */
+    public java.util.List<JamiahDto> getJamiahsForUser(String ownerUid) {
+        return repository.findByOwnerId(ownerUid).stream()
+                .map(mapper::toDto)
+                .collect(java.util.stream.Collectors.toList());
     }
 
     public JamiahDto joinByInvitation(String code, String uid) {

@@ -1,0 +1,2 @@
+ALTER TABLE jamiah
+    ADD COLUMN owner_id VARCHAR(255);
