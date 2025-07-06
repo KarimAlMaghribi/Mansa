@@ -123,14 +123,17 @@ public class JamiahService {
         if (entity.getInvitationExpiry() != null && entity.getInvitationExpiry().isBefore(LocalDate.now())) {
             throw new ResponseStatusException(HttpStatus.GONE);
         }
-        if (entity.getMaxMembers() != null && entity.getMembers().size() >= entity.getMaxMembers()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member limit reached");
-        }
         com.example.backend.UserProfile user = userRepository.findByUid(uid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        entity.getMembers().add(user);
-        user.getJamiahs().add(entity);
-        return mapper.toDto(repository.save(entity));
+        if (!entity.getMembers().contains(user)) {
+            if (entity.getMaxMembers() != null && entity.getMembers().size() >= entity.getMaxMembers()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member limit reached");
+            }
+            entity.getMembers().add(user);
+            user.getJamiahs().add(entity);
+            repository.save(entity);
+        }
+        return mapper.toDto(entity);
     }
 
     public void delete(String publicId) {
