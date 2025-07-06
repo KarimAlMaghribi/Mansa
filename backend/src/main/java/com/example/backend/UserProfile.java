@@ -27,6 +27,13 @@ public class UserProfile {
     @Column(length = 2048)
     private String interests;
 
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "profile_image")
+    private byte[] profileImage;
+
+    private String profileImageType;
+
     @ManyToMany(mappedBy = "members")
     private Set<com.example.backend.jamiah.Jamiah> jamiahs = new HashSet<>();
 
@@ -123,6 +130,22 @@ public class UserProfile {
 
     public void setInterests(String interests) {
         this.interests = interests;
+    }
+
+    public byte[] getProfileImage() {
+        return profileImage;
+    }
+
+    public void setProfileImage(byte[] profileImage) {
+        this.profileImage = profileImage;
+    }
+
+    public String getProfileImageType() {
+        return profileImageType;
+    }
+
+    public void setProfileImageType(String profileImageType) {
+        this.profileImageType = profileImageType;
     }
 
     public Set<com.example.backend.jamiah.Jamiah> getJamiahs() {
