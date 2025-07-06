@@ -43,6 +43,7 @@ import LockIcon from '@mui/icons-material/Lock';
 import CloseIcon from '@mui/icons-material/Close';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
+import { auth } from '../../firebase_config';
 import { GenerateInviteButton } from '../../components/jamiah/GenerateInviteButton';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../routing/routes';
@@ -79,8 +80,14 @@ export const Groups = () => {
   const [activeStep, setActiveStep] = useState(0);
 
   useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      setGroups([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    fetch(`${API_BASE_URL}/api/jamiahs`)
+    fetch(`${API_BASE_URL}/api/userProfiles/uid/${uid}/jamiahs`)
       .then(res => res.json())
       .then(setGroups)
       .catch(() => setGroups([]))
