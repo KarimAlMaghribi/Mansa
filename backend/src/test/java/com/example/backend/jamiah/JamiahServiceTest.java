@@ -156,4 +156,30 @@ class JamiahServiceTest {
         assertThrows(ResponseStatusException.class,
                 () -> service.joinByInvitation(invite.getInvitationCode(), "u2"));
     }
+
+    @Test
+    void joinByInvitationAlreadyMember() {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("ExistingMember");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(2);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        service.create(dto);
+        Jamiah entity = repository.findAll().get(0);
+        JamiahDto invite = service.createOrRefreshInvitation(entity.getId());
+
+        UserProfile user = new UserProfile();
+        user.setUsername("user1");
+        user.setUid("u1");
+        userRepository.save(user);
+
+        service.joinByInvitation(invite.getInvitationCode(), "u1");
+        service.joinByInvitation(invite.getInvitationCode(), "u1");
+
+        assertEquals(1, repository.countMembers(entity.getId()));
+    }
 }
