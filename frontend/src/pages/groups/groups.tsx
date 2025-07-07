@@ -119,10 +119,28 @@ export const Groups = () => {
     fetch(`${API_BASE_URL}/api/jamiahs/${group.id}/join-public?uid=${encodeURIComponent(uid)}`, {
       method: 'POST'
     })
-      .then(res => res.json())
-      .then(j => {
-        setGroups([...groups, j]);
-      });
+      .then(async res => {
+        if (res.ok) {
+          const j = await res.json();
+          setGroups([...groups, j]);
+          setSnackbarMessage('Beitritt erfolgreich');
+          setSnackbarError(false);
+        } else if (res.status === 400) {
+          setSnackbarMessage('Maximale Teilnehmerzahl erreicht');
+          setSnackbarError(true);
+        } else if (res.status === 404) {
+          setSnackbarMessage('Jamiah nicht gefunden');
+          setSnackbarError(true);
+        } else {
+          setSnackbarMessage('Fehler beim Beitreten');
+          setSnackbarError(true);
+        }
+      })
+      .catch(() => {
+        setSnackbarMessage('Fehler beim Beitreten');
+        setSnackbarError(true);
+      })
+      .finally(() => setSnackbarOpen(true));
   };
 
   const getCycleInfo = (g: Jamiah) => {
@@ -149,6 +167,7 @@ export const Groups = () => {
   }, [search, visibilityFilter, statusFilter]);
 
   const filteredGroups = groups
+    .filter(g => g && g.name)
     .filter(g => g.name.toLowerCase().includes(search.toLowerCase()))
     .filter(g =>
       visibilityFilter === 'all'
