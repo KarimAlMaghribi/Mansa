@@ -9,6 +9,7 @@ import { FormField } from '../../components/profile/FormField';
 import { AvatarUploader } from '../../components/profile/AvatarUploader';
 import { auth } from '../../firebase_config';
 import { useAuth } from '../../context/AuthContext';
+import { uploadProfileImage } from '../../firebase/firebase-service';
 
 export const Profile = () => {
   const { t } = useTranslation();
@@ -53,6 +54,12 @@ export const Profile = () => {
   const onSubmit: SubmitHandler<ProfileFormValues> = async values => {
     if (!auth.currentUser) return;
     const { avatar, ...payload } = values;
+
+    if (avatar) {
+      await uploadProfileImage(auth.currentUser.uid, avatar as File);
+      window.dispatchEvent(new Event('profileImageUpdated'));
+    }
+
     await fetch(`${API_BASE_URL}/api/userProfiles/uid/${auth.currentUser.uid}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
