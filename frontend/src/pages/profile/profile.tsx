@@ -1,63 +1,27 @@
-import React, { useEffect, useState } from "react";
-import {
-  Box,
-  Button,
-  Grid,
-  MenuItem,
-  TextField,
-  Typography,
-  Snackbar,
-  Alert
-} from "@mui/material";
-import Avatar from "@mui/material/Avatar";
-import { uploadProfileImage, deleteProfileImage } from "../../firebase/firebase-service";
-import { auth } from "../../firebase_config";
-import { useAuth } from "../../context/AuthContext";
-import { API_BASE_URL } from "../../constants/api";
+import React, { useEffect, useState } from 'react';
+import { Box, Button, Card, CardContent, CircularProgress, Grid, Skeleton, Typography } from '@mui/material';
+import { useForm, FormProvider, SubmitHandler } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import { useTranslation } from 'react-i18next';
+import { API_BASE_URL } from '../../constants/api';
+import { profileSchema, ProfileFormValues } from './profileSchema';
+import { FormField } from '../../components/profile/FormField';
+import { AvatarUploader } from '../../components/profile/AvatarUploader';
+import { auth } from '../../firebase_config';
+import { useAuth } from '../../context/AuthContext';
 
-const helperTexts: Record<string, string> = {
-  firstName: "Mindestens 2 Zeichen.",
-  lastName: "Mindestens 2 Zeichen.",
-  birthDate: "Du musst mindestens 18 Jahre alt sein.",
-  address: "Mindestens 2 Zeichen.",
-  phone: "Nur Ziffern, mind. 7 Stellen.",
-  username: "Mindestens 3 Zeichen. Benutzername muss einzigartig sein.",
-  gender: "Bitte auswählen.",
-  nationality: "Bitte auswählen.",
-  language: "Bitte auswählen."
-};
-
-const calculateAge = (birthDate: string): number => {
-  const today = new Date();
-  const birth = new Date(birthDate);
-  let age = today.getFullYear() - birth.getFullYear();
-  const m = today.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-  return age;
-};
-
-const isValidPhone = (phone: string) => /^\+?[0-9]{7,15}$/.test(phone);
-
-export const Profile: React.FC = () => {
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    birthDate: "",
-    gender: "",
-    nationality: "",
-    address: "",
-    phone: "",
-    username: "",
-    language: "",
-    interests: "",
-    image: ""
-  });
-  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>("");
+export const Profile = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+
+  const methods = useForm<ProfileFormValues>({
+    resolver: yupResolver(profileSchema),
+    mode: 'onChange',
+    defaultValues: { avatar: null } as Partial<ProfileFormValues>
+  });
+
+  const { handleSubmit, reset, formState } = methods;
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -66,238 +30,113 @@ export const Profile: React.FC = () => {
         const resp = await fetch(`${API_BASE_URL}/api/userProfiles/uid/${user.uid}`);
         if (resp.ok) {
           const data = await resp.json();
-          setFormData(prev => ({
-            ...prev,
-            firstName: data.firstName || "",
-            lastName: data.lastName || "",
-            birthDate: data.birthDate || "",
-            gender: data.gender || "",
-            nationality: data.nationality || "",
-            address: data.address || "",
-            phone: data.phone || "",
-            username: data.username || "",
-            language: data.language || "",
-            interests: data.interests || ""
-          }));
+          reset({
+            firstName: data.firstName || '',
+            lastName: data.lastName || '',
+            username: data.username || '',
+            birthDate: data.birthDate || '',
+            address: data.address || '',
+            phone: data.phone || '',
+            language: data.language || '',
+            nationality: data.nationality || '',
+            gender: data.gender || '',
+            interests: data.interests || '',
+          });
         }
-      } catch (err) {
-        console.error(err);
+      } finally {
+        setLoading(false);
       }
     };
-    if (user) {
-      fetchProfile();
-    }
-  }, [user]);
+    fetchProfile();
+  }, [user, reset]);
 
-  useEffect(() => {
-    const loadImage = async () => {
-      if (!user) return;
-      try {
-        const resp = await fetch(`${API_BASE_URL}/api/userProfiles/uid/${user.uid}/image`);
-        if (resp.ok) {
-          const blob = await resp.blob();
-          setPreviewUrl(URL.createObjectURL(blob));
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    loadImage();
-  }, [user]);
-
-  const handleSnackbarClose = () => setSnackbarOpen(false);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setFieldErrors({ ...fieldErrors, [e.target.name]: false });
-  };
-
-  const handleBlur = async (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    const trimmed = value.trim();
-    const fail = (condition: boolean) => condition && setFieldErrors(prev => ({ ...prev, [name]: true }));
-
-    switch (name) {
-      case "firstName":
-      case "lastName":
-      case "address":
-        if (trimmed) fail(trimmed.length < 2);
-        break;
-      case "birthDate":
-        if (trimmed) fail(calculateAge(trimmed) < 18);
-        break;
-      case "phone":
-        if (trimmed) fail(!isValidPhone(trimmed));
-        break;
-      case "username":
-        if (!trimmed) break;
-        if (trimmed.length < 3) {
-          fail(true);
-          break;
-        }
-        if (user) {
-          const resp = await fetch(`${API_BASE_URL}/api/userProfiles/check?username=${encodeURIComponent(trimmed)}`);
-          const available = await resp.json();
-          if (!available) {
-            setFieldErrors(prev => ({ ...prev, [name]: true }));
-            setSnackbarMessage("Benutzername bereits vergeben.");
-            setSnackbarOpen(true);
-          }
-        }
-        break;
-      case "gender":
-      case "nationality":
-      case "language":
-        break;
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
-      setSnackbarMessage('Nur PNG oder JPG erlaubt.');
-      setSnackbarOpen(true);
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setSnackbarMessage('Die Datei darf maximal 5 MB groß sein.');
-      setSnackbarOpen(true);
-      return;
-    }
-    setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
-  };
-
-  const handleDeleteImage = async () => {
-    if (!user) return;
-    await deleteProfileImage(user.uid);
-    setSelectedFile(null);
-    setPreviewUrl('');
-    window.dispatchEvent(new Event('profileImageUpdated'));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const errors: Record<string, boolean> = {};
-    if (formData.birthDate && calculateAge(formData.birthDate) < 18) errors.birthDate = true;
-    if (formData.phone && !isValidPhone(formData.phone)) errors.phone = true;
-    if (formData.username && formData.username.trim().length < 3) errors.username = true;
-    if (formData.firstName && formData.firstName.trim().length < 2) errors.firstName = true;
-    if (formData.lastName && formData.lastName.trim().length < 2) errors.lastName = true;
-    if (formData.address && formData.address.trim().length < 2) errors.address = true;
-    setFieldErrors(prev => ({ ...prev, ...errors }));
-
-    if (Object.keys(errors).length > 0) return;
+  const onSubmit: SubmitHandler<ProfileFormValues> = async values => {
     if (!auth.currentUser) return;
-
-    let imageUrl = previewUrl;
-    if (selectedFile && user) {
-      const uploaded = await uploadProfileImage(user.uid, selectedFile);
-      if (uploaded) {
-        imageUrl = uploaded;
-        window.dispatchEvent(new Event('profileImageUpdated'));
-      }
-    }
-
-    const { image, ...payload } = formData;
-    const resp = await fetch(`${API_BASE_URL}/api/userProfiles/uid/${auth.currentUser.uid}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+    const { avatar, ...payload } = values;
+    await fetch(`${API_BASE_URL}/api/userProfiles/uid/${auth.currentUser.uid}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ uid: auth.currentUser.uid, ...payload })
     });
-    if (!resp.ok) {
-      setSnackbarMessage("Fehler beim Speichern des Profils.");
-      setSnackbarOpen(true);
-      return;
-    }
-    setSnackbarMessage("Profil aktualisiert.");
-    setSnackbarOpen(true);
-    if (!selectedFile) {
-      // ensure other components refresh even if no file was uploaded
-      window.dispatchEvent(new Event('profileImageUpdated'));
-    }
   };
 
-  const getError = (field: keyof typeof formData) => fieldErrors[field] || false;
-  const getHelper = (field: keyof typeof formData) => getError(field) ? helperTexts[field] : " ";
-
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3, px: 2, maxWidth: 600, mx: "auto" }}>
-      <Typography variant="h5" gutterBottom>Profil bearbeiten</Typography>
-      <Grid container spacing={2}>
-        {Object.entries(formData)
-          .filter(([key]) => key !== "image")
-          .map(([key, value]) => (
-          <Grid item xs={12} key={key}>
-            <TextField
-              fullWidth
-              required={false}
-              name={key}
-              label={{
-                firstName: "Vorname",
-                lastName: "Nachname",
-                birthDate: "Geburtsdatum",
-                gender: "Geschlecht",
-                nationality: "Nationalität",
-                address: "Adresse",
-                phone: "Telefonnummer",
-                username: "Benutzername",
-                language: "Sprache",
-                interests: "Interessen / Vorstellung"
-              }[key] || key}
-              type={key === "birthDate" ? "date" : "text"}
-              value={value}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              error={getError(key as keyof typeof formData)}
-              helperText={getHelper(key as keyof typeof formData)}
-              multiline={key === "interests"}
-              rows={key === "interests" ? 3 : undefined}
-              InputLabelProps={key === "birthDate" ? { shrink: true } : undefined}
-              select={["gender", "nationality", "language"].includes(key)}
-            >
-              {key === "gender" && ["männlich", "weiblich"].map(g => (
-                <MenuItem key={g} value={g}>{g}</MenuItem>
-              ))}
-              {key === "nationality" && [
-                "Deutschland 🇩🇪", "Türkei 🇹🇷", "Syrien 🇸🇾", "Afghanistan 🇦🇫", "Marokko 🇲🇦"
-              ].map(n => (
-                <MenuItem key={n} value={n}>{n}</MenuItem>
-              ))}
-              {key === "language" && [
-                { code: "de", label: "Deutsch 🇩🇪" },
-                { code: "en", label: "Englisch 🇬🇧" },
-                { code: "ar", label: "Arabisch 🇸🇦" },
-                { code: "fr", label: "Französisch 🇫🇷" }
-              ].map(l => (
-                <MenuItem key={l.code} value={l.code}>{l.label}</MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-        ))}
-        <Grid item xs={12}>
-          <Box display="flex" alignItems="center" gap={2}>
-            {previewUrl && <Avatar src={previewUrl} />}
-            <Button variant="outlined" component="label">
-              Bild wählen
-              <input hidden type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleFileChange} />
-            </Button>
-            {previewUrl && (
-              <Button color="error" onClick={handleDeleteImage}>Bild löschen</Button>
-            )}
-          </Box>
-        </Grid>
-      </Grid>
-      <Button type="submit" variant="contained" color="primary" sx={{ mt: 2 }}>
-        Speichern
-      </Button>
-      <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
-        <Alert severity="success" onClose={handleSnackbarClose} sx={{ width: '100%' }}>
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
-    </Box>
+    <FormProvider {...methods}>
+      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 3, px: 2, maxWidth: 600, mx: 'auto' }}>
+        <Typography variant="h5" gutterBottom>
+          {t('profile.title')}
+        </Typography>
+        {loading ? (
+          <Skeleton variant="rectangular" height={400} />
+        ) : (
+          <>
+            <Card variant="outlined" sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="h6">{t('profile.personalData')}</Typography>
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid item xs={12} md={6}>
+                    <FormField name="firstName" label={t('profile.firstName')} control={methods.control} />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <FormField name="lastName" label={t('profile.lastName')} control={methods.control} />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <FormField name="username" label={t('profile.username')} control={methods.control} />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <FormField type="date" name="birthDate" label={t('profile.birthDate')} control={methods.control} InputLabelProps={{ shrink: true }} />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <AvatarUploader name="avatar" control={methods.control} />
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+
+            <Card variant="outlined" sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="h6">{t('profile.contactData')}</Typography>
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid item xs={12} md={6}>
+                    <FormField name="address" label={t('profile.address')} control={methods.control} />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <FormField name="phone" label={t('profile.phone')} control={methods.control} />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <FormField
+                      name="nationality"
+                      label={t('profile.nationality')}
+                      control={methods.control}
+                      options={[{ value: 'de', label: 'Deutschland' }, { value: 'tr', label: 'T\u00fcrkei' }]}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <FormField
+                      name="language"
+                      label={t('profile.language')}
+                      control={methods.control}
+                      options={[{ value: 'de', label: 'Deutsch' }, { value: 'en', label: 'Englisch' }]}
+                    />
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="h6">{t('profile.settings')}</Typography>
+                <FormField name="interests" label={t('profile.interests')} control={methods.control} multiline rows={3} />
+              </CardContent>
+            </Card>
+          </>
+        )}
+        <Box display="flex" justifyContent="flex-end" mt={3}>
+          <Button type="submit" variant="contained" disabled={!formState.isValid || formState.isSubmitting} startIcon={formState.isSubmitting ? <CircularProgress size={20} /> : null}>
+            {t('save')}
+          </Button>
+        </Box>
+      </Box>
+    </FormProvider>
   );
 };

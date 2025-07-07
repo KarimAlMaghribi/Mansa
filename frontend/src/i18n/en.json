@@ -1,0 +1,19 @@
+{
+  "profile": {
+    "title": "Edit Profile",
+    "personalData": "Personal Data",
+    "contactData": "Contact Information",
+    "settings": "Settings",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "username": "Username",
+    "birthDate": "Birth Date",
+    "address": "Address",
+    "phone": "Phone Number",
+    "language": "Language",
+    "nationality": "Nationality",
+    "gender": "Gender",
+    "interests": "Interests / Bio"
+  },
+  "save": "Save"
+}
