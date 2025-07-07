@@ -209,6 +209,28 @@ class JamiahServiceTest {
     }
 
     @Test
+    void onlyOwnerCanModify() {
+        UserProfile owner = new UserProfile();
+        owner.setUsername("owner");
+        owner.setUid("ownerA");
+        userRepository.save(owner);
+
+        JamiahDto dto = new JamiahDto();
+        dto.setName("Protected");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(1);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        JamiahDto created = service.createJamiah("ownerA", dto);
+
+        assertThrows(ResponseStatusException.class,
+                () -> service.delete(created.getId().toString(), "intruder"));
+    }
+
+    @Test
     void getJamiahsForUserReturnsOwnedJamiahs() {
         UserProfile user = new UserProfile();
         user.setUsername("owner");
