@@ -15,6 +15,7 @@ import {useNavigate, useParams} from "react-router-dom";
 import {auth} from "../../firebase_config";
 import {useTheme} from '@mui/material';
 import {QuickMenuButtons} from "./header-elements/quick-menu-buttons";
+import {ROUTES} from "../../routing/routes";
 
 export function Header() {
     const navigate = useNavigate();
@@ -44,7 +45,7 @@ export function Header() {
 
     const handleCloseNavMenu = () => {
         setAnchorElNav(null);
-        if (groupId) navigate(`/jamiah/${groupId}`);
+        navigate(`/${ROUTES.GROUPS}`);
     };
 
     const handleCloseUserMenu = (setting: any) => {
