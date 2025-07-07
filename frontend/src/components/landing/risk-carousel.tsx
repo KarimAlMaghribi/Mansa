@@ -10,7 +10,7 @@ import event from "../../assests/imgs/risk-examples/event.jpg"
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import IconButton from "@mui/material/IconButton";
-import {theme} from "../../theme";
+import { useTheme } from '@mui/material';
 
 interface RiskExample {
     img: string;
@@ -58,6 +58,7 @@ export const RiskElement = (props: RiskExample) => {
 }
 
 export const RiskCarousel = () => {
+    const theme = useTheme();
     const orange = theme.palette.primary.main;
 
 

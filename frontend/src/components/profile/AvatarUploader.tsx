@@ -3,7 +3,7 @@ import { Box, Button, IconButton } from '@mui/material';
 import Avatar from '@mui/material/Avatar';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useDropzone } from 'react-dropzone';
-import Cropper from 'react-easy-crop';
+import Cropper, { Area } from 'react-easy-crop';
 import { Control, useController } from 'react-hook-form';
 import { getCroppedImg } from './cropHelpers';
 
@@ -32,7 +32,7 @@ export const AvatarUploader = ({ name, control }: AvatarUploaderProps) => {
 
   const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { 'image/*': [] } });
 
-  const handleCropComplete = useCallback((_croppedArea, pixels) => {
+  const handleCropComplete = useCallback((_croppedArea: Area, pixels: Area) => {
     setCroppedAreaPixels(pixels);
   }, []);
 
