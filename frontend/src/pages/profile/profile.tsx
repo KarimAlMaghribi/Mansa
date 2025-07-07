@@ -86,6 +86,14 @@ export const Profile = () => {
                   <Grid item xs={12} md={6}>
                     <FormField type="date" name="birthDate" label={t('profile.birthDate')} control={methods.control} InputLabelProps={{ shrink: true }} />
                   </Grid>
+                  <Grid item xs={12} md={6}>
+                    <FormField
+                      name="gender"
+                      label={t('profile.gender')}
+                      control={methods.control}
+                      options={[{ value: 'männlich', label: 'männlich' }, { value: 'weiblich', label: 'weiblich' }]}
+                    />
+                  </Grid>
                   <Grid item xs={12}>
                     <AvatarUploader name="avatar" control={methods.control} />
                   </Grid>
