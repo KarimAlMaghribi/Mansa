@@ -2,8 +2,10 @@ import * as yup from 'yup';
 import dayjs from 'dayjs';
 import { API_BASE_URL } from '../../constants/api';
 
-const checkUsernameUnique = async (username: string) => {
-  const resp = await fetch(`${API_BASE_URL}/api/userProfiles/check?username=${encodeURIComponent(username)}`);
+const checkUsernameUnique = async (username?: string) => {
+  const resp = await fetch(
+    `${API_BASE_URL}/api/userProfiles/check?username=${encodeURIComponent(username ?? '')}`
+  );
   const available = await resp.json();
   return available;
 };

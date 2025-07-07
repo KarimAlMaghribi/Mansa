@@ -14,12 +14,13 @@ import Logo from "../../assests/imgs/jamiah_logo.png";
 import {useLocation, useNavigate} from "react-router-dom";
 import {Page, pages} from "./pages";
 import {auth} from "../../firebase_config";
-import {theme} from "../../theme";
+import {useTheme} from '@mui/material';
 import {QuickMenuButtons} from "./header-elements/quick-menu-buttons";
 
 export function Header() {
     const location = useLocation();
     const navigate = useNavigate();
+    const theme = useTheme();
 
     const [isLoggedIn, setIsLoggedIn] = React.useState<boolean>(false);
     const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(null);

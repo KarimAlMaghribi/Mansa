@@ -4,7 +4,7 @@ import { Control, useController } from 'react-hook-form';
 
 interface Option { value: string; label: string }
 
-interface FormFieldProps extends TextFieldProps {
+type FormFieldProps = TextFieldProps & {
   name: string;
   label: string;
   control: Control<any>;

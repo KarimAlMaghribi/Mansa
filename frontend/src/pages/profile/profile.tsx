@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Button, Card, CardContent, CircularProgress, Grid, Skeleton, Typography } from '@mui/material';
-import { useForm, FormProvider, SubmitHandler } from 'react-hook-form';
+import { useForm, FormProvider, SubmitHandler, Resolver } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../../constants/api';
@@ -16,7 +16,7 @@ export const Profile = () => {
   const [loading, setLoading] = useState(true);
 
   const methods = useForm<ProfileFormValues>({
-    resolver: yupResolver(profileSchema),
+    resolver: yupResolver(profileSchema) as Resolver<ProfileFormValues>,
     mode: 'onChange',
     defaultValues: { avatar: null } as Partial<ProfileFormValues>
   });
