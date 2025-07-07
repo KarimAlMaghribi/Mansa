@@ -16,6 +16,17 @@ public interface JamiahRepository extends JpaRepository<Jamiah, Long> {
     long countMembers(@Param("id") Long id);
 
     /**
+     * Find all public Jamiahs.
+     */
+    java.util.List<Jamiah> findByIsPublicTrue();
+
+    /**
+     * Fetch a Jamiah with members by numeric id.
+     */
+    @Query("select j from Jamiah j left join fetch j.members where j.id = :id")
+    Optional<Jamiah> findWithMembersById(@Param("id") Long id);
+
+    /**
      * Find all Jamiahs created by the given user.
      */
     java.util.List<Jamiah> findByOwnerId(String ownerId);
