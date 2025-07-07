@@ -110,8 +110,7 @@ export const Groups = () => {
   const handleJoinOpen = () => navigate(`/${ROUTES.JOIN_JAMIAH}`);
   const handleCloseModal = () => setOpenModal(false);
   const handleDetails = (group: Jamiah) => {
-    setSelectedGroup(group);
-    setOpenModal(true);
+    navigate(`/jamiah/${group.id}`);
   };
 
   const handleJoinPublic = (group: Jamiah) => {
