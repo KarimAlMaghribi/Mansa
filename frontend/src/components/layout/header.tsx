@@ -45,11 +45,7 @@ export function Header() {
 
     const handleCloseNavMenu = () => {
         setAnchorElNav(null);
-        if (groupId) {
-            navigate(`/jamiah/${groupId}`);
-        } else {
-            navigate(`/${ROUTES.GROUPS}`);
-        }
+        navigate(`/${ROUTES.GROUPS}`);
     };
 
     const handleCloseUserMenu = (setting: any) => {
