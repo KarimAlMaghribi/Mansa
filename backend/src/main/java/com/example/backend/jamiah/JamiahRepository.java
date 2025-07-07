@@ -19,4 +19,10 @@ public interface JamiahRepository extends JpaRepository<Jamiah, Long> {
      * Find all Jamiahs created by the given user.
      */
     java.util.List<Jamiah> findByOwnerId(String ownerId);
+
+    /**
+     * Find all Jamiahs where the given user is a member.
+     */
+    @Query("SELECT j FROM Jamiah j JOIN j.members m WHERE m.uid = :uid")
+    java.util.List<Jamiah> findByMemberUid(@Param("uid") String uid);
 }

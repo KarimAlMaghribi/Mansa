@@ -31,8 +31,11 @@ public class JamiahController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public JamiahDto create(@Valid @RequestBody JamiahDto dto) {
-        return service.createJamiah(null, dto);
+    public JamiahDto create(
+        @RequestParam(required = false) String uid,
+        @Valid @RequestBody JamiahDto dto
+    ) {
+        return service.createJamiah(uid, dto);
     }
 
     @PutMapping("/{id}")
