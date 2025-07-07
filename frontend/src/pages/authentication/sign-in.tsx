@@ -28,7 +28,7 @@ export const LoginForm: React.FC = () => {
       const user = result.user;
       const resp = await fetch(`${API_BASE_URL}/api/userProfiles/uid/${user.uid}`);
       if (resp.status === 404) {
-        navigate(`/${ROUTES.COMPLETE_PROFILE}`);
+        navigate(`/${ROUTES.PROFILE}`);
       } else if (resp.ok) {
         navigate("/");
       } else {

@@ -24,7 +24,6 @@ export const ROUTES = {
     DOCUMENTS: 'documents',
     REPORTS: 'reports',
     ONBOARDING: 'onboarding',
-    COMPLETE_PROFILE: 'complete-profile',
 
     JOIN_JAMIAH: 'join-jamiah',
 
