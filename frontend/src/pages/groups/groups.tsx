@@ -94,7 +94,7 @@ export const Groups = () => {
       .then(setGroups)
       .catch(() => setGroups([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [user]);
 
   const navigate = useNavigate();
   const handleCreateOpen = () => setOpenCreateModal(true);
