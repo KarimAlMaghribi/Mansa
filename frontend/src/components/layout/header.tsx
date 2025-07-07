@@ -11,21 +11,19 @@ import Container from '@mui/material/Container';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import Logo from "../../assests/imgs/jamiah_logo.png";
-import {useLocation, useNavigate} from "react-router-dom";
-import {Page, pages} from "./pages";
+import {useNavigate, useParams} from "react-router-dom";
 import {auth} from "../../firebase_config";
 import {useTheme} from '@mui/material';
 import {QuickMenuButtons} from "./header-elements/quick-menu-buttons";
 
 export function Header() {
-    const location = useLocation();
     const navigate = useNavigate();
+    const { groupId } = useParams<{ groupId: string }>();
     const theme = useTheme();
 
     const [isLoggedIn, setIsLoggedIn] = React.useState<boolean>(false);
     const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(null);
     const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
-    const [activePage, setActivePage] = React.useState<string | null>(pages[0].name);
 
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged(user => {
@@ -35,14 +33,6 @@ export function Header() {
         return () => unsubscribe();
     }, []);
 
-    useEffect(() => {
-        if (location.pathname === "/")
-            setActivePage(pages[0].name);
-        else {
-            const currentPage = pages.find(page => location.pathname === `/${page.route}`);
-            setActivePage(currentPage ? currentPage.name : null);
-        }
-    }, [location]);
 
     const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => {
         setAnchorElNav(event.currentTarget);
@@ -52,13 +42,12 @@ export function Header() {
         setAnchorElUser(event.currentTarget);
     };
 
-    const handleCloseNavMenu = (page: Page) => {
-        setActivePage(page.name);
+    const handleCloseNavMenu = () => {
         setAnchorElNav(null);
-        navigate(page.route);
+        if (groupId) navigate(`/jamiah/${groupId}`);
     };
 
-    const handleCloseUserMenu = (setting: Page) => {
+    const handleCloseUserMenu = (setting: any) => {
         setAnchorElUser(null);
         navigate(setting.route)
     };
@@ -99,12 +88,9 @@ export function Header() {
                             onClose={() => setAnchorElNav(null)}
                             sx={{display: {xs: 'block', md: 'none'}}}>
 
-                            {pages.map((page) => (
-                                page.authenticated && !isLoggedIn ? null :
-                                <MenuItem key={page.name} onClick={() => handleCloseNavMenu(page)}>
-                                    <Typography sx={{textAlign: 'center'}}>{page.name}</Typography>
-                                </MenuItem>
-                            ))}
+                            <MenuItem onClick={handleCloseNavMenu}>
+                                <Typography sx={{textAlign: 'center'}}>Übersicht</Typography>
+                            </MenuItem>
                         </Menu>
                     </Box>
 
@@ -126,22 +112,17 @@ export function Header() {
                     </Typography>
 
                     <Box sx={{flexGrow: 1, display: {xs: 'none', md: 'flex'}}}>
-                        {pages.map((page) => (
-                            page.authenticated && !isLoggedIn ? null :
-                            <Button
-                                key={page.name}
-                                onClick={() => handleCloseNavMenu(page)}
-                                sx={{
-                                    my: 2,
-                                    color: activePage === page.name ? theme.palette.primary.main : 'white',
-                                    display: 'block',
-                                    textDecoration: 'none',
-                                    textDecorationColor: 'white',
-                                    fontWeight: activePage === page.name ? 'bold' : 'normal'
-                                }}>
-                                {page.name}
-                            </Button>
-                        ))}
+                        <Button
+                            onClick={handleCloseNavMenu}
+                            sx={{
+                                my: 2,
+                                color: 'white',
+                                display: 'block',
+                                textDecoration: 'none',
+                                textDecorationColor: 'white'
+                            }}>
+                            Übersicht
+                        </Button>
                     </Box>
                     <QuickMenuButtons
                         isLoggedIn={isLoggedIn}

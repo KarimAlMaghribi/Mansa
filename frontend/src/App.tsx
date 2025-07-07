@@ -29,6 +29,7 @@ import {Votes} from "./pages/votes/votes";
 import {Documents} from "./pages/documents/documents";
 import {Reports} from "./pages/reports/reports";
 import {Members} from "./pages/memebers/members";
+import JamiahLayout from "./components/layout/jamiah-layout";
 import {Onboarding} from "./pages/onboarding/onboarding";
 import { JoinJamiahPage } from "./pages/join-jamiah/join-jamiah";
 import { GroupDetails } from "./pages/group-details/group-details";
@@ -45,6 +46,15 @@ function App() {
                 <Route path="/verify-email" element={<VerifyEmail />} />
 
                 {/* Private routes */}
+                <Route path="/jamiah/:groupId/*" element={<PrivateRoute><JamiahLayout /></PrivateRoute>}>
+                    <Route index element={<Navigate to="dashboard" replace />} />
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="members" element={<Members />} />
+                    <Route path="payments" element={<Payments />} />
+                    <Route path="votes" element={<Votes />} />
+                    <Route path="documents" element={<Documents />} />
+                    <Route path="reports" element={<Reports />} />
+                </Route>
                 <Route path={`/${ROUTES.DASHBOARD}`} element={<PrivateRoute><Dashboard /></PrivateRoute>} />
                 <Route path={`/${ROUTES.GROUPS}`} element={<PrivateRoute><Groups /></PrivateRoute>} />
                 <Route path={`/${ROUTES.MEMBERS}`} element={<PrivateRoute><Members /></PrivateRoute>} />
