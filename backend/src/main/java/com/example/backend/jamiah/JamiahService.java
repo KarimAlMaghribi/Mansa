@@ -131,10 +131,10 @@ public class JamiahService {
     }
 
     /**
-     * Retrieve all Jamiahs owned by the specified user.
+     * Retrieve all Jamiahs the specified user is a member of.
      */
-    public java.util.List<JamiahDto> getJamiahsForUser(String ownerUid) {
-        return repository.findByOwnerId(ownerUid).stream()
+    public java.util.List<JamiahDto> getJamiahsForUser(String uid) {
+        return repository.findByMemberUid(uid).stream()
                 .map(mapper::toDto)
                 .collect(java.util.stream.Collectors.toList());
     }
