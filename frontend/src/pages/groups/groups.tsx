@@ -20,6 +20,7 @@ import {
   Snackbar,
   Alert,
   Avatar,
+  Chip,
   LinearProgress,
   Pagination,
   List,
@@ -53,6 +54,7 @@ import dayjs from 'dayjs';
 
 export const Groups = () => {
   const [groups, setGroups] = useState<Jamiah[]>([]);
+  const [publicGroups, setPublicGroups] = useState<Jamiah[]>([]);
   const [openModal, setOpenModal] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Jamiah | null>(null);
   const [openCreateModal, setOpenCreateModal] = useState(false);
@@ -96,6 +98,13 @@ export const Groups = () => {
       .finally(() => setLoading(false));
   }, [user]);
 
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/jamiahs/public`)
+      .then(res => res.json())
+      .then(setPublicGroups)
+      .catch(() => setPublicGroups([]));
+  }, []);
+
   const navigate = useNavigate();
   const handleCreateOpen = () => setOpenCreateModal(true);
   const handleJoinOpen = () => navigate(`/${ROUTES.JOIN_JAMIAH}`);
@@ -103,6 +112,17 @@ export const Groups = () => {
   const handleDetails = (group: Jamiah) => {
     setSelectedGroup(group);
     setOpenModal(true);
+  };
+
+  const handleJoinPublic = (group: Jamiah) => {
+    const uid = auth.currentUser?.uid || '';
+    fetch(`${API_BASE_URL}/api/jamiahs/${group.id}/join-public?uid=${encodeURIComponent(uid)}`, {
+      method: 'POST'
+    })
+      .then(res => res.json())
+      .then(j => {
+        setGroups([...groups, j]);
+      });
   };
 
   const getCycleInfo = (g: Jamiah) => {
@@ -121,6 +141,8 @@ export const Groups = () => {
     const unit = g.rateInterval === 'WEEKLY' ? 'week' : 'month';
     return dayjs().diff(dayjs(g.startDate), unit) >= g.cycleCount;
   };
+
+  const joinedIds = new Set(groups.filter(g => g.id).map(g => g.id as string));
 
   useEffect(() => {
     setPage(1);
@@ -279,6 +301,39 @@ export const Groups = () => {
             <Pagination count={Math.ceil(filteredGroups.length / 9)} page={page} onChange={(_, p) => setPage(p)} />
           </Box>
         )}
+
+        <Divider sx={{ my: 4 }} />
+        <Typography variant="h5" gutterBottom>Öffentliche Jamiahs</Typography>
+        <Grid container spacing={4}>
+          {publicGroups.map(pg => {
+            const joined = joinedIds.has(pg.id as string);
+            return (
+              <Grid item xs={12} sm={6} md={4} key={pg.id}>
+                <Card>
+                  <CardContent>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                      <Avatar sx={{ bgcolor: theme.palette.primary.main, color: theme.palette.getContrastText(theme.palette.primary.main) }}>
+                        {pg.name[0]}
+                      </Avatar>
+                      <Typography variant="h6">{pg.name}</Typography>
+                      {joined && <Chip label="Beigetreten" color="success" size="small" />}
+                    </Box>
+                    {pg.description && (
+                      <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{pg.description}</Typography>
+                    )}
+                  </CardContent>
+                  <CardActions>
+                    {joined ? (
+                      <Button disabled fullWidth>Beigetreten</Button>
+                    ) : (
+                      <Button variant="contained" fullWidth onClick={() => handleJoinPublic(pg)}>Beitreten</Button>
+                    )}
+                  </CardActions>
+                </Card>
+              </Grid>
+            );
+          })}
+        </Grid>
 
         {/* Detail-Modal */}
         <Dialog open={openModal} onClose={handleCloseModal} maxWidth="sm" fullWidth TransitionComponent={Fade}>

@@ -231,4 +231,54 @@ class JamiahServiceTest {
         assertEquals(1, jamiahs.size());
         assertEquals("Owned Group", jamiahs.get(0).getName());
     }
+
+    @Test
+    void findAllPublicReturnsOnlyPublicJamiahs() {
+        JamiahDto pub = new JamiahDto();
+        pub.setName("Public");
+        pub.setIsPublic(true);
+        pub.setMaxGroupSize(3);
+        pub.setCycleCount(1);
+        pub.setRateAmount(new BigDecimal("5"));
+        pub.setRateInterval(RateInterval.MONTHLY);
+        pub.setStartDate(LocalDate.now());
+
+        JamiahDto priv = new JamiahDto();
+        priv.setName("Private");
+        priv.setIsPublic(false);
+        priv.setMaxGroupSize(3);
+        priv.setCycleCount(1);
+        priv.setRateAmount(new BigDecimal("5"));
+        priv.setRateInterval(RateInterval.MONTHLY);
+        priv.setStartDate(LocalDate.now());
+
+        service.create(pub);
+        service.create(priv);
+
+        List<JamiahDto> all = service.findAllPublic();
+        assertEquals(1, all.size());
+        assertEquals("Public", all.get(0).getName());
+    }
+
+    @Test
+    void joinPublicAddsMember() {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("JoinablePublic");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(1);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        JamiahDto created = service.create(dto);
+        UserProfile user = new UserProfile();
+        user.setUsername("member");
+        user.setUid("m1");
+        userRepository.save(user);
+
+        JamiahDto joined = service.joinPublic(created.getId().toString(), "m1");
+        assertEquals(1, repository.countMembers(repository.findAll().get(0).getId()));
+        assertEquals(created.getId(), joined.getId());
+    }
 }

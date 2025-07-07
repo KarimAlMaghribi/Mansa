@@ -43,6 +43,15 @@ public class JamiahService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Retrieve all public Jamiahs.
+     */
+    public List<JamiahDto> findAllPublic() {
+        return repository.findByIsPublicTrue().stream()
+                .map(mapper::toDto)
+                .collect(Collectors.toList());
+    }
+
     public JamiahDto create(JamiahDto dto) {
         return create(dto, null);
     }
@@ -148,6 +157,27 @@ public class JamiahService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (entity.getInvitationExpiry() != null && entity.getInvitationExpiry().isBefore(LocalDate.now())) {
             throw new ResponseStatusException(HttpStatus.GONE);
+        }
+        com.example.backend.UserProfile user = userRepository.findByUid(uid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (!entity.getMembers().contains(user)) {
+            if (entity.getMaxMembers() != null && entity.getMembers().size() >= entity.getMaxMembers()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member limit reached");
+            }
+            entity.getMembers().add(user);
+            user.getJamiahs().add(entity);
+            repository.save(entity);
+        }
+        return mapper.toDto(entity);
+    }
+
+    /**
+     * Join a public Jamiah without invitation code.
+     */
+    public JamiahDto joinPublic(String publicId, String uid) {
+        Jamiah entity = getByPublicId(publicId);
+        if (!Boolean.TRUE.equals(entity.getIsPublic())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Jamiah is not public");
         }
         com.example.backend.UserProfile user = userRepository.findByUid(uid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));

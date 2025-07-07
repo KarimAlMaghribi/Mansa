@@ -24,6 +24,11 @@ public class JamiahController {
         return service.findAll();
     }
 
+    @GetMapping("/public")
+    public List<JamiahDto> listPublic() {
+        return service.findAllPublic();
+    }
+
     @GetMapping("/{id}")
     public JamiahDto get(@PathVariable String id) {
         return service.findByPublicId(id);
@@ -51,6 +56,11 @@ public class JamiahController {
     @PostMapping("/join")
     public JamiahDto join(@RequestParam String code, @RequestParam String uid) {
         return service.joinByInvitation(code, uid);
+    }
+
+    @PostMapping("/{id}/join-public")
+    public JamiahDto joinPublic(@PathVariable String id, @RequestParam String uid) {
+        return service.joinPublic(id, uid);
     }
 
     @DeleteMapping("/{id}")

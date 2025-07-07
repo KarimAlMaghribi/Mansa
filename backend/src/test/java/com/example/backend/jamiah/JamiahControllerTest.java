@@ -190,4 +190,52 @@ class JamiahControllerTest {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/jamiahs/" + created.getId()))
                 .andExpect(status().isNoContent());
     }
+
+    @Test
+    void listPublicJamiahs() throws Exception {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("Public");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(1);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        mockMvc.perform(post("/api/jamiahs")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/jamiahs/public"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Public"));
+    }
+
+    @Test
+    void joinPublicJamiah() throws Exception {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("JoinPublic");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(1);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        String response = mockMvc.perform(post("/api/jamiahs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andReturn().getResponse().getContentAsString();
+        JamiahDto created = objectMapper.readValue(response, JamiahDto.class);
+
+        UserProfile user = new UserProfile();
+        user.setUsername("joiner");
+        user.setUid("uid1");
+        userRepository.save(user);
+
+        mockMvc.perform(post("/api/jamiahs/" + created.getId() + "/join-public?uid=uid1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(created.getId().toString()));
+    }
 }
