@@ -44,13 +44,16 @@ public class JamiahController {
     }
 
     @PutMapping("/{id}")
-    public JamiahDto update(@PathVariable String id, @Valid @RequestBody JamiahDto dto) {
-        return service.update(id, dto);
+    public JamiahDto update(@PathVariable String id,
+                            @RequestParam(required = false) String uid,
+                            @Valid @RequestBody JamiahDto dto) {
+        return service.update(id, dto, uid);
     }
 
     @PostMapping("/{id}/invite")
-    public JamiahDto invite(@PathVariable String id) {
-        return service.createOrRefreshInvitation(id);
+    public JamiahDto invite(@PathVariable String id,
+                            @RequestParam(required = false) String uid) {
+        return service.createOrRefreshInvitation(id, uid);
     }
 
     @PostMapping("/join")
@@ -65,7 +68,8 @@ public class JamiahController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable String id) {
-        service.delete(id);
+    public void delete(@PathVariable String id,
+                       @RequestParam(required = false) String uid) {
+        service.delete(id, uid);
     }
 }

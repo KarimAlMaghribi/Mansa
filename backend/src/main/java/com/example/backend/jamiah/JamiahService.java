@@ -103,9 +103,10 @@ public class JamiahService {
         return mapper.toDto(repository.save(entity));
     }
 
-    public JamiahDto update(String publicId, JamiahDto dto) {
+    public JamiahDto update(String publicId, JamiahDto dto, String uid) {
         validateParameters(dto);
         Jamiah entity = getByPublicId(publicId);
+        ensureOwner(entity, uid);
         entity.setName(dto.getName());
         entity.setDescription(dto.getDescription());
         entity.setLanguage(dto.getLanguage());
@@ -119,6 +120,10 @@ public class JamiahService {
         return mapper.toDto(repository.save(entity));
     }
 
+    public JamiahDto update(String publicId, JamiahDto dto) {
+        return update(publicId, dto, null);
+    }
+
     public JamiahDto createOrRefreshInvitation(Long id) {
         Jamiah entity = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -127,11 +132,16 @@ public class JamiahService {
         return mapper.toDto(repository.save(entity));
     }
 
-    public JamiahDto createOrRefreshInvitation(String publicId) {
+    public JamiahDto createOrRefreshInvitation(String publicId, String uid) {
         Jamiah entity = getByPublicId(publicId);
+        ensureOwner(entity, uid);
         entity.setInvitationCode(InviteCodeGenerator.generate());
         entity.setInvitationExpiry(LocalDate.now().plusDays(1));
         return mapper.toDto(repository.save(entity));
+    }
+
+    public JamiahDto createOrRefreshInvitation(String publicId) {
+        return createOrRefreshInvitation(publicId, null);
     }
 
     public JamiahDto findByPublicId(String publicId) {
@@ -192,9 +202,14 @@ public class JamiahService {
         return mapper.toDto(entity);
     }
 
-    public void delete(String publicId) {
+    public void delete(String publicId, String uid) {
         Jamiah entity = getByPublicId(publicId);
+        ensureOwner(entity, uid);
         repository.delete(entity);
+    }
+
+    public void delete(String publicId) {
+        delete(publicId, null);
     }
 
     private boolean isRateLimited(String key) {
@@ -207,6 +222,15 @@ public class JamiahService {
             }
             entry.count++;
             return entry.count > MAX_ATTEMPTS;
+        }
+    }
+
+    private void ensureOwner(Jamiah jamiah, String uid) {
+        if (jamiah.getOwnerId() == null) {
+            return;
+        }
+        if (uid == null || !jamiah.getOwnerId().equals(uid)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
     }
 

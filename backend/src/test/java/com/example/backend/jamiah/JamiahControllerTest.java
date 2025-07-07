@@ -192,6 +192,33 @@ class JamiahControllerTest {
     }
 
     @Test
+    void deleteJamiahForbiddenForNonOwner() throws Exception {
+        UserProfile user = new UserProfile();
+        user.setUsername("owner");
+        user.setUid("uidA");
+        userRepository.save(user);
+
+        JamiahDto dto = new JamiahDto();
+        dto.setName("Protected");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(1);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        String response = mockMvc.perform(post("/api/jamiahs?uid=uidA")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andReturn().getResponse().getContentAsString();
+        JamiahDto created = objectMapper.readValue(response, JamiahDto.class);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/jamiahs/" + created.getId() + "?uid=other"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void listPublicJamiahs() throws Exception {
         JamiahDto dto = new JamiahDto();
         dto.setName("Public");
