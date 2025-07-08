@@ -4,9 +4,19 @@ import {
 } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { selectName } from '../../store/slices/user-profile';
+import { JamiahSettings } from '../../components/jamiah/JamiahSettings';
+import { Jamiah } from '../../models/Jamiah';
 
 export const Dashboard = () => {
   const userName = useSelector(selectName);
+
+  const jamiah: Jamiah = {
+    name: 'Beispiel Jamiah',
+    isPublic: false,
+    cycleCount: 12,
+    rateAmount: 50,
+    rateInterval: 'MONTHLY',
+  };
 
   const stats = [
     {
@@ -81,6 +91,8 @@ export const Dashboard = () => {
               </Grid>
           ))}
         </Grid>
+
+        <JamiahSettings jamiah={jamiah} />
 
         <Grid container spacing={3}>
           {/* Abstimmungen */}
