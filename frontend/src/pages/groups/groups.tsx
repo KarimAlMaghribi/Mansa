@@ -239,6 +239,7 @@ export const Groups = () => {
           <List>
             {paginatedGroups.map(group => {
               const info = getCycleInfo(group);
+              const isOwner = group.ownerId === user?.uid;
               return (
                 <ListItem key={group.id} disablePadding>
                   <ListItemButton onClick={() => handleDetails(group)}>
@@ -248,7 +249,12 @@ export const Groups = () => {
                       </Avatar>
                     </ListItemAvatar>
                     <ListItemText
-                      primary={group.name}
+                      primary={
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <span>{group.name}</span>
+                          {isOwner && <Chip label="Eigentümer" color="info" size="small" />}
+                        </Box>
+                      }
                       secondary={`Zyklus ${info.current} von ${group.cycleCount ?? '?'}`}
                     />
                   </ListItemButton>
@@ -271,11 +277,16 @@ export const Groups = () => {
                             {group.name[0]}
                           </Avatar>
                           <Typography variant="h6">{group.name}</Typography>
-                          {group.isPublic ? (
-                            <Tooltip title="Öffentliche Jamiah"><PublicIcon fontSize="small" /></Tooltip>
-                          ) : (
-                            <Tooltip title="Private Jamiah"><LockIcon fontSize="small" /></Tooltip>
-                          )}
+                          <Box display="flex" alignItems="center" gap={1}>
+                            {group.isPublic ? (
+                              <Tooltip title="Öffentliche Jamiah"><PublicIcon fontSize="small" /></Tooltip>
+                            ) : (
+                              <Tooltip title="Private Jamiah"><LockIcon fontSize="small" /></Tooltip>
+                            )}
+                            {group.ownerId === user?.uid && (
+                              <Chip label="Eigentümer" color="info" size="small" />
+                            )}
+                          </Box>
                         </Box>
                         <LinearProgress variant="determinate" value={progress} sx={{ mb: 1 }} />
                         <Typography variant="body2">Zyklus {info.current} von {group.cycleCount ?? '?'}</Typography>
@@ -325,6 +336,7 @@ export const Groups = () => {
         <Grid container spacing={4}>
           {publicGroups.map(pg => {
             const joined = joinedIds.has(pg.id as string);
+            const isOwner = pg.ownerId === user?.uid;
             return (
               <Grid item xs={12} sm={6} md={4} key={pg.id}>
                 <Card>
@@ -334,14 +346,20 @@ export const Groups = () => {
                         {pg.name[0]}
                       </Avatar>
                       <Typography variant="h6">{pg.name}</Typography>
-                      {joined && <Chip label="Beigetreten" color="success" size="small" />}
+                      {isOwner ? (
+                        <Chip label="Eigentümer" color="info" size="small" />
+                      ) : (
+                        joined && <Chip label="Beigetreten" color="success" size="small" />
+                      )}
                     </Box>
                     {pg.description && (
                       <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{pg.description}</Typography>
                     )}
                   </CardContent>
                   <CardActions>
-                    {joined ? (
+                    {isOwner ? (
+                      <Button disabled fullWidth>Eigentümer</Button>
+                    ) : joined ? (
                       <Button disabled fullWidth>Beigetreten</Button>
                     ) : (
                       <Button variant="contained" fullWidth onClick={() => handleJoinPublic(pg)}>Beitreten</Button>

@@ -12,6 +12,9 @@ import java.util.UUID;
 public class JamiahDto {
     private UUID id;
 
+    /** Owner of the Jamiah (uid of the creating user). */
+    private String ownerId;
+
     @NotBlank
     @Size(min = 3)
     private String name;
