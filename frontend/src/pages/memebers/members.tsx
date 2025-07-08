@@ -1,20 +1,39 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Box, Typography, Grid, Paper, Button, Divider, Switch, FormControlLabel, Avatar, Stack
+  Box,
+  Typography,
+  Grid,
+  Paper,
+  Button,
+  Switch,
+  FormControlLabel,
+  Avatar,
+  Stack,
+  IconButton
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/PersonRemove';
-import EmailIcon from '@mui/icons-material/Email';
+import ChatIcon from '@mui/icons-material/Chat';
+import { API_BASE_URL } from '../../constants/api';
+
+interface Member {
+  id: number;
+  username: string;
+  firstName?: string;
+  lastName?: string;
+}
 
 export const Members = () => {
-  const [isAdminView, setIsAdminView] = React.useState(true);
+  const [isAdminView, setIsAdminView] = useState(true);
+  const [members, setMembers] = useState<Member[]>([]);
 
-  const members = [
-    { name: 'Amina Yusuf', role: 'Admin', joined: '01.2023', payments: '✅', lastLogin: '2025-05-02' },
-    { name: 'Ali Khan', role: 'Mitglied', joined: '03.2023', payments: '❌', lastLogin: '2025-04-20' },
-    { name: 'Fatima El-Hadi', role: 'Mitglied', joined: '08.2023', payments: '✅', lastLogin: '2025-05-01' },
-  ];
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/userProfiles`)
+      .then(res => res.json())
+      .then(setMembers)
+      .catch(() => setMembers([]));
+  }, []);
 
   return (
       <Box p={4}>
@@ -31,43 +50,39 @@ export const Members = () => {
           />
         </Box>
 
-        <Grid container spacing={3}>
-          {members.map((member, i) => (
-              <Grid item xs={12} md={6} key={i}>
-                <Paper sx={{ p: 2 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <Avatar>{member.name.charAt(0)}</Avatar>
-                    <Box flexGrow={1}>
-                      <Typography variant="h6">{member.name}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Rolle: {member.role} | Beigetreten: {member.joined}
-                      </Typography>
-                    </Box>
-                    {isAdminView && (
+          <Grid container spacing={3}>
+            {members.map(member => {
+              const name = `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() || member.username;
+              const initial = name.charAt(0).toUpperCase();
+              return (
+                <Grid item xs={12} md={6} key={member.id}>
+                  <Paper sx={{ p: 2 }}>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Avatar>{initial}</Avatar>
+                      <Box flexGrow={1}>
+                        <Typography variant="h6">{name}</Typography>
+                        {isAdminView && (
+                          <Typography variant="body2" color="text.secondary">
+                            {member.username}
+                          </Typography>
+                        )}
+                      </Box>
+                      {isAdminView ? (
                         <Stack direction="row" spacing={1}>
                           <Button size="small" startIcon={<EditIcon />}>Bearbeiten</Button>
                           <Button size="small" color="error" startIcon={<DeleteIcon />}>Entfernen</Button>
                         </Stack>
-                    )}
-                  </Stack>
-                  <Divider sx={{ my: 1 }} />
-                  <Typography variant="body2">
-                    Zahlungsstatus: {isAdminView ? member.payments : (member.name === 'Ali Khan' ? '❌' : '✅')}
-                  </Typography>
-                  {isAdminView && (
-                      <Typography variant="body2" color="text.secondary">
-                        Letzter Login: {member.lastLogin}
-                      </Typography>
-                  )}
-                  {!isAdminView && member.role === 'Admin' && (
-                      <Box mt={1}>
-                        <Button variant="outlined" size="small" startIcon={<EmailIcon />}>Kontakt aufnehmen</Button>
-                      </Box>
-                  )}
-                </Paper>
-              </Grid>
-          ))}
-        </Grid>
+                      ) : (
+                        <IconButton aria-label="Chat" color="primary">
+                          <ChatIcon />
+                        </IconButton>
+                      )}
+                    </Stack>
+                  </Paper>
+                </Grid>
+              );
+            })}
+          </Grid>
       </Box>
   );
 };
