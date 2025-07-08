@@ -13,6 +13,8 @@ import {getTheme} from "./theme";
 import "./index.scss";
 import {BrowserRouter} from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { PermissionsProvider } from "./context/PermissionsContext";
+import { PermissionKeyEnum } from "./enums/PermissionKey.enum";
 import "./i18n";
 
 const AppWrapper = () => {
@@ -24,7 +26,9 @@ const AppWrapper = () => {
             <ThemeProvider theme={theme}>
                 <BrowserRouter>
                     <AuthProvider>
-                        <App/>
+                        <PermissionsProvider permissions={Object.values(PermissionKeyEnum)}>
+                            <App/>
+                        </PermissionsProvider>
                     </AuthProvider>
                 </BrowserRouter>
             </ThemeProvider>
