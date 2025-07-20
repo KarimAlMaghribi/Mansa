@@ -1,22 +1,43 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Box, Grid, Paper, Typography, List, ListItem, ListItemText, Divider, Stack, Button, Tooltip
+  Box,
+  Grid,
+  Paper,
+  Typography,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
+  Stack,
+  Button,
+  Tooltip
 } from '@mui/material';
 import { useSelector } from 'react-redux';
+import { useParams } from 'react-router-dom';
 import { selectName } from '../../store/slices/user-profile';
 import { JamiahSettings } from '../../components/jamiah/JamiahSettings';
 import { Jamiah } from '../../models/Jamiah';
+import { API_BASE_URL } from '../../constants/api';
+import { StartCycleButton } from '../../components/jamiah/StartCycleButton';
+import { useAuth } from '../../context/AuthContext';
 
 export const Dashboard = () => {
+  const { groupId } = useParams();
   const userName = useSelector(selectName);
+  const { user } = useAuth();
+  const [jamiah, setJamiah] = useState<Jamiah | null>(null);
+  const [cycleStarted, setCycleStarted] = useState(false);
 
-  const jamiah: Jamiah = {
-    name: 'Beispiel Jamiah',
-    isPublic: false,
-    cycleCount: 12,
-    rateAmount: 50,
-    rateInterval: 'MONTHLY',
-  };
+  useEffect(() => {
+    if (!groupId) return;
+    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}`)
+      .then(res => res.json())
+      .then(data => {
+        setJamiah(data);
+        if (data.startDate) setCycleStarted(true);
+      })
+      .catch(() => setJamiah(null));
+  }, [groupId]);
 
   const stats = [
     {
@@ -92,7 +113,21 @@ export const Dashboard = () => {
           ))}
         </Grid>
 
-        <JamiahSettings jamiah={jamiah} />
+        {jamiah && user?.uid === jamiah.ownerId && (
+          <Box mb={2}>
+            <StartCycleButton
+              jamiahId={jamiah.id as string}
+              onStarted={() => setCycleStarted(true)}
+            />
+            {cycleStarted && (
+              <Typography variant="body2" mt={1}>
+                Aktiver Zyklus läuft
+              </Typography>
+            )}
+          </Box>
+        )}
+
+        {jamiah && <JamiahSettings jamiah={jamiah} />}
 
         <Grid container spacing={3}>
           {/* Abstimmungen */}
