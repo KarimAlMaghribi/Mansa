@@ -3,6 +3,7 @@ package com.example.backend;
 import jakarta.persistence.*;
 import java.util.HashSet;
 import java.util.Set;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "user_profiles", uniqueConstraints = @UniqueConstraint(columnNames = "username"))
@@ -35,6 +36,7 @@ public class UserProfile {
     private String profileImageType;
 
     @ManyToMany(mappedBy = "members")
+    @JsonIgnore
     private Set<com.example.backend.jamiah.Jamiah> jamiahs = new HashSet<>();
 
     public UserProfile() {
