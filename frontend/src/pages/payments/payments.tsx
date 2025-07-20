@@ -1,27 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Box, Typography, Paper, List, ListItem, ListItemText, Button, Divider, Stack,
-  Switch, FormControlLabel, IconButton
+  Box, Typography, Paper, List, ListItem, ListItemText, Button,
+  Switch, FormControlLabel
 } from '@mui/material';
-import CheckIcon from '@mui/icons-material/CheckCircle';
-import CloseIcon from '@mui/icons-material/Cancel';
-import EditIcon from '@mui/icons-material/Edit';
 import EuroIcon from '@mui/icons-material/Euro';
+import { API_BASE_URL } from '../../constants/api';
+import { auth } from '../../firebase_config';
 
 export const Payments = () => {
-  const [isAdminView, setIsAdminView] = React.useState(true);
-
-  const allPayments = [
-    { name: 'Amina Yusuf', month: 'April 2025', amount: '50€', status: 'Bezahlt' },
-    { name: 'Ali Khan', month: 'April 2025', amount: '50€', status: 'Ausstehend' },
-    { name: 'Fatima El-Hadi', month: 'April 2025', amount: '50€', status: 'Bezahlt' },
-    { name: 'Amina Yusuf', month: 'Mai 2025', amount: '50€', status: 'Bezahlt' },
+  const [isAdminView, setIsAdminView] = useState(true);
+  const members = [
+    { uid: 'u1', name: 'Amina Yusuf' },
+    { uid: 'u2', name: 'Ali Khan' },
   ];
 
-  const memberName = 'Amina Yusuf';
-  const visiblePayments = isAdminView
-      ? allPayments
-      : allPayments.filter(p => p.name === memberName);
+  const handlePay = (uid: string) => {
+    const groupId = (window.location.pathname.split('/')[2]);
+    const cycleId = 1; // simplified demo
+    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${cycleId}/pay?uid=${encodeURIComponent(uid)}&amount=50`, { method: 'POST' });
+  };
 
   return (
       <Box p={4}>
@@ -48,31 +45,12 @@ export const Payments = () => {
 
         <Paper sx={{ p: 2 }}>
           <List>
-            {visiblePayments.map((payment, i) => (
-                <React.Fragment key={i}>
-                  <ListItem
-                      secondaryAction={
-                        <Stack direction="row" spacing={1}>
-                          {payment.status === 'Bezahlt' ? (
-                              <CheckIcon color="success" />
-                          ) : (
-                              <CloseIcon color="error" />
-                          )}
-                          {isAdminView && (
-                              <IconButton edge="end">
-                                <EditIcon />
-                              </IconButton>
-                          )}
-                        </Stack>
-                      }
-                  >
-                    <ListItemText
-                        primary={`${payment.month} – ${payment.amount}`}
-                        secondary={isAdminView ? `Mitglied: ${payment.name}` : `Status: ${payment.status}`}
-                    />
-                  </ListItem>
-                  {i < visiblePayments.length - 1 && <Divider />}
-                </React.Fragment>
+            {members.map(m => (
+              <ListItem key={m.uid} secondaryAction={
+                <Button size="small" variant="outlined" onClick={() => handlePay(m.uid)}>Bezahlt</Button>
+              }>
+                <ListItemText primary={m.name} />
+              </ListItem>
             ))}
           </List>
         </Paper>

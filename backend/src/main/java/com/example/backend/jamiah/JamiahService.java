@@ -2,6 +2,9 @@ package com.example.backend.jamiah;
 
 import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.util.InviteCodeGenerator;
+import com.example.backend.jamiah.JamiahCycleRepository;
+import com.example.backend.jamiah.JamiahPaymentRepository;
+import java.math.BigDecimal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -19,6 +22,8 @@ public class JamiahService {
     private final JamiahRepository repository;
     private final JamiahMapper mapper;
     private final com.example.backend.UserProfileRepository userRepository;
+    private final JamiahCycleRepository cycleRepository;
+    private final JamiahPaymentRepository paymentRepository;
 
     private static final Logger log = LoggerFactory.getLogger(JamiahService.class);
 
@@ -31,10 +36,16 @@ public class JamiahService {
         int count = 0;
     }
 
-    public JamiahService(JamiahRepository repository, JamiahMapper mapper, com.example.backend.UserProfileRepository userRepository) {
+    public JamiahService(JamiahRepository repository,
+                         JamiahMapper mapper,
+                         com.example.backend.UserProfileRepository userRepository,
+                         JamiahCycleRepository cycleRepository,
+                         JamiahPaymentRepository paymentRepository) {
         this.repository = repository;
         this.mapper = mapper;
         this.userRepository = userRepository;
+        this.cycleRepository = cycleRepository;
+        this.paymentRepository = paymentRepository;
     }
 
     public List<JamiahDto> findAll() {
@@ -250,6 +261,42 @@ public class JamiahService {
                 .filter(j -> java.util.UUID.nameUUIDFromBytes(j.getId().toString().getBytes()).equals(uuid))
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    public JamiahCycle startCycle(String jamiahPublicId, String uid) {
+        Jamiah jamiah = getByPublicId(jamiahPublicId);
+        ensureOwner(jamiah, uid);
+        if (jamiah.getStartDate() == null) {
+            jamiah.setStartDate(LocalDate.now());
+            repository.save(jamiah);
+        }
+        JamiahCycle cycle = new JamiahCycle();
+        cycle.setJamiah(jamiah);
+        cycle.setCycleNumber((int) (cycleRepository.countByJamiahId(jamiah.getId()) + 1));
+        cycle.setStartDate(LocalDate.now());
+        cycle.setCompleted(false);
+        return cycleRepository.save(cycle);
+    }
+
+    public JamiahPayment recordPayment(Long cycleId, String uid, BigDecimal amount) {
+        JamiahCycle cycle = cycleRepository.findById(cycleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        com.example.backend.UserProfile user = userRepository.findByUid(uid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        JamiahPayment payment = new JamiahPayment();
+        payment.setCycle(cycle);
+        payment.setUser(user);
+        payment.setAmount(amount);
+        payment.setPaidAt(java.time.LocalDateTime.now());
+        JamiahPayment saved = paymentRepository.save(payment);
+
+        long memberCount = repository.countMembers(cycle.getJamiah().getId());
+        long paidCount = paymentRepository.countByCycleId(cycleId);
+        if (memberCount > 0 && paidCount >= memberCount) {
+            cycle.setCompleted(true);
+            cycleRepository.save(cycle);
+        }
+        return saved;
     }
 
     void validateParameters(JamiahDto dto) {
