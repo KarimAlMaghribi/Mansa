@@ -34,6 +34,11 @@ public class JamiahController {
         return service.findByPublicId(id);
     }
 
+    @GetMapping("/{id}/members")
+    public java.util.List<com.example.backend.UserProfile> members(@PathVariable String id) {
+        return service.getMembers(id);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public JamiahDto create(

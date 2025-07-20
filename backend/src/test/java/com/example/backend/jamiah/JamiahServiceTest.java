@@ -303,4 +303,33 @@ class JamiahServiceTest {
         assertEquals(1, repository.countMembers(repository.findAll().get(0).getId()));
         assertEquals(created.getId(), joined.getId());
     }
+
+    @Test
+    void getMembersReturnsAllMembers() {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("MemberList");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(1);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        JamiahDto created = service.create(dto);
+
+        UserProfile u1 = new UserProfile();
+        u1.setUsername("user1");
+        u1.setUid("uid1");
+        userRepository.save(u1);
+        service.joinPublic(created.getId().toString(), "uid1");
+
+        UserProfile u2 = new UserProfile();
+        u2.setUsername("user2");
+        u2.setUid("uid2");
+        userRepository.save(u2);
+        service.joinPublic(created.getId().toString(), "uid2");
+
+        java.util.List<UserProfile> members = service.getMembers(created.getId().toString());
+        assertEquals(2, members.size());
+    }
 }

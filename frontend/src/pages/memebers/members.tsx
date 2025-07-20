@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -25,15 +26,17 @@ interface Member {
 }
 
 export const Members = () => {
+  const { groupId } = useParams();
   const [isAdminView, setIsAdminView] = useState(true);
   const [members, setMembers] = useState<Member[]>([]);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/userProfiles`)
+    if (!groupId) return;
+    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/members`)
       .then(res => res.json())
       .then(setMembers)
       .catch(() => setMembers([]));
-  }, []);
+  }, [groupId]);
 
   return (
       <Box p={4}>

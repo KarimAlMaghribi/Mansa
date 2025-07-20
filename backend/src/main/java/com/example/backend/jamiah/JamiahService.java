@@ -202,6 +202,16 @@ public class JamiahService {
         return mapper.toDto(entity);
     }
 
+    /**
+     * Retrieve all members of the Jamiah identified by the public id.
+     */
+    public java.util.List<com.example.backend.UserProfile> getMembers(String publicId) {
+        Jamiah base = getByPublicId(publicId);
+        Jamiah withMembers = repository.findWithMembersById(base.getId())
+                .orElse(base);
+        return new java.util.ArrayList<>(withMembers.getMembers());
+    }
+
     public void delete(String publicId, String uid) {
         Jamiah entity = getByPublicId(publicId);
         ensureOwner(entity, uid);
