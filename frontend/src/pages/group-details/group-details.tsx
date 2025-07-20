@@ -4,17 +4,24 @@ import { Box, Typography, Button, Divider } from '@mui/material';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
 import { ROUTES } from '../../routing/routes';
+import { StartCycleButton } from '../../components/jamiah/StartCycleButton';
+import { useAuth } from '../../context/AuthContext';
 
 export const GroupDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [group, setGroup] = useState<Jamiah | null>(null);
+  const { user } = useAuth();
+  const [cycleStarted, setCycleStarted] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${id}`)
       .then(res => res.json())
-      .then(setGroup)
+      .then(data => {
+        setGroup(data);
+        if (data.startDate) setCycleStarted(true);
+      })
       .catch(() => setGroup(null));
   }, [id]);
 
@@ -48,6 +55,19 @@ export const GroupDetails = () => {
           <Typography variant="body2" mt={2}>
             Sichtbarkeit: <b>{group.isPublic ? 'Öffentlich' : 'Privat'}</b>
           </Typography>
+          {user?.uid === group.ownerId && (
+            <Box mt={2}>
+              <StartCycleButton
+                jamiahId={group.id as string}
+                onStarted={() => setCycleStarted(true)}
+              />
+              {cycleStarted && (
+                <Typography variant="body2" mt={1}>
+                  Aktiver Zyklus läuft
+                </Typography>
+              )}
+            </Box>
+          )}
           <Box mt={3}>
             {group.isPublic ? (
               <Button variant="contained" disabled={group.maxMembers !== undefined && group.currentMembers !== undefined && group.currentMembers >= group.maxMembers}>

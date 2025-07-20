@@ -71,3 +71,7 @@ Zugangsdaten und Konfigurationswerte wie Firebase- und GCP-Anmeldeinformationen 
 - Das Backend kann sowohl lokal mit einer mitgelieferten MySQL-Datenbank laufen als auch in der Cloud mit Cloud SQL.
 - Die Chatfunktion befindet sich unter `/chat` und nutzt OpenAI über das Frontend direkt im Browser.
 
+### Jamiah Zahlungen
+
+Nach dem Erstellen einer Jamiah kann der Besitzer über `POST /api/jamiahs/{id}/start` den ersten Zahlungszyklus starten. Fehlt ein Startdatum, wird dabei der aktuelle Tag verwendet. Zahlungen einzelner Mitglieder lassen sich anschließend über `POST /api/jamiahs/{id}/cycles/{cycleId}/pay` verbuchen. Sobald alle Mitglieder einer Runde gezahlt haben, wird der Zyklus automatisch als abgeschlossen markiert.
+

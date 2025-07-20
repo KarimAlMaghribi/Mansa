@@ -1,10 +1,13 @@
 package com.example.backend.jamiah;
 
 import com.example.backend.jamiah.dto.JamiahDto;
+import com.example.backend.jamiah.JamiahCycle;
+import com.example.backend.jamiah.JamiahPayment;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import java.math.BigDecimal;
 
 import java.util.List;
 
@@ -54,6 +57,19 @@ public class JamiahController {
     public JamiahDto invite(@PathVariable String id,
                             @RequestParam(required = false) String uid) {
         return service.createOrRefreshInvitation(id, uid);
+    }
+
+    @PostMapping("/{id}/start")
+    public JamiahCycle start(@PathVariable String id, @RequestParam String uid) {
+        return service.startCycle(id, uid);
+    }
+
+    @PostMapping("/{id}/cycles/{cycleId}/pay")
+    public JamiahPayment pay(@PathVariable String id,
+                             @PathVariable Long cycleId,
+                             @RequestParam String uid,
+                             @RequestParam BigDecimal amount) {
+        return service.recordPayment(cycleId, uid, amount);
     }
 
     @PostMapping("/join")
