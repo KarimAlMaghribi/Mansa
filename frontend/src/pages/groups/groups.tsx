@@ -47,6 +47,7 @@ import { API_BASE_URL } from '../../constants/api';
 import { auth } from '../../firebase_config';
 import { useAuth } from '../../context/AuthContext';
 import { GenerateInviteButton } from '../../components/jamiah/GenerateInviteButton';
+import { StartCycleButton } from '../../components/jamiah/StartCycleButton';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../routing/routes';
 import { motion } from 'framer-motion';
@@ -316,7 +317,13 @@ export const Groups = () => {
                         {!group.isPublic && group.id && (
                           <GenerateInviteButton jamiahId={group.id} />
                         )}
-                      </CardActions>
+                        {group.ownerId === user?.uid && !group.startDate && group.id && (
+                          <StartCycleButton
+                            jamiahId={group.id}
+                            onStarted={() => setGroups(gs => gs.map(g => g.id === group.id ? { ...g, startDate: new Date().toISOString() } : g))}
+                          />
+                        )}
+                     </CardActions>
                     </Card>
                   </motion.div>
                 </Grid>
