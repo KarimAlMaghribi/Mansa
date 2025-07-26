@@ -1,5 +1,10 @@
 import { createTheme } from '@mui/material/styles';
 
+/**
+ * Create the MUI theme used across the application. Older parts of the code
+ * expect a `buildTheme` export, so we expose both `getTheme` and
+ * `buildTheme` as aliases to maintain backwards compatibility.
+ */
 export const getTheme = (darkMode: boolean) =>
   createTheme({
     palette: {
@@ -56,3 +61,7 @@ export const getTheme = (darkMode: boolean) =>
       },
     },
   });
+
+// Temporary alias for compatibility with older imports. Can be removed once all
+// usages have been migrated to `getTheme`.
+export const buildTheme = getTheme;
