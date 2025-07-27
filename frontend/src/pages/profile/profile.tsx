@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Box, Button, Card, CardContent, CircularProgress, Grid, Skeleton, Typography } from '@mui/material';
 import { useForm, FormProvider, SubmitHandler, Resolver } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -15,6 +15,7 @@ export const Profile = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const initialized = useRef(false);
 
   const methods = useForm<ProfileFormValues>({
     resolver: yupResolver(profileSchema) as Resolver<ProfileFormValues>,
@@ -22,7 +23,7 @@ export const Profile = () => {
     defaultValues: { avatar: null } as Partial<ProfileFormValues>
   });
 
-  const { handleSubmit, reset, formState } = methods;
+  const { handleSubmit, reset, formState, watch } = methods;
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -46,12 +47,13 @@ export const Profile = () => {
         }
       } finally {
         setLoading(false);
+        initialized.current = true;
       }
     };
     fetchProfile();
   }, [user, reset]);
 
-  const onSubmit: SubmitHandler<ProfileFormValues> = async values => {
+  const saveProfile = async (values: Partial<ProfileFormValues>) => {
     if (!auth.currentUser) return;
     const { avatar, ...payload } = values;
 
@@ -67,9 +69,20 @@ export const Profile = () => {
     });
   };
 
+  const watchedValues = watch();
+
+  useEffect(() => {
+    if (!initialized.current || !formState.isDirty) return;
+    const timer = setTimeout(() => {
+      saveProfile(watchedValues);
+      reset(watchedValues);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [watchedValues, formState.isDirty, reset]);
+
   return (
     <FormProvider {...methods}>
-      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 3, px: 2, maxWidth: 600, mx: 'auto' }}>
+      <Box component="form" onSubmit={e => {e.preventDefault(); saveProfile(methods.getValues());}} sx={{ mt: 3, px: 2, maxWidth: 600, mx: 'auto' }}>
         <Typography variant="h5" gutterBottom>
           {t('profile.title')}
         </Typography>
@@ -147,7 +160,7 @@ export const Profile = () => {
           </>
         )}
         <Box display="flex" justifyContent="flex-end" mt={3}>
-          <Button type="submit" variant="contained" disabled={!formState.isValid || formState.isSubmitting} startIcon={formState.isSubmitting ? <CircularProgress size={20} /> : null}>
+          <Button type="submit" variant="contained" disabled={formState.isSubmitting} startIcon={formState.isSubmitting ? <CircularProgress size={20} /> : null}>
             {t('save')}
           </Button>
         </Box>
