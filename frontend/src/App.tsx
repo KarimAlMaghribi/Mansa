@@ -3,6 +3,7 @@ import {Navigate, Route, Routes} from "react-router-dom";
 
 import {Landing} from "./pages/landing/landing";
 import {LoginForm} from "./pages/authentication/sign-in";
+import {SignUpForm} from "./pages/authentication/sign-up";
 import {ForgotPassword} from "./pages/authentication/forgot-password";
 import {RiskOverview} from "./pages/risk-overview/risk-overview";
 import {Layout} from "./components/layout/layout";
@@ -42,6 +43,7 @@ function App() {
             <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path={`/${ROUTES.SIGN_IN}`} element={<LoginForm />} />
+                <Route path={`/${ROUTES.SIGN_UP}`} element={<SignUpForm />} />
                 <Route path={`/${ROUTES.FORGOT_PASSWORD}`} element={<ForgotPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
 
