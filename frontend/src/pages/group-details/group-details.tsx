@@ -28,7 +28,7 @@ export const GroupDetails = () => {
   return (
     <Box p={4} maxWidth={600} mx="auto">
       <Button variant="text" onClick={() => navigate(`/${ROUTES.GROUPS}`)}>
-        Zurück zur Übersicht
+        Zurück zu Meine Jamiahs
       </Button>
       {group ? (
         <Box mt={2}>

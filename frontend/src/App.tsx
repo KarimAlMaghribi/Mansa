@@ -32,6 +32,7 @@ import {Reports} from "./pages/reports/reports";
 import {Members} from "./pages/memebers/members";
 import JamiahLayout from "./components/layout/jamiah-layout";
 import {Onboarding} from "./pages/onboarding/onboarding";
+import SearchPage from "./pages/search/search";
 import { JoinJamiahPage } from "./pages/join-jamiah/join-jamiah";
 import { GroupDetails } from "./pages/group-details/group-details";
 import {VerifyEmail} from "./pages/authentication/verifyEmail";
@@ -59,6 +60,7 @@ function App() {
                 </Route>
                 <Route path={`/${ROUTES.DASHBOARD}`} element={<PrivateRoute><Dashboard /></PrivateRoute>} />
                 <Route path={`/${ROUTES.GROUPS}`} element={<PrivateRoute><Groups /></PrivateRoute>} />
+                <Route path={`/${ROUTES.SEARCH}`} element={<PrivateRoute><SearchPage /></PrivateRoute>} />
                 <Route path={`/${ROUTES.MEMBERS}`} element={<PrivateRoute><Members /></PrivateRoute>} />
                 <Route path={`/${ROUTES.PAYMENTS}`} element={<PrivateRoute><Payments /></PrivateRoute>} />
                 <Route path={`/${ROUTES.VOTES}`} element={<PrivateRoute><Votes /></PrivateRoute>} />

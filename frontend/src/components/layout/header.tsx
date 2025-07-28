@@ -43,9 +43,9 @@ export function Header() {
         setAnchorElUser(event.currentTarget);
     };
 
-    const handleCloseNavMenu = () => {
+    const handleNavigate = (route: string) => {
         setAnchorElNav(null);
-        navigate(`/${ROUTES.GROUPS}`);
+        navigate(route);
     };
 
     const handleCloseUserMenu = (setting: any) => {
@@ -89,8 +89,11 @@ export function Header() {
                             onClose={() => setAnchorElNav(null)}
                             sx={{display: {xs: 'block', md: 'none'}}}>
 
-                            <MenuItem onClick={handleCloseNavMenu}>
-                                <Typography sx={{textAlign: 'center'}}>Übersicht</Typography>
+                            <MenuItem onClick={() => handleNavigate(`/${ROUTES.GROUPS}`)}>
+                                <Typography sx={{textAlign: 'center'}}>Meine Jamiahs</Typography>
+                            </MenuItem>
+                            <MenuItem onClick={() => handleNavigate(`/${ROUTES.SEARCH}`)}>
+                                <Typography sx={{textAlign: 'center'}}>Suche</Typography>
                             </MenuItem>
                         </Menu>
                     </Box>
@@ -114,7 +117,7 @@ export function Header() {
 
                     <Box sx={{flexGrow: 1, display: {xs: 'none', md: 'flex'}}}>
                         <Button
-                            onClick={handleCloseNavMenu}
+                            onClick={() => handleNavigate(`/${ROUTES.GROUPS}`)}
                             sx={{
                                 my: 2,
                                 color: 'white',
@@ -122,7 +125,18 @@ export function Header() {
                                 textDecoration: 'none',
                                 textDecorationColor: 'white'
                             }}>
-                            Übersicht
+                            Meine Jamiahs
+                        </Button>
+                        <Button
+                            onClick={() => handleNavigate(`/${ROUTES.SEARCH}`)}
+                            sx={{
+                                my: 2,
+                                color: 'white',
+                                display: 'block',
+                                textDecoration: 'none',
+                                textDecorationColor: 'white'
+                            }}>
+                            Suche
                         </Button>
                     </Box>
                     <QuickMenuButtons
