@@ -10,11 +10,11 @@ export const getTheme = (darkMode: boolean) =>
     palette: {
       mode: darkMode ? 'dark' : 'light',
       primary: {
-        main: '#0B6B3A', // tiefes, elegantes Islamgrün
-        light: '#a7d7c5', // sanftes Minzgrün
+        main: '#0B6B3A',
+        light: '#a7d7c5',
       },
       secondary: {
-        main: '#D4AF37', // edles Gold für Akzente
+        main: '#D4AF37',
       },
       background: {
         default: darkMode ? '#121212' : '#F9F9F6',
@@ -25,7 +25,7 @@ export const getTheme = (darkMode: boolean) =>
       },
     },
     shape: {
-      borderRadius: 16,
+      borderRadius: 0,
     },
     typography: {
       fontFamily: [
@@ -55,13 +55,11 @@ export const getTheme = (darkMode: boolean) =>
       MuiPaper: {
         styleOverrides: {
           root: {
-            borderRadius: 16,
+            borderRadius: 0,
           },
         },
       },
     },
   });
 
-// Temporary alias for compatibility with older imports. Can be removed once all
-// usages have been migrated to `getTheme`.
 export const buildTheme = getTheme;
