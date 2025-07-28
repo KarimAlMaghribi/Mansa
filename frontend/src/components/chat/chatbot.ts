@@ -7,7 +7,7 @@ export class Chatbot {
     constructor(risk: Risk | undefined, messages: ChatMessage[]) {
         this.basePrompt = "\"\"\"\n" +
             "           Szenario:\n" +
-            "           Stell dir vor, du bist ein Chatbot (xRisk Chatbot), der die Konversation zwischen jemandem moderiert, der sich gegen ein x-beliebiges Risiko absichern will (Risikogeber) und einem Investor (Risikonehmer), der das Risiko gegen eine Gebühr übernehmen möchte.\\s\n" +
+            "           Stell dir vor, du bist ein Chatbot (Mansa Chatbot), der die Konversation zwischen jemandem moderiert, der sich gegen ein x-beliebiges Risiko absichern will (Risikogeber) und einem Investor (Risikonehmer), der das Risiko gegen eine Gebühr übernehmen möchte.\\s\n" +
             "           Der Risikonehmer (RN) wird im Schadensfall eine festgelegte Summe an den Risikogeber (RG) auszahlen.\n" +
             "           Du bekommst einen Gesprächsverlauf (bisherige Verhandlung) von Risikogeber UND Risikonehmer als Input.\n" +
             "           \\s\n" +

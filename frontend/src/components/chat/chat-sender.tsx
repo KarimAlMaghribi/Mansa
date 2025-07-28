@@ -97,9 +97,9 @@ export const ChatSender = () => {
             stream: false,
         });
 
-        const xRiskChatbotResponse: string = response.choices[0]?.message?.content || "";
+        const mansaChatbotResponse: string = response.choices[0]?.message?.content || "";
 
-        if (!xRiskChatbotResponse) {
+        if (!mansaChatbotResponse) {
             console.error("No response from OpenAI:", response);
             return;
         }
@@ -109,7 +109,7 @@ export const ChatSender = () => {
             created: new Date().toISOString(),
             type: MessageTypeEnum.TEXT,
             uid: CHATBOT_UID,
-            content: xRiskChatbotResponse,
+            content: mansaChatbotResponse,
             read: false,
             prompt: prompt
         }

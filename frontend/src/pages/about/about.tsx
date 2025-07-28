@@ -10,11 +10,11 @@ export const About = () => {
   return (
       <Box p={{ xs: 2, md: 6 }}>
         <Typography variant="h3" fontWeight="bold" gutterBottom sx={{ color: theme.palette.primary.main }}>
-          Über Jamiah
+          Über Mansa
         </Typography>
 
         <Typography variant="body1" fontSize={18} gutterBottom sx={{ maxWidth: '800px' }}>
-          Jamiah ist die digitale Plattform für muslimische Gemeinschaften, die Organisation, Finanzen und Kommunikation
+          Mansa ist die digitale Plattform für muslimische Gemeinschaften, die Organisation, Finanzen und Kommunikation
           intelligent vereint. Egal ob Moschee-Verein, Spenden-Initiative oder Nachbarschafts-Jamiah –
           wir digitalisieren den Zusammenhalt.
         </Typography>
@@ -29,7 +29,7 @@ export const About = () => {
               </Avatar>
               <Typography variant="h6" fontWeight="bold">Unsere Mission</Typography>
               <Typography variant="body2" mt={1}>
-                Jamiah bringt Struktur, Transparenz und Effizienz in deine Gemeinschaft – mit Fokus auf Usability und Vertrauen.
+                Mansa bringt Struktur, Transparenz und Effizienz in deine Gemeinschaft – mit Fokus auf Usability und Vertrauen.
               </Typography>
             </Paper>
           </Grid>
@@ -53,7 +53,7 @@ export const About = () => {
               </Avatar>
               <Typography variant="h6" fontWeight="bold">Sicher & DSGVO-konform</Typography>
               <Typography variant="body2" mt={1}>
-                Deine Daten gehören dir. Jamiah schützt Informationen nach höchsten Sicherheitsstandards.
+                Deine Daten gehören dir. Mansa schützt Informationen nach höchsten Sicherheitsstandards.
               </Typography>
             </Paper>
           </Grid>
@@ -64,7 +64,7 @@ export const About = () => {
             Kontakt & Kooperation
           </Typography>
           <Typography variant="body1" sx={{ maxWidth: '700px' }}>
-            Du möchtest Jamiah in deiner Gemeinde einsetzen, Feedback geben oder mitentwickeln?
+            Du möchtest Mansa in deiner Gemeinde einsetzen, Feedback geben oder mitentwickeln?
             Wir freuen uns über deine Nachricht.
           </Typography>
         </Box>
