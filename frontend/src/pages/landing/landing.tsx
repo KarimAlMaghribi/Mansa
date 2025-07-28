@@ -67,7 +67,7 @@ export const Landing = () => {
                     }}
                 >
                   <Typography variant="h3" fontWeight="bold" gutterBottom>
-                    Jamiah – Die digitale Gemeinschaft
+                    Mansa – Die Jamiah-Plattform
                   </Typography>
                   <Typography variant="h5" maxWidth="600px">
                     Gemeinsam. Transparent. Digital. – Deine Jamiah mit einem Klick organisiert.
@@ -85,13 +85,13 @@ export const Landing = () => {
         {/* PROBLEM / LÖSUNG */}
         <Container maxWidth="md" sx={{ py: 10 }}>
           <Typography variant="h4" gutterBottom color="primary.main">
-            Warum Jamiah?
+            Warum Mansa?
           </Typography>
           <Typography variant="body1" sx={{ fontSize: "1.1rem" }}>
             Papierformulare, manuelle Buchhaltung und fehlende Transparenz sind Vergangenheit.
           </Typography>
           <Typography variant="body1" sx={{ mt: 2, fontSize: "1.1rem" }}>
-            Mit <strong>Jamiah</strong> digitalisierst du deine Gemeinschaft: Mitgliederverwaltung, Beiträge,
+            Mit <strong>Mansa</strong> digitalisierst du deine Gemeinschaft: Mitgliederverwaltung, Beiträge,
             Abstimmungen und Kommunikation – alles in einer Plattform.
           </Typography>
         </Container>

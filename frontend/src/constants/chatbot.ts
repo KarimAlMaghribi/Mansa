@@ -1,1 +1,1 @@
-export const CHATBOT_UID = "XRiskChatbot";
+export const CHATBOT_UID = "MansaChatbot";

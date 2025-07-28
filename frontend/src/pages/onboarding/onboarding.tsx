@@ -18,14 +18,14 @@ export const Onboarding = () => {
     if (activeStep < steps.length - 1) {
       setActiveStep(prev => prev + 1);
     } else {
-      alert('Willkommen bei Jamiah! 🎉');
+      alert('Willkommen bei Mansa! 🎉');
     }
   };
 
   return (
       <Box p={4}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Willkommen bei Jamiah 👋
+          Willkommen bei Mansa 👋
         </Typography>
 
         <Paper sx={{ p: 3, mt: 2 }}>

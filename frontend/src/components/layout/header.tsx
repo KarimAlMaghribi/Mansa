@@ -60,7 +60,7 @@ export function Header() {
                     <Box
                         onClick={() => navigate('/')}
                         component="img"
-                        sx={{maxWidth: '50px', display: {xs: 'none', md: 'flex'}, mr: 6, cursor: 'pointer'}}
+                        sx={{maxWidth: '80px', display: {xs: 'none', md: 'flex'}, mr: 6, cursor: 'pointer'}}
                         src={Logo}/>
 
                     <Box sx={{flexGrow: 1, display: {xs: 'flex', md: 'none'}}}>
