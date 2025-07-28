@@ -81,7 +81,11 @@ export const SearchPage = () => {
       .finally(() => setSnackbarOpen(true));
   };
 
-  const filteredPublicGroups = publicGroups.filter(pg =>
+  const availablePublicGroups = publicGroups.filter(
+    pg => !joinedIds.has(pg.id as string) && pg.ownerId !== user?.uid
+  );
+
+  const filteredPublicGroups = availablePublicGroups.filter(pg =>
     pg.name.toLowerCase().includes(search.toLowerCase())
   );
 
