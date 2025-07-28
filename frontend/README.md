@@ -1,7 +1,7 @@
-# XRisk Frontend
+# Mansa Frontend
 
 ## General
-This is the frontend for the XRisk project. It is built using React and Typescript.
+This is the frontend for the Mansa project. It is built using React and Typescript.
 
 
 ## Configuration

@@ -66,7 +66,7 @@ export const ChatMessages = () => {
                                                         <Box>
                                                             {message.created ? (
                                                                 <Typography variant="body2" color="grey.400" mb={1}>
-                                                                    {message.uid === CHATBOT_UID ? "XRisk-Chabot" : otherChatMemberName},{' '}
+                                                                    {message.uid === CHATBOT_UID ? "Mansa-Chatbot" : otherChatMemberName},{' '}
                                                                     {formatLastActivity(message.created)}
                                                                 </Typography>
                                                             ) : null}
