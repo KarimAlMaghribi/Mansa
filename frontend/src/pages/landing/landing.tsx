@@ -38,7 +38,7 @@ export const Landing = () => {
               muted
               playsInline
               preload="auto"
-              onEnded={(e) => e.currentTarget.pause()}
+              loop
               style={{
                 width: "100%",
                 height: "100%",
