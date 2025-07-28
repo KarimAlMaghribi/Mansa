@@ -10,7 +10,7 @@ export const Footer = () => {
         <React.Fragment>
             <Grid container style={{backgroundColor: "#1F271B", padding: "40px 80px", marginTop: "auto", width: "100%"}}>
                 <Grid size={2}>
-                    <img src={Logo} style={{width: "60px", height: "50px"}} alt="logo"/>
+                    <img src={Logo} style={{width: "80px", height: "70px"}} alt="logo"/>
                 </Grid>
                 <Grid size={2}>
                     <Typography variant="h6" color="white">Product</Typography>
