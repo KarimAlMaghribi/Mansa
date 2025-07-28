@@ -13,6 +13,9 @@ import {
   Snackbar,
   Alert
 } from '@mui/material';
+import KeyIcon from '@mui/icons-material/VpnKey';
+import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../../routing/routes';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
 import { auth } from '../../firebase_config';
@@ -26,6 +29,7 @@ export const SearchPage = () => {
   const [snackbarError, setSnackbarError] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/jamiahs/public`)
@@ -89,6 +93,13 @@ export const SearchPage = () => {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+        <Button
+          variant="outlined"
+          startIcon={<KeyIcon />}
+          onClick={() => navigate(`/${ROUTES.JOIN_JAMIAH}`)}
+        >
+          Beitreten mit Code
+        </Button>
       </Box>
       <Grid container spacing={4}>
         {filteredPublicGroups.map(pg => {
