@@ -18,24 +18,17 @@ import { selectName } from '../../store/slices/user-profile';
 import { JamiahSettings } from '../../components/jamiah/JamiahSettings';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
-import { StartCycleButton } from '../../components/jamiah/StartCycleButton';
-import { useAuth } from '../../context/AuthContext';
 
 export const Dashboard = () => {
   const { groupId } = useParams();
   const userName = useSelector(selectName);
-  const { user } = useAuth();
   const [jamiah, setJamiah] = useState<Jamiah | null>(null);
-  const [cycleStarted, setCycleStarted] = useState(false);
 
   useEffect(() => {
     if (!groupId) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}`)
       .then(res => res.json())
-      .then(data => {
-        setJamiah(data);
-        if (data.startDate) setCycleStarted(true);
-      })
+      .then(data => setJamiah(data))
       .catch(() => setJamiah(null));
   }, [groupId]);
 
@@ -113,17 +106,13 @@ export const Dashboard = () => {
           ))}
         </Grid>
 
-        {jamiah && user?.uid === jamiah.ownerId && (
-          <Box mb={2}>
-            <StartCycleButton
-              jamiahId={jamiah.id as string}
-              onStarted={() => setCycleStarted(true)}
-            />
-            {cycleStarted && (
-              <Typography variant="body2" mt={1}>
-                Aktiver Zyklus läuft
+        {jamiah && (
+          <Box mb={4}>
+            <Paper sx={{ p: 2, textAlign: 'center' }}>
+              <Typography variant="h6">
+                {jamiah.startDate ? '🟢 Zyklus läuft' : '⏸️ Zyklus noch nicht gestartet'}
               </Typography>
-            )}
+            </Paper>
           </Box>
         )}
 
