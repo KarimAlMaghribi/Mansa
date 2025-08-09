@@ -25,4 +25,7 @@ public class JamiahPayment {
 
     private BigDecimal amount;
     private LocalDateTime paidAt;
+
+    /** Whether the payer confirmed the payment. */
+    private Boolean confirmed = false;
 }

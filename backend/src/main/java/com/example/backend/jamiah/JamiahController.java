@@ -87,6 +87,13 @@ public class JamiahController {
         return service.getPayments(cycleId);
     }
 
+    @PostMapping("/{id}/cycles/{cycleId}/confirm-receipt")
+    public JamiahCycle confirmReceipt(@PathVariable String id,
+                                      @PathVariable Long cycleId,
+                                      @RequestParam String uid) {
+        return service.confirmReceipt(cycleId, uid);
+    }
+
     @PostMapping("/join")
     public JamiahDto join(@RequestParam String code, @RequestParam String uid) {
         return service.joinByInvitation(code, uid);

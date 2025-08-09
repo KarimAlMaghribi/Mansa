@@ -272,9 +272,15 @@ public class JamiahService {
         }
         JamiahCycle cycle = new JamiahCycle();
         cycle.setJamiah(jamiah);
-        cycle.setCycleNumber((int) (cycleRepository.countByJamiahId(jamiah.getId()) + 1));
+        cycle.setCycleNumber(1);
         cycle.setStartDate(LocalDate.now());
         cycle.setCompleted(false);
+        java.util.List<com.example.backend.UserProfile> members = new java.util.ArrayList<>(jamiah.getMembers());
+        java.util.Collections.shuffle(members);
+        cycle.setMemberOrder(members.stream().map(com.example.backend.UserProfile::getUid).collect(java.util.stream.Collectors.toList()));
+        if (!members.isEmpty()) {
+            cycle.setRecipient(members.get(0));
+        }
         return cycleRepository.save(cycle);
     }
 
@@ -293,19 +299,59 @@ public class JamiahService {
         payment.setUser(user);
         payment.setAmount(amount);
         payment.setPaidAt(java.time.LocalDateTime.now());
+        payment.setConfirmed(true);
         JamiahPayment saved = paymentRepository.save(payment);
-
-        long memberCount = repository.countMembers(cycle.getJamiah().getId());
-        long paidCount = paymentRepository.countByCycleId(cycleId);
-        if (memberCount > 0 && paidCount >= memberCount) {
-            cycle.setCompleted(true);
-            cycleRepository.save(cycle);
-        }
+        maybeCompleteCycle(cycle);
         return saved;
     }
 
     public java.util.List<JamiahPayment> getPayments(Long cycleId) {
         return paymentRepository.findByCycleId(cycleId);
+    }
+
+    public JamiahCycle confirmReceipt(Long cycleId, String uid) {
+        JamiahCycle cycle = cycleRepository.findById(cycleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (cycle.getRecipient() == null || cycle.getRecipient().getUid() == null || !cycle.getRecipient().getUid().equals(uid)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        cycle.setRecipientConfirmed(true);
+        JamiahCycle saved = cycleRepository.save(cycle);
+        maybeCompleteCycle(saved);
+        return saved;
+    }
+
+    private void maybeCompleteCycle(JamiahCycle cycle) {
+        long memberCount = cycle.getMemberOrder() != null && !cycle.getMemberOrder().isEmpty()
+                ? cycle.getMemberOrder().size()
+                : repository.countMembers(cycle.getJamiah().getId());
+        long paidCount = paymentRepository.countByCycleId(cycle.getId());
+        if (memberCount > 0 && paidCount >= memberCount && Boolean.TRUE.equals(cycle.getRecipientConfirmed())) {
+            cycle.setCompleted(true);
+            cycleRepository.save(cycle);
+            startNextRoundIfNeeded(cycle);
+        }
+    }
+
+    private void startNextRoundIfNeeded(JamiahCycle current) {
+        java.util.List<String> order = current.getMemberOrder();
+        if (order == null || current.getRecipient() == null) {
+            return;
+        }
+        int idx = order.indexOf(current.getRecipient().getUid());
+        if (idx >= 0 && idx < order.size() - 1) {
+            JamiahCycle next = new JamiahCycle();
+            next.setJamiah(current.getJamiah());
+            next.setCycleNumber(current.getCycleNumber() + 1);
+            next.setStartDate(LocalDate.now());
+            next.setCompleted(false);
+            next.setMemberOrder(order);
+            String nextUid = order.get(idx + 1);
+            com.example.backend.UserProfile nextUser = userRepository.findByUid(nextUid)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+            next.setRecipient(nextUser);
+            cycleRepository.save(next);
+        }
     }
 
     void validateParameters(JamiahDto dto) {
