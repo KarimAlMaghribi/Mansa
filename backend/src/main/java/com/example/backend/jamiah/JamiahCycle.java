@@ -32,6 +32,7 @@ public class JamiahCycle {
     @ElementCollection
     @CollectionTable(name = "jamiah_cycle_order", joinColumns = @JoinColumn(name = "cycle_id"))
     @Column(name = "member_uid")
+    @OrderColumn(name = "order_index")
     private List<String> memberOrder = new ArrayList<>();
 
     /** Current recipient for this round. */
