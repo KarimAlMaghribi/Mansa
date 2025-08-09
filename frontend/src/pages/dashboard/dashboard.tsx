@@ -10,7 +10,8 @@ import {
   Divider,
   Stack,
   Button,
-  Tooltip
+  Tooltip,
+  Chip
 } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { useParams } from 'react-router-dom';
@@ -18,11 +19,16 @@ import { selectName } from '../../store/slices/user-profile';
 import { JamiahSettings } from '../../components/jamiah/JamiahSettings';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
+import CheckIcon from '@mui/icons-material/Check';
+import { auth } from '../../firebase_config';
 
 export const Dashboard = () => {
   const { groupId } = useParams();
   const userName = useSelector(selectName);
   const [jamiah, setJamiah] = useState<Jamiah | null>(null);
+  const [cycle, setCycle] = useState<any | null>(null);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
 
   useEffect(() => {
     if (!groupId) return;
@@ -30,6 +36,25 @@ export const Dashboard = () => {
       .then(res => res.json())
       .then(data => setJamiah(data))
       .catch(() => setJamiah(null));
+
+    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/members`)
+      .then(res => res.json())
+      .then(data => setMembers(data))
+      .catch(() => setMembers([]));
+
+    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles`)
+      .then(res => res.json())
+      .then(data => {
+        const active = data[data.length - 1];
+        setCycle(active);
+        if (active) {
+          fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${active.id}/payments`)
+            .then(res => res.json())
+            .then(p => setPayments(p))
+            .catch(() => setPayments([]));
+        }
+      })
+      .catch(() => setCycle(null));
   }, [groupId]);
 
   const stats = [
@@ -106,13 +131,30 @@ export const Dashboard = () => {
           ))}
         </Grid>
 
-        {jamiah && (
+        {jamiah && cycle && (
           <Box mb={4}>
-            <Paper sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="h6">
-                {jamiah.startDate ? '🟢 Zyklus läuft' : '⏸️ Zyklus noch nicht gestartet'}
-              </Typography>
-            </Paper>
+            <Typography variant="h5" fontWeight="bold" gutterBottom>{jamiah.name}</Typography>
+            <Typography variant="subtitle1" gutterBottom>
+              Zyklus – Runde <b>{cycle.cycleNumber}</b> von {cycle.memberOrder?.length || members.length}
+            </Typography>
+            <List>
+              {cycle.memberOrder?.map((uid: string) => {
+                const m = members.find(mem => mem.uid === uid) || {};
+                const hasPaid = payments.some(p => p.user && p.user.uid === uid);
+                const isRecipient = cycle.recipient && cycle.recipient.uid === uid;
+                const displayName = m.firstName || m.username || uid;
+                return (
+                  <ListItem key={uid}>
+                    <ListItemText primary={`${displayName}${auth.currentUser?.uid === uid ? ' (Du)' : ''}`} />
+                    {isRecipient && <Chip label="Aktueller Empfänger" size="small" color="primary" sx={{ mr: 1 }} />}
+                    {hasPaid && <CheckIcon color="success" />}
+                  </ListItem>
+                );
+              })}
+            </List>
+            <Typography variant="body2">
+              Fortschritt: {payments.length}/{cycle.memberOrder?.length || members.length} Zahlungen bestätigt.
+            </Typography>
           </Box>
         )}
 
