@@ -69,12 +69,22 @@ public class JamiahController {
         return service.startCycle(id, uid);
     }
 
+    @GetMapping("/{id}/cycles")
+    public java.util.List<JamiahCycle> cycles(@PathVariable String id) {
+        return service.getCycles(id);
+    }
+
     @PostMapping("/{id}/cycles/{cycleId}/pay")
     public JamiahPayment pay(@PathVariable String id,
                              @PathVariable Long cycleId,
                              @RequestParam String uid,
                              @RequestParam BigDecimal amount) {
         return service.recordPayment(cycleId, uid, amount);
+    }
+
+    @GetMapping("/{id}/cycles/{cycleId}/payments")
+    public java.util.List<JamiahPayment> payments(@PathVariable String id, @PathVariable Long cycleId) {
+        return service.getPayments(cycleId);
     }
 
     @PostMapping("/join")

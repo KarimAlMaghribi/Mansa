@@ -278,6 +278,11 @@ public class JamiahService {
         return cycleRepository.save(cycle);
     }
 
+    public java.util.List<JamiahCycle> getCycles(String jamiahPublicId) {
+        Jamiah jamiah = getByPublicId(jamiahPublicId);
+        return cycleRepository.findByJamiahId(jamiah.getId());
+    }
+
     public JamiahPayment recordPayment(Long cycleId, String uid, BigDecimal amount) {
         JamiahCycle cycle = cycleRepository.findById(cycleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -297,6 +302,10 @@ public class JamiahService {
             cycleRepository.save(cycle);
         }
         return saved;
+    }
+
+    public java.util.List<JamiahPayment> getPayments(Long cycleId) {
+        return paymentRepository.findByCycleId(cycleId);
     }
 
     void validateParameters(JamiahDto dto) {
