@@ -7,81 +7,70 @@ import {
   ListItemText,
   Toolbar,
   IconButton,
-  useMediaQuery,
   CssBaseline,
 } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Outlet, Link } from 'react-router-dom';
-import { useTheme } from '@mui/material/styles';
-
-const drawerWidth = 220;
 
 export const JamiahLayout: React.FC = () => {
-  const theme = useTheme();
-  const isSmUp = useMediaQuery(theme.breakpoints.up('sm'));
-  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+  const drawerWidth = open ? 220 : 60;
 
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
   const menu = [
-    { text: 'Dashboard', path: `dashboard` },
-    { text: 'Mitglieder', path: `members` },
-    { text: 'Beiträge', path: `payments` },
-    { text: 'Abstimmungen', path: `votes` },
-    { text: 'Dokumente', path: `documents` },
-    { text: 'Berichte', path: `reports` },
+    { text: 'Dashboard', path: `dashboard`, emoji: '📊' },
+    { text: 'Mitglieder', path: `members`, emoji: '👥' },
+    { text: 'Beiträge', path: `payments`, emoji: '💰' },
+    { text: 'Abstimmungen', path: `votes`, emoji: '🗳️' },
+    { text: 'Dokumente', path: `documents`, emoji: '📄' },
+    { text: 'Berichte', path: `reports`, emoji: '📈' },
   ];
 
-  const drawer = (
-    <Box>
-      <Toolbar />
-      <List>
-        {menu.map(item => (
-          <ListItemButton
-            key={item.text}
-            component={Link}
-            to={item.path}
-            onClick={() => setMobileOpen(false)}
-          >
-            <ListItemText primary={item.text} />
-          </ListItemButton>
-        ))}
-      </List>
-    </Box>
-  );
+  const toggleDrawer = () => setOpen(!open);
 
   return (
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
-      {!isSmUp && (
-        <IconButton
-          color="inherit"
-          aria-label="open drawer"
-          edge="start"
-          onClick={handleDrawerToggle}
-          sx={{ position: 'fixed', top: theme.spacing(9), left: theme.spacing(2), zIndex: theme.zIndex.appBar }}
-        >
-          <MenuIcon />
-        </IconButton>
-      )}
-      <Box component="nav" sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }} aria-label="navigation menu">
-        <Drawer
-          variant={isSmUp ? 'permanent' : 'temporary'}
-          open={isSmUp ? true : mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            '& .MuiDrawer-paper': { width: drawerWidth, boxSizing: 'border-box' },
-          }}
-        >
-          {drawer}
-        </Drawer>
-      </Box>
-      <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${drawerWidth}px)` } }}>
+      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
         <Toolbar />
         <Outlet />
       </Box>
+      <Drawer
+        variant="permanent"
+        anchor="right"
+        open
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': {
+            width: drawerWidth,
+            boxSizing: 'border-box',
+            overflowX: 'hidden',
+            transition: 'width 0.3s',
+          },
+        }}
+      >
+        <Toolbar sx={{ justifyContent: open ? 'flex-end' : 'center' }}>
+          <IconButton onClick={toggleDrawer}>
+            {open ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+          </IconButton>
+        </Toolbar>
+        <List>
+          {menu.map(item => (
+            <ListItemButton
+              key={item.text}
+              component={Link}
+              to={item.path}
+              sx={{ justifyContent: open ? 'flex-start' : 'center', px: 2 }}
+            >
+              <span role="img" aria-label={item.text} style={{ fontSize: 20 }}>
+                {item.emoji}
+              </span>
+              {open && <ListItemText primary={item.text} sx={{ pl: 1 }} />}
+            </ListItemButton>
+          ))}
+        </List>
+      </Drawer>
     </Box>
   );
 };
