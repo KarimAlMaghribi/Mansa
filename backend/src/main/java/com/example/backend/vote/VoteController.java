@@ -7,6 +7,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/votes")
+@CrossOrigin(origins = "*")
 public class VoteController {
     private final VoteService service;
 
