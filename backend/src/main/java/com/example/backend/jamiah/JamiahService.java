@@ -70,6 +70,7 @@ public class JamiahService {
     public JamiahDto create(JamiahDto dto, String uid) {
         validateParameters(dto);
         Jamiah entity = mapper.toEntity(dto);
+        entity.setStartDate(null); // ensure cycle not started on creation
         if (uid != null) {
             com.example.backend.UserProfile user = userRepository.findByUid(uid)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -86,6 +87,7 @@ public class JamiahService {
     public JamiahDto createJamiah(String ownerUid, JamiahDto dto) {
         validateParameters(dto);
         Jamiah j = mapper.toEntity(dto);
+        j.setStartDate(null); // ensure cycle not started on creation
         j.setOwnerId(ownerUid);
         if (ownerUid != null) {
             com.example.backend.UserProfile user = userRepository.findByUid(ownerUid)
