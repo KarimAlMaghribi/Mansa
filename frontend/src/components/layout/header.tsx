@@ -55,7 +55,7 @@ export function Header() {
 
     return (
         <AppBar position="static" elevation={0} sx={{backgroundColor: "#1F271B"}}>
-            <Container maxWidth="xl">
+            <Container maxWidth="xl" sx={{px: {xs: 2, md: 6}}}>
                 <Toolbar disableGutters>
                     <Box
                         onClick={() => navigate('/')}

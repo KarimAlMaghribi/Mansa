@@ -10,19 +10,29 @@ export const Banner = () => {
                     backgroundImage:`url(${cover})`,
                     backgroundRepeat: "no-repeat",
                     backgroundSize: "cover",
-                    height: "70vh"
+                    height: {xs: "40vh", md: "70vh"},
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    px: {xs: 2, md: 12}
                 }}>
                 <Typography
                     variant="h2"
                     color="white"
-                    style={{width: "40%", paddingTop: "200px", paddingLeft: "100px"}}>
+                    sx={{
+                        width: {xs: "100%", md: "40%"},
+                        fontSize: {xs: "2rem", md: "3rem"}
+                    }}>
                     <b>Wir machen Risiken handelbar!</b>
                 </Typography>
 
                 <Typography
                     variant="h4"
                     color="white"
-                    style={{width: "40%", paddingLeft: "100px"}}>
+                    sx={{
+                        width: {xs: "100%", md: "40%"},
+                        mt: {xs: 2, md: 0}
+                    }}>
                     Wir sind die intelligente Plattform für Partner-basierte Risiko-Transformation!
                 </Typography>
             </Box>
