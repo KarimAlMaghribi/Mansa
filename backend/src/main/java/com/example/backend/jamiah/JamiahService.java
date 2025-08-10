@@ -289,8 +289,9 @@ public class JamiahService {
         dto.setPayoutPerInterval(payout);
         int rounds = members.size();
         dto.setRounds(rounds);
-        java.time.LocalDate end = java.time.LocalDate.now();
-        for (int i = 0; i < rounds; i++) {
+        java.time.LocalDate start = jamiah.getStartDate() != null ? jamiah.getStartDate() : java.time.LocalDate.now();
+        java.time.LocalDate end = start;
+        for (int i = 1; i < rounds; i++) {
             if (jamiah.getRateInterval() == RateInterval.MONTHLY) {
                 end = end.plusMonths(1);
             } else {
@@ -319,7 +320,7 @@ public class JamiahService {
         JamiahCycle cycle = new JamiahCycle();
         cycle.setJamiah(jamiah);
         cycle.setCycleNumber(1);
-        cycle.setStartDate(LocalDate.now());
+        cycle.setStartDate(jamiah.getStartDate());
         cycle.setCompleted(false);
         cycle.setMemberOrder(order);
         String firstUid = order.get(0);
@@ -339,6 +340,10 @@ public class JamiahService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         com.example.backend.UserProfile user = userRepository.findByUid(uid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        java.util.Optional<JamiahPayment> existing = paymentRepository.findByCycleIdAndUserUid(cycleId, uid);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
         JamiahPayment payment = new JamiahPayment();
         payment.setCycle(cycle);
         payment.setUser(user);
@@ -350,8 +355,20 @@ public class JamiahService {
         return saved;
     }
 
-    public java.util.List<JamiahPayment> getPayments(Long cycleId) {
-        return paymentRepository.findByCycleId(cycleId);
+    public java.util.List<JamiahPayment> getPayments(Long cycleId, String uid) {
+        JamiahCycle cycle = cycleRepository.findById(cycleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        Jamiah jamiah = cycle.getJamiah();
+        boolean isOwner = jamiah.getOwnerId() != null && jamiah.getOwnerId().equals(uid);
+        boolean isRecipient = cycle.getRecipient() != null
+                && cycle.getRecipient().getUid() != null
+                && cycle.getRecipient().getUid().equals(uid);
+        if (isOwner || isRecipient) {
+            return paymentRepository.findByCycleId(cycleId);
+        }
+        return paymentRepository.findByCycleIdAndUserUid(cycleId, uid)
+                .map(java.util.List::of)
+                .orElse(java.util.Collections.emptyList());
     }
 
     public JamiahPayment confirmPaymentReceipt(Long cycleId, Long paymentId, String uid) {
@@ -394,7 +411,13 @@ public class JamiahService {
             JamiahCycle next = new JamiahCycle();
             next.setJamiah(current.getJamiah());
             next.setCycleNumber(current.getCycleNumber() + 1);
-            next.setStartDate(LocalDate.now());
+            java.time.LocalDate nextStart = current.getStartDate();
+            if (current.getJamiah().getRateInterval() == RateInterval.MONTHLY) {
+                nextStart = nextStart.plusMonths(1);
+            } else {
+                nextStart = nextStart.plusWeeks(1);
+            }
+            next.setStartDate(nextStart);
             next.setCompleted(false);
             next.setMemberOrder(order);
             String nextUid = order.get(idx + 1);
