@@ -6,7 +6,6 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import GroupIcon from '@mui/icons-material/Group';
 import PeopleIcon from '@mui/icons-material/People';
 import PaymentIcon from '@mui/icons-material/Payment';
-import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import DescriptionIcon from '@mui/icons-material/Description';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import SchoolIcon from '@mui/icons-material/School';
@@ -25,7 +24,6 @@ export const pages: Page[] = [
     { name: 'Jamiahs', route: ROUTES.GROUPS, icon: GroupIcon, authenticated: true },
     { name: 'Mitglieder', route: ROUTES.MEMBERS, icon: PeopleIcon, authenticated: true },
     { name: 'Beiträge', route: ROUTES.PAYMENTS, icon: PaymentIcon, authenticated: true },
-    { name: 'Abstimmungen', route: ROUTES.VOTES, icon: HowToVoteIcon, authenticated: true },
     { name: 'Dokumente', route: ROUTES.DOCUMENTS, icon: DescriptionIcon, authenticated: true },
     { name: 'Berichte', route: ROUTES.REPORTS, icon: AssessmentIcon, authenticated: true },
     { name: 'Über uns', route: ROUTES.ABOUT },

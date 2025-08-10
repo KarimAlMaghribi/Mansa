@@ -63,7 +63,6 @@ function App() {
                 <Route path={`/${ROUTES.SEARCH}`} element={<PrivateRoute><SearchPage /></PrivateRoute>} />
                 <Route path={`/${ROUTES.MEMBERS}`} element={<PrivateRoute><Members /></PrivateRoute>} />
                 <Route path={`/${ROUTES.PAYMENTS}`} element={<PrivateRoute><Payments /></PrivateRoute>} />
-                <Route path={`/${ROUTES.VOTES}`} element={<PrivateRoute><Votes /></PrivateRoute>} />
                 <Route path={`/${ROUTES.DOCUMENTS}`} element={<PrivateRoute><Documents /></PrivateRoute>} />
                 <Route path={`/${ROUTES.REPORTS}`} element={<PrivateRoute><Reports /></PrivateRoute>} />
                 <Route path={`/${ROUTES.CHAT}`} element={<PrivateRoute><Chat /></PrivateRoute>} />
