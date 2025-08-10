@@ -18,10 +18,10 @@ export const Footer = () => {
                     width: "100%"
                 }}
             >
-                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
+                <Grid size={{xs: 12, sm: 6, md: 2}} sx={{mb: {xs: 4, md: 0}}}>
                     <img src={Logo} style={{width: "80px", height: "70px"}} alt="logo"/>
                 </Grid>
-                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
+                <Grid size={{xs: 12, sm: 6, md: 2}} sx={{mb: {xs: 4, md: 0}}}>
                     <Typography variant="h6" color="white">Product</Typography>
                     <br />
                     <Typography color="white" variant="body2">Pricing</Typography>
@@ -36,7 +36,7 @@ export const Footer = () => {
                     </div>
 
                 </Grid>
-                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
+                <Grid size={{xs: 12, sm: 6, md: 2}} sx={{mb: {xs: 4, md: 0}}}>
                     <Typography variant="h6" color="white">Solutions</Typography>
                     <br />
                     <Typography color="white" variant="body2">Brainstorming</Typography>
@@ -47,7 +47,7 @@ export const Footer = () => {
                     <br />
                     <Typography color="white" variant="body2">Research</Typography>
                 </Grid>
-                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
+                <Grid size={{xs: 12, sm: 6, md: 2}} sx={{mb: {xs: 4, md: 0}}}>
                     <Typography variant="h6" color="white">Resources</Typography>
                     <br />
                     <Typography color="white" variant="body2">Help Center</Typography>
@@ -58,7 +58,7 @@ export const Footer = () => {
                     <br />
                     <Typography color="white" variant="body2">FAQs</Typography>
                 </Grid>
-                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
+                <Grid size={{xs: 12, sm: 6, md: 2}} sx={{mb: {xs: 4, md: 0}}}>
                     <Typography variant="h6" color="white">Support</Typography>
                     <br />
                     <Typography color="white" variant="body2">Contact Us</Typography>
@@ -69,7 +69,7 @@ export const Footer = () => {
                     <br />
                     <Typography color="white" variant="body2">Integrations</Typography>
                 </Grid>
-                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
+                <Grid size={{xs: 12, sm: 6, md: 2}} sx={{mb: {xs: 4, md: 0}}}>
                     <Typography variant="h6" color="white">Company</Typography>
                     <br />
                     <Typography color="white" variant="body2">About</Typography>
@@ -80,15 +80,14 @@ export const Footer = () => {
                     <br />
                     <Typography color="white" variant="body2">Request Demo</Typography>
                 </Grid>
-                <Grid xs={12} sx={{mt: "50px"}}>
+                <Grid size={12} sx={{mt: "50px"}}>
                     <Divider color="white"/>
                 </Grid>
-                <Grid xs={12} md={6} sx={{mt: "20px"}}>
+                <Grid size={{xs: 12, md: 6}} sx={{mt: "20px"}}>
                     <Typography color="white">© {new Date().getFullYear()} XRISK AG. All rights reserved</Typography>
                 </Grid>
                 <Grid
-                    xs={12}
-                    md={6}
+                    size={{xs: 12, md: 6}}
                     display="flex"
                     justifyContent={{xs: "center", md: "flex-end"}}
                     flexWrap="wrap"
