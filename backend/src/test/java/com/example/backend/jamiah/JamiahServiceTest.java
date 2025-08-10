@@ -209,6 +209,27 @@ class JamiahServiceTest {
     }
 
     @Test
+    void newJamiahHasNoStartDate() {
+        UserProfile user = new UserProfile();
+        user.setUsername("owner2");
+        user.setUid("owner2");
+        userRepository.save(user);
+
+        JamiahDto dto = new JamiahDto();
+        dto.setName("NoStartDate");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setCycleCount(1);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        service.createJamiah("owner2", dto);
+        Jamiah jamiah = repository.findAll().get(0);
+        assertNull(jamiah.getStartDate());
+    }
+
+    @Test
     void onlyOwnerCanModify() {
         UserProfile owner = new UserProfile();
         owner.setUsername("owner");
