@@ -29,6 +29,7 @@ export const Dashboard = () => {
   const [cycle, setCycle] = useState<any | null>(null);
   const [payments, setPayments] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const votePageLink = groupId ? `/jamiah/${groupId}/votes` : '/groups';
 
   useEffect(() => {
     if (!groupId) return;
@@ -79,7 +80,7 @@ export const Dashboard = () => {
     {
       label: 'Offene Anträge',
       value: 2,
-      href: '/votes',
+      href: votePageLink,
       tooltip: 'Anträge, über die aktuell abgestimmt wird.'
     }
   ];
@@ -176,7 +177,7 @@ export const Dashboard = () => {
               <Button
                   size="small"
                   sx={{ mt: 2 }}
-                  href="/votes"
+                  href={votePageLink}
                   target="_blank"
                   rel="noopener noreferrer"
               >

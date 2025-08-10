@@ -60,6 +60,17 @@ export const Votes = () => {
       });
   }, [groupId]);
 
+  useEffect(() => {
+    const jamiahLoaded = !!jamiah;
+    const userIsOwner = user?.uid === jamiah?.ownerId;
+    const cycleNotStarted = !cycleStarted;
+    const enoughMembers = (jamiah?.currentMembers || 0) >= 2;
+    console.log('Jamiah loaded:', jamiahLoaded);
+    console.log('User is owner:', userIsOwner);
+    console.log('Cycle not started:', cycleNotStarted);
+    console.log('Has enough members:', enoughMembers);
+  }, [jamiah, user, cycleStarted]);
+
   const handleVote = (vote: Vote) => {
     setSelectedVote(vote);
     setVoteModalOpen(true);
