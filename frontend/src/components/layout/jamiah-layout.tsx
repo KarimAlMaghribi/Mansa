@@ -5,9 +5,9 @@ import {
   List,
   ListItemButton,
   ListItemText,
-  Toolbar,
   IconButton,
   CssBaseline,
+  useTheme,
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -15,7 +15,20 @@ import { Outlet, Link } from 'react-router-dom';
 
 export const JamiahLayout: React.FC = () => {
   const [open, setOpen] = React.useState(false);
+  const theme = useTheme();
   const drawerWidth = open ? 220 : 60;
+  const toolbarHeight = theme.mixins.toolbar.minHeight;
+  const [footerHeight, setFooterHeight] = React.useState(0);
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      const footer = document.getElementById('footer');
+      setFooterHeight(footer ? footer.offsetHeight : 0);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const menu = [
     { text: 'Dashboard', path: `dashboard`, emoji: '📊' },
@@ -31,13 +44,9 @@ export const JamiahLayout: React.FC = () => {
   return (
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-        <Toolbar />
-        <Outlet />
-      </Box>
       <Drawer
         variant="permanent"
-        anchor="right"
+        anchor="left"
         open
         sx={{
           width: drawerWidth,
@@ -47,14 +56,16 @@ export const JamiahLayout: React.FC = () => {
             boxSizing: 'border-box',
             overflowX: 'hidden',
             transition: 'width 0.3s',
+            top: toolbarHeight,
+            height: `calc(100% - ${toolbarHeight}px - ${footerHeight}px)`,
           },
         }}
       >
-        <Toolbar sx={{ justifyContent: open ? 'flex-end' : 'center' }}>
+        <Box sx={{ display: 'flex', justifyContent: open ? 'flex-end' : 'center', p: 1 }}>
           <IconButton onClick={toggleDrawer}>
-            {open ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+            {open ? <ChevronLeftIcon /> : <ChevronRightIcon />}
           </IconButton>
-        </Toolbar>
+        </Box>
         <List>
           {menu.map(item => (
             <ListItemButton
@@ -71,6 +82,9 @@ export const JamiahLayout: React.FC = () => {
           ))}
         </List>
       </Drawer>
+      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+        <Outlet />
+      </Box>
     </Box>
   );
 };
