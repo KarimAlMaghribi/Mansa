@@ -15,8 +15,10 @@ interface Member {
 }
 
 interface Payment {
+  id: number;
   user: { uid: string; };
   paidAt: string;
+  recipientConfirmed: boolean;
 }
 
 interface Cycle {
@@ -24,6 +26,7 @@ interface Cycle {
   cycleNumber: number;
   startDate: string;
   completed: boolean;
+  recipient?: { uid: string };
 }
 
 export const Payments = () => {
@@ -79,23 +82,40 @@ export const Payments = () => {
     window.open(link, '_blank');
   };
 
+  const currentCycle = cycles.find(c => c.id === selectedCycle) || null;
+  const isRecipient = currentCycle?.recipient?.uid === currentUid;
+  const showList = isAdminView || isRecipient;
+
   const handleConfirm = (uid: string) => {
     if (!selectedCycle) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/pay?uid=${encodeURIComponent(uid)}&amount=${amount}`, { method: 'POST' })
       .then(() => fetchPayments(selectedCycle));
   };
 
+  const handleReceiptConfirm = (paymentId: number) => {
+    if (!selectedCycle) return;
+    const uid = currentUid || '';
+    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/payments/${paymentId}/confirm-receipt?uid=${encodeURIComponent(uid)}`, { method: 'POST' })
+      .then(() => fetchPayments(selectedCycle));
+  };
+
   const renderMemberRow = (m: Member) => {
     const payment = payments.find(p => p.user.uid === m.uid);
     const name = m.firstName || m.lastName ? `${m.firstName || ''} ${m.lastName || ''}`.trim() : m.username;
+    let action;
+    if (payment) {
+      if (isRecipient && !payment.recipientConfirmed && m.uid !== currentUid) {
+        action = <Button size="small" variant="outlined" onClick={() => handleReceiptConfirm(payment.id)}>Erhalt bestätigen</Button>;
+      } else {
+        action = <Typography variant="body2">{`${new Date(payment.paidAt).toLocaleDateString()}${payment.recipientConfirmed ? ' / Empfang bestätigt' : ' / Eingang offen'}`}</Typography>;
+      }
+    } else if (m.uid === currentUid) {
+      action = <Button size="small" variant="outlined" onClick={() => handleConfirm(m.uid)}>Zahlung bestätigen</Button>;
+    } else {
+      action = <Typography variant="body2">Nicht bestätigt</Typography>;
+    }
     return (
-      <ListItem key={m.uid} secondaryAction={
-        payment ? (
-          <Typography variant="body2">{new Date(payment.paidAt).toLocaleDateString()}</Typography>
-        ) : (
-          <Button size="small" variant="outlined" onClick={() => handleConfirm(m.uid)}>Bestätigen</Button>
-        )
-      }>
+      <ListItem key={m.uid} secondaryAction={action}>
         <ListItemText primary={name} />
       </ListItem>
     );
@@ -140,7 +160,7 @@ export const Payments = () => {
           <Button sx={{ ml: 2 }} variant="outlined" onClick={() => handleConfirm(currentUid || '')}>Zahlung bestätigen</Button>
         </Box>
 
-        {isAdminView ? (
+        {showList ? (
           <Paper sx={{ p: 2 }}>
             <List>
               {members.map(renderMemberRow)}
@@ -149,7 +169,7 @@ export const Payments = () => {
         ) : (
           <Typography variant="body2">
             {payments.find(p => p.user.uid === currentUid)
-              ? `Bezahlt am ${new Date((payments.find(p => p.user.uid === currentUid) as Payment).paidAt).toLocaleDateString()}`
+              ? `Bezahlt am ${new Date((payments.find(p => p.user.uid === currentUid) as Payment).paidAt).toLocaleDateString()}${(payments.find(p => p.user.uid === currentUid) as Payment).recipientConfirmed ? ' / Empfang bestätigt' : ''}`
               : 'Noch nicht bezahlt'}
           </Typography>
         )}
