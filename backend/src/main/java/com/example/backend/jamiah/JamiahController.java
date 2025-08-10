@@ -65,8 +65,13 @@ public class JamiahController {
     }
 
     @PostMapping("/{id}/start")
-    public JamiahCycle start(@PathVariable String id, @RequestParam String uid) {
-        return service.startCycle(id, uid);
+    public JamiahCycle start(@PathVariable String id, @RequestParam String uid, @RequestBody StartRequest request) {
+        return service.startCycle(id, uid, request.getOrder());
+    }
+
+    @GetMapping("/{id}/start-preview")
+    public com.example.backend.jamiah.dto.StartPreviewDto preview(@PathVariable String id, @RequestParam String uid) {
+        return service.previewStart(id, uid);
     }
 
     @GetMapping("/{id}/cycles")
@@ -87,11 +92,12 @@ public class JamiahController {
         return service.getPayments(cycleId);
     }
 
-    @PostMapping("/{id}/cycles/{cycleId}/confirm-receipt")
-    public JamiahCycle confirmReceipt(@PathVariable String id,
-                                      @PathVariable Long cycleId,
-                                      @RequestParam String uid) {
-        return service.confirmReceipt(cycleId, uid);
+    @PostMapping("/{id}/cycles/{cycleId}/payments/{paymentId}/confirm-receipt")
+    public JamiahPayment confirmPaymentReceipt(@PathVariable String id,
+                                               @PathVariable Long cycleId,
+                                               @PathVariable Long paymentId,
+                                               @RequestParam String uid) {
+        return service.confirmPaymentReceipt(cycleId, paymentId, uid);
     }
 
     @PostMapping("/join")
@@ -109,5 +115,17 @@ public class JamiahController {
     public void delete(@PathVariable String id,
                        @RequestParam(required = false) String uid) {
         service.delete(id, uid);
+    }
+
+    static class StartRequest {
+        private java.util.List<String> order;
+
+        public java.util.List<String> getOrder() {
+            return order;
+        }
+
+        public void setOrder(java.util.List<String> order) {
+            this.order = order;
+        }
     }
 }

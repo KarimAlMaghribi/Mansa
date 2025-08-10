@@ -263,9 +263,53 @@ public class JamiahService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    public JamiahCycle startCycle(String jamiahPublicId, String uid) {
+    public com.example.backend.jamiah.dto.StartPreviewDto previewStart(String jamiahPublicId, String uid) {
         Jamiah jamiah = getByPublicId(jamiahPublicId);
         ensureOwner(jamiah, uid);
+        Jamiah withMembers = repository.findWithMembersById(jamiah.getId()).orElse(jamiah);
+        java.util.List<com.example.backend.UserProfile> members = new java.util.ArrayList<>(withMembers.getMembers());
+        if (members.size() < 2) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Need at least 2 members");
+        }
+        java.util.Collections.shuffle(members);
+        com.example.backend.jamiah.dto.StartPreviewDto dto = new com.example.backend.jamiah.dto.StartPreviewDto();
+        java.util.List<com.example.backend.jamiah.dto.StartPreviewDto.MemberInfo> order = new java.util.ArrayList<>();
+        for (com.example.backend.UserProfile u : members) {
+            com.example.backend.jamiah.dto.StartPreviewDto.MemberInfo mi = new com.example.backend.jamiah.dto.StartPreviewDto.MemberInfo();
+            mi.setUid(u.getUid());
+            mi.setUsername(u.getUsername());
+            mi.setFirstName(u.getFirstName());
+            mi.setLastName(u.getLastName());
+            order.add(mi);
+        }
+        dto.setOrder(order);
+        java.math.BigDecimal payout = jamiah.getRateAmount().multiply(java.math.BigDecimal.valueOf(members.size()));
+        dto.setPayoutPerInterval(payout);
+        int rounds = members.size();
+        dto.setRounds(rounds);
+        java.time.LocalDate end = java.time.LocalDate.now();
+        for (int i = 0; i < rounds; i++) {
+            if (jamiah.getRateInterval() == RateInterval.MONTHLY) {
+                end = end.plusMonths(1);
+            } else {
+                end = end.plusWeeks(1);
+            }
+        }
+        dto.setExpectedEndDate(end);
+        return dto;
+    }
+
+    public JamiahCycle startCycle(String jamiahPublicId, String uid, java.util.List<String> order) {
+        Jamiah jamiah = getByPublicId(jamiahPublicId);
+        ensureOwner(jamiah, uid);
+        Jamiah withMembers = repository.findWithMembersById(jamiah.getId()).orElse(jamiah);
+        java.util.List<com.example.backend.UserProfile> members = new java.util.ArrayList<>(withMembers.getMembers());
+        if (members.size() < 2) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Need at least 2 members");
+        }
+        if (order == null || order.size() != members.size() || !new java.util.HashSet<>(order).equals(members.stream().map(com.example.backend.UserProfile::getUid).collect(java.util.stream.Collectors.toSet()))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid member order");
+        }
         if (jamiah.getStartDate() == null) {
             jamiah.setStartDate(LocalDate.now());
             repository.save(jamiah);
@@ -275,12 +319,11 @@ public class JamiahService {
         cycle.setCycleNumber(1);
         cycle.setStartDate(LocalDate.now());
         cycle.setCompleted(false);
-        java.util.List<com.example.backend.UserProfile> members = new java.util.ArrayList<>(jamiah.getMembers());
-        java.util.Collections.shuffle(members);
-        cycle.setMemberOrder(members.stream().map(com.example.backend.UserProfile::getUid).collect(java.util.stream.Collectors.toList()));
-        if (!members.isEmpty()) {
-            cycle.setRecipient(members.get(0));
-        }
+        cycle.setMemberOrder(order);
+        String firstUid = order.get(0);
+        com.example.backend.UserProfile first = userRepository.findByUid(firstUid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        cycle.setRecipient(first);
         return cycleRepository.save(cycle);
     }
 
@@ -309,15 +352,20 @@ public class JamiahService {
         return paymentRepository.findByCycleId(cycleId);
     }
 
-    public JamiahCycle confirmReceipt(Long cycleId, String uid) {
+    public JamiahPayment confirmPaymentReceipt(Long cycleId, Long paymentId, String uid) {
         JamiahCycle cycle = cycleRepository.findById(cycleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (cycle.getRecipient() == null || cycle.getRecipient().getUid() == null || !cycle.getRecipient().getUid().equals(uid)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        cycle.setRecipientConfirmed(true);
-        JamiahCycle saved = cycleRepository.save(cycle);
-        maybeCompleteCycle(saved);
+        JamiahPayment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!payment.getCycle().getId().equals(cycleId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        payment.setRecipientConfirmed(true);
+        JamiahPayment saved = paymentRepository.save(payment);
+        maybeCompleteCycle(cycle);
         return saved;
     }
 
@@ -325,8 +373,9 @@ public class JamiahService {
         long memberCount = cycle.getMemberOrder() != null && !cycle.getMemberOrder().isEmpty()
                 ? cycle.getMemberOrder().size()
                 : repository.countMembers(cycle.getJamiah().getId());
-        long paidCount = paymentRepository.countByCycleId(cycle.getId());
-        if (memberCount > 0 && paidCount >= memberCount && Boolean.TRUE.equals(cycle.getRecipientConfirmed())) {
+        java.util.List<JamiahPayment> payments = paymentRepository.findByCycleId(cycle.getId());
+        boolean allConfirmed = payments.size() >= memberCount && payments.stream().allMatch(p -> Boolean.TRUE.equals(p.getConfirmed()) && Boolean.TRUE.equals(p.getRecipientConfirmed()));
+        if (memberCount > 0 && allConfirmed) {
             cycle.setCompleted(true);
             cycleRepository.save(cycle);
             startNextRoundIfNeeded(cycle);

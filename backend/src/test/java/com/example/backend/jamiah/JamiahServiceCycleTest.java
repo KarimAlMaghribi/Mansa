@@ -3,6 +3,7 @@ package com.example.backend.jamiah;
 import com.example.backend.UserProfile;
 import com.example.backend.UserProfileRepository;
 import com.example.backend.jamiah.dto.JamiahDto;
+import com.example.backend.jamiah.JamiahPayment;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,12 +44,21 @@ public class JamiahServiceCycleTest {
         owner.setUsername("owner");
         owner.setUid("u1");
         userRepository.save(owner);
+        UserProfile member = new UserProfile();
+        member.setUsername("m");
+        member.setUid("u2");
+        userRepository.save(member);
 
         JamiahDto created = createJamiah("u1");
-        JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1");
-
         Jamiah jamiah = jamiahRepository.findAll().get(0);
-        assertNotNull(jamiah.getStartDate());
+        jamiah.getMembers().add(member);
+        member.getJamiahs().add(jamiah);
+        jamiahRepository.save(jamiah);
+
+        JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1", java.util.Arrays.asList("u1", "u2"));
+
+        Jamiah jamiahUpdated = jamiahRepository.findAll().get(0);
+        assertNotNull(jamiahUpdated.getStartDate());
         assertEquals(1, cycle.getCycleNumber());
     }
 
@@ -69,10 +79,12 @@ public class JamiahServiceCycleTest {
         member.getJamiahs().add(jamiah);
         jamiahRepository.save(jamiah);
 
-        JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1");
-        service.recordPayment(cycle.getId(), "u1", new BigDecimal("5"));
+        JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1", java.util.Arrays.asList("u1", "u2"));
+        JamiahPayment p1 = service.recordPayment(cycle.getId(), "u1", new BigDecimal("5"));
+        JamiahPayment p2 = service.recordPayment(cycle.getId(), "u2", new BigDecimal("5"));
         assertFalse(cycleRepository.findById(cycle.getId()).get().getCompleted());
-        service.recordPayment(cycle.getId(), "u2", new BigDecimal("5"));
+        service.confirmPaymentReceipt(cycle.getId(), p1.getId(), "u1");
+        service.confirmPaymentReceipt(cycle.getId(), p2.getId(), "u1");
         assertTrue(cycleRepository.findById(cycle.getId()).get().getCompleted());
     }
 }

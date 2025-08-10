@@ -28,4 +28,7 @@ public class JamiahPayment {
 
     /** Whether the payer confirmed the payment. */
     private Boolean confirmed = false;
+
+    /** Whether the current recipient confirmed receiving this payment. */
+    private Boolean recipientConfirmed = false;
 }

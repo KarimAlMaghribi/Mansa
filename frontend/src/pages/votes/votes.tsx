@@ -107,7 +107,7 @@ export const Votes = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" fontWeight="bold">Abstimmungen</Typography>
         <Stack direction="row" spacing={2}>
-          {jamiah && user?.uid === jamiah.ownerId && !cycleStarted && (
+          {jamiah && user?.uid === jamiah.ownerId && !cycleStarted && (jamiah.currentMembers || 0) >= 2 && (
             <StartCycleButton
               jamiahId={jamiah.id as string}
               onStarted={() => setCycleStarted(true)}
