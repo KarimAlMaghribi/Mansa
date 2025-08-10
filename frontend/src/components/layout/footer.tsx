@@ -11,12 +11,17 @@ export const Footer = () => {
             <Grid
                 container
                 id="footer"
-                style={{backgroundColor: "#1F271B", padding: "40px 80px", marginTop: "auto", width: "100%"}}
+                sx={{
+                    backgroundColor: "#1F271B",
+                    p: {xs: "40px 20px", md: "40px 80px"},
+                    mt: "auto",
+                    width: "100%"
+                }}
             >
-                <Grid size={2}>
+                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
                     <img src={Logo} style={{width: "80px", height: "70px"}} alt="logo"/>
                 </Grid>
-                <Grid size={2}>
+                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
                     <Typography variant="h6" color="white">Product</Typography>
                     <br />
                     <Typography color="white" variant="body2">Pricing</Typography>
@@ -31,7 +36,7 @@ export const Footer = () => {
                     </div>
 
                 </Grid>
-                <Grid size={2}>
+                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
                     <Typography variant="h6" color="white">Solutions</Typography>
                     <br />
                     <Typography color="white" variant="body2">Brainstorming</Typography>
@@ -42,7 +47,7 @@ export const Footer = () => {
                     <br />
                     <Typography color="white" variant="body2">Research</Typography>
                 </Grid>
-                <Grid size={2}>
+                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
                     <Typography variant="h6" color="white">Resources</Typography>
                     <br />
                     <Typography color="white" variant="body2">Help Center</Typography>
@@ -53,7 +58,7 @@ export const Footer = () => {
                     <br />
                     <Typography color="white" variant="body2">FAQs</Typography>
                 </Grid>
-                <Grid size={2}>
+                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
                     <Typography variant="h6" color="white">Support</Typography>
                     <br />
                     <Typography color="white" variant="body2">Contact Us</Typography>
@@ -64,7 +69,7 @@ export const Footer = () => {
                     <br />
                     <Typography color="white" variant="body2">Integrations</Typography>
                 </Grid>
-                <Grid size={2}>
+                <Grid xs={12} sm={6} md={2} sx={{mb: {xs: 4, md: 0}}}>
                     <Typography variant="h6" color="white">Company</Typography>
                     <br />
                     <Typography color="white" variant="body2">About</Typography>
@@ -75,21 +80,28 @@ export const Footer = () => {
                     <br />
                     <Typography color="white" variant="body2">Request Demo</Typography>
                 </Grid>
-                <Grid size={12} style={{marginTop: "50px"}}>
+                <Grid xs={12} sx={{mt: "50px"}}>
                     <Divider color="white"/>
                 </Grid>
-                <Grid size={6} style={{marginTop: "20px"}}>
+                <Grid xs={12} md={6} sx={{mt: "20px"}}>
                     <Typography color="white">© {new Date().getFullYear()} XRISK AG. All rights reserved</Typography>
                 </Grid>
-                <Grid size={6} display="flex" justifyContent="right" style={{marginTop: "20px"}}>
-                    <Typography color="white" variant="body2" style={{ marginLeft: "10px", marginRight: "10px" }}>Imprint</Typography>
-                    <Typography color="white" variant="body2" style={{ marginLeft: "10px", marginRight: "10px" }}>Terms</Typography>
-                    <Typography color="white" variant="body2" style={{ marginLeft: "10px", marginRight: "10px" }}>Privacy</Typography>
-                    <Typography color="white" variant="body2" style={{ marginLeft: "10px", marginRight: "10px" }}>Support</Typography>
-                    <Typography color="white" variant="body2" style={{ marginLeft: "10px", marginRight: "10px" }}>About</Typography>
-                    <Typography color="white" variant="body2" style={{ marginLeft: "10px", marginRight: "10px" }}>Contact</Typography>
-                    <LinkedInIcon style={{color: "white", marginLeft: "10px", marginRight: "10px"}}/>
-                    <XIcon style={{color: "white", marginLeft: "10px", marginRight: "10px"}}/>
+                <Grid
+                    xs={12}
+                    md={6}
+                    display="flex"
+                    justifyContent={{xs: "center", md: "flex-end"}}
+                    flexWrap="wrap"
+                    sx={{mt: "20px", gap: 2}}
+                >
+                    <Typography color="white" variant="body2">Imprint</Typography>
+                    <Typography color="white" variant="body2">Terms</Typography>
+                    <Typography color="white" variant="body2">Privacy</Typography>
+                    <Typography color="white" variant="body2">Support</Typography>
+                    <Typography color="white" variant="body2">About</Typography>
+                    <Typography color="white" variant="body2">Contact</Typography>
+                    <LinkedInIcon sx={{color: "white"}}/>
+                    <XIcon sx={{color: "white"}}/>
                 </Grid>
             </Grid>
 
