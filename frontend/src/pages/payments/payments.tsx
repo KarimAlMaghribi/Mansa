@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box, Typography, Paper, List, ListItem, ListItemText, Button,
-  Switch, FormControlLabel, TextField, MenuItem
+  Switch, FormControlLabel, TextField, MenuItem, Snackbar, Alert
 } from '@mui/material';
 import EuroIcon from '@mui/icons-material/Euro';
 import { API_BASE_URL } from '../../constants/api';
@@ -37,6 +37,7 @@ export const Payments = () => {
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<number | null>(null);
   const [amount, setAmount] = useState<number>(50);
+  const [snackbar, setSnackbar] = useState<string | null>(null);
 
   const groupId = window.location.pathname.split('/')[2];
   const currentUid = auth.currentUser?.uid;
@@ -66,7 +67,8 @@ export const Payments = () => {
   }, [groupId, currentUid]);
 
   const fetchPayments = (cycleId: number) => {
-    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${cycleId}/payments`)
+    const uid = currentUid || '';
+    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${cycleId}/payments?uid=${encodeURIComponent(uid)}`)
       .then(r => r.json())
       .then(data => setPayments(data));
   };
@@ -75,7 +77,7 @@ export const Payments = () => {
     if (selectedCycle !== null) {
       fetchPayments(selectedCycle);
     }
-  }, [groupId, selectedCycle]);
+  }, [groupId, selectedCycle, currentUid]);
 
   const handlePay = () => {
     const link = `https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=student.abdelkarim@gmail.com&amount=${amount}&currency_code=EUR`;
@@ -86,17 +88,35 @@ export const Payments = () => {
   const isRecipient = currentCycle?.recipient?.uid === currentUid;
   const showList = isAdminView || isRecipient;
 
+  const totalMembers = members.length;
+  const paidCount = payments.length;
+  const receiptCount = payments.filter(p => p.recipientConfirmed).length;
+  let roundStatus = 'offen';
+  if (currentCycle?.completed) {
+    roundStatus = 'abgeschlossen';
+  } else if (receiptCount === totalMembers && totalMembers > 0) {
+    roundStatus = 'vollständig bestätigt';
+  } else if (paidCount === totalMembers && totalMembers > 0) {
+    roundStatus = 'vollständig bezahlt';
+  }
+
   const handleConfirm = (uid: string) => {
     if (!selectedCycle) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/pay?uid=${encodeURIComponent(uid)}&amount=${amount}`, { method: 'POST' })
-      .then(() => fetchPayments(selectedCycle));
+      .then(() => {
+        setSnackbar('Zahlung bestätigt');
+        fetchPayments(selectedCycle);
+      });
   };
 
   const handleReceiptConfirm = (paymentId: number) => {
     if (!selectedCycle) return;
     const uid = currentUid || '';
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/payments/${paymentId}/confirm-receipt?uid=${encodeURIComponent(uid)}`, { method: 'POST' })
-      .then(() => fetchPayments(selectedCycle));
+      .then(() => {
+        setSnackbar('Empfang bestätigt');
+        fetchPayments(selectedCycle);
+      });
   };
 
   const renderMemberRow = (m: Member) => {
@@ -122,7 +142,8 @@ export const Payments = () => {
   };
 
   return (
-      <Box p={4}>
+      <>
+        <Box p={4}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
           <Typography variant="h4" fontWeight="bold">Zahlungsübersicht</Typography>
           <Box display="flex" alignItems="center" gap={2}>
@@ -162,6 +183,11 @@ export const Payments = () => {
 
         {showList ? (
           <Paper sx={{ p: 2 }}>
+            <Box mb={2}>
+              <Typography variant="body2">Bezahlt: {paidCount}/{totalMembers}</Typography>
+              <Typography variant="body2">Empfang bestätigt: {receiptCount}/{totalMembers}</Typography>
+              <Typography variant="body2">Rundenstatus: {roundStatus}</Typography>
+            </Box>
             <List>
               {members.map(renderMemberRow)}
             </List>
@@ -173,6 +199,12 @@ export const Payments = () => {
               : 'Noch nicht bezahlt'}
           </Typography>
         )}
-      </Box>
+        </Box>
+        <Snackbar open={!!snackbar} autoHideDuration={4000} onClose={() => setSnackbar(null)}>
+          <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: '100%' }}>
+            {snackbar}
+          </Alert>
+        </Snackbar>
+      </>
   );
 };

@@ -88,8 +88,10 @@ public class JamiahController {
     }
 
     @GetMapping("/{id}/cycles/{cycleId}/payments")
-    public java.util.List<JamiahPayment> payments(@PathVariable String id, @PathVariable Long cycleId) {
-        return service.getPayments(cycleId);
+    public java.util.List<JamiahPayment> payments(@PathVariable String id,
+                                                  @PathVariable Long cycleId,
+                                                  @RequestParam String uid) {
+        return service.getPayments(cycleId, uid);
     }
 
     @PostMapping("/{id}/cycles/{cycleId}/payments/{paymentId}/confirm-receipt")
