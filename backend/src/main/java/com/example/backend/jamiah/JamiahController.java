@@ -97,6 +97,12 @@ public class JamiahController {
         return paymentService.getPayments(id, cycleId, uid);
     }
 
+    @GetMapping("/{id}/cycles/summary")
+    public java.util.List<com.example.backend.jamiah.dto.CycleSummaryDto> cycleSummary(@PathVariable String id,
+                                                                                       @RequestParam String uid) {
+        return paymentService.getCycleSummaries(id, uid);
+    }
+
     @PostMapping("/{id}/cycles/{cycleId}/payments/{paymentId}/confirm-receipt")
     public PaymentDto confirmPaymentReceipt(@PathVariable String id,
                                             @PathVariable Long cycleId,

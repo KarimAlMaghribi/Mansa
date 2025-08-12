@@ -4,6 +4,7 @@ import com.example.backend.UserProfile;
 import com.example.backend.UserProfileRepository;
 import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.dto.PaymentDto;
+import com.example.backend.jamiah.dto.CycleSummaryDto;
 import com.example.backend.jamiah.JamiahPayment;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -284,5 +285,43 @@ public class PaymentServiceTest {
 
         assertThrows(ResponseStatusException.class, () ->
                 paymentService.confirmReceipt(created.getId().toString(), cycle.getId(), payment.getId(), "u1", "u1"));
+    }
+
+    @Test
+    void summaryCountsExcludeRecipient() {
+        UserProfile owner = new UserProfile();
+        owner.setUsername("owner");
+        owner.setUid("u1");
+        userRepository.save(owner);
+
+        UserProfile recipient = new UserProfile();
+        recipient.setUsername("rec");
+        recipient.setUid("u2");
+        userRepository.save(recipient);
+
+        UserProfile member = new UserProfile();
+        member.setUsername("m");
+        member.setUid("u3");
+        userRepository.save(member);
+
+        JamiahDto created = createJamiah("u1");
+        Jamiah jamiah = jamiahRepository.findAll().get(0);
+        jamiah.getMembers().add(recipient);
+        recipient.getJamiahs().add(jamiah);
+        jamiah.getMembers().add(member);
+        member.getJamiahs().add(jamiah);
+        jamiahRepository.save(jamiah);
+
+        JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1", java.util.Arrays.asList("u2", "u3", "u1"));
+        PaymentDto p = paymentService.confirmPayment(created.getId().toString(), cycle.getId(), "u1", new BigDecimal("5"), "u1");
+        paymentService.confirmReceipt(created.getId().toString(), cycle.getId(), p.getId(), "u2", "u2");
+
+        java.util.List<CycleSummaryDto> summary = paymentService.getCycleSummaries(created.getId().toString(), "u1");
+        assertEquals(1, summary.size());
+        CycleSummaryDto s = summary.get(0);
+        assertEquals(2, s.getTotalPayers());
+        assertEquals(1, s.getPaidCount());
+        assertEquals(1, s.getReceiptCount());
+        assertEquals("u2", s.getRecipientUid());
     }
 }

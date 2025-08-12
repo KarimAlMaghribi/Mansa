@@ -3,6 +3,7 @@ package com.example.backend.jamiah;
 import com.example.backend.UserProfile;
 import com.example.backend.UserProfileRepository;
 import com.example.backend.jamiah.dto.PaymentDto;
+import com.example.backend.jamiah.dto.CycleSummaryDto;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -135,6 +136,39 @@ public class PaymentService {
                     .orElse(java.util.Collections.emptyList());
         }
         return payments.stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    public List<CycleSummaryDto> getCycleSummaries(String jamiahPublicId, String callerUid) {
+        Jamiah jamiah = jamiahRepository.findByPublicId(jamiahPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (jamiah.getOwnerId() == null || !jamiah.getOwnerId().equals(callerUid)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        List<JamiahCycle> cycles = cycleRepository.findByJamiahId(jamiah.getId());
+        return cycles.stream().map(cycle -> {
+            String recipientUid = cycle.getRecipient() != null ? cycle.getRecipient().getUid() : null;
+            long totalPayers = cycle.getMemberOrder() != null && !cycle.getMemberOrder().isEmpty()
+                    ? cycle.getMemberOrder().stream().filter(uid -> !uid.equals(recipientUid)).count()
+                    : jamiahRepository.countMembers(jamiah.getId()) - (recipientUid != null ? 1 : 0);
+            List<JamiahPayment> payments = paymentRepository
+                    .findAllByJamiahIdAndCycleId(jamiah.getId(), cycle.getId());
+            long paidCount = payments.stream()
+                    .filter(p -> Boolean.TRUE.equals(p.getConfirmed()) && !p.getPayerUid().equals(recipientUid))
+                    .count();
+            long receiptCount = payments.stream()
+                    .filter(p -> Boolean.TRUE.equals(p.getRecipientConfirmed()) && !p.getPayerUid().equals(recipientUid))
+                    .count();
+            CycleSummaryDto dto = new CycleSummaryDto();
+            dto.setId(cycle.getId());
+            dto.setCycleNumber(cycle.getCycleNumber());
+            dto.setStartDate(cycle.getStartDate());
+            dto.setCompleted(Boolean.TRUE.equals(cycle.getCompleted()));
+            dto.setRecipientUid(recipientUid);
+            dto.setTotalPayers((int) totalPayers);
+            dto.setPaidCount((int) paidCount);
+            dto.setReceiptCount((int) receiptCount);
+            return dto;
+        }).collect(Collectors.toList());
     }
 
     private PaymentDto toDto(JamiahPayment payment) {
