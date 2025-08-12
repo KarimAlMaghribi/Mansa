@@ -47,6 +47,10 @@ public class PaymentService {
         if (!matchesPublicId(jamiahId, jamiahPublicId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
+        // recipient does not pay in own round
+        if (cycle.getRecipient() != null && payerUid.equals(cycle.getRecipient().getUid())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipient can't pay in own round");
+        }
         userRepository.findByUid(payerUid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         Optional<JamiahPayment> existing = paymentRepository
@@ -94,6 +98,9 @@ public class PaymentService {
         JamiahPayment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (!payment.getJamiahId().equals(jamiahId) || !payment.getCycleId().equals(cycleId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        if (payment.getPayerUid().equals(recipientUid)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
         if (!Boolean.TRUE.equals(payment.getConfirmed())) {
@@ -189,7 +196,8 @@ public class PaymentService {
 
     private boolean matchesPublicId(Long jamiahId, String publicId) {
         if (publicId == null) return true;
-        java.util.UUID expected = java.util.UUID.nameUUIDFromBytes(jamiahId.toString().getBytes());
-        return expected.toString().equals(publicId);
+        return jamiahRepository.findByPublicId(publicId)
+                .map(j -> j.getId().equals(jamiahId))
+                .orElse(false);
     }
 }
