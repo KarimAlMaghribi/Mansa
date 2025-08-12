@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import EuroIcon from '@mui/icons-material/Euro';
 import { API_BASE_URL } from '../../constants/api';
-import { auth } from '../../firebase_config';
+import { useAuth } from '../../context/AuthContext';
 
 interface Member {
   uid: string;
@@ -19,6 +19,7 @@ interface Payment {
   user: { uid: string; };
   paidAt: string;
   recipientConfirmed: boolean;
+  confirmed: boolean;
 }
 
 interface Cycle {
@@ -39,8 +40,9 @@ export const Payments = () => {
   const [amount, setAmount] = useState<number>(50);
   const [snackbar, setSnackbar] = useState<string | null>(null);
 
+  const { user } = useAuth();
+  const currentUid = user?.uid;
   const groupId = window.location.pathname.split('/')[2];
-  const currentUid = auth.currentUser?.uid;
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}`)
@@ -89,7 +91,7 @@ export const Payments = () => {
   const showList = isAdminView || isRecipient;
 
   const totalMembers = members.length;
-  const paidCount = payments.length;
+  const paidCount = payments.filter(p => p.confirmed).length;
   const receiptCount = payments.filter(p => p.recipientConfirmed).length;
   let roundStatus = 'offen';
   if (currentCycle?.completed) {
@@ -124,10 +126,14 @@ export const Payments = () => {
     const name = m.firstName || m.lastName ? `${m.firstName || ''} ${m.lastName || ''}`.trim() : m.username;
     let action;
     if (payment) {
-      if (isRecipient && !payment.recipientConfirmed && m.uid !== currentUid) {
+      if (!payment.confirmed && m.uid === currentUid) {
+        action = <Button size="small" variant="outlined" onClick={() => handleConfirm(m.uid)}>Zahlung bestätigen</Button>;
+      } else if (isRecipient && payment.confirmed && !payment.recipientConfirmed && m.uid !== currentUid) {
         action = <Button size="small" variant="outlined" onClick={() => handleReceiptConfirm(payment.id)}>Erhalt bestätigen</Button>;
-      } else {
+      } else if (payment.confirmed) {
         action = <Typography variant="body2">{`${new Date(payment.paidAt).toLocaleDateString()}${payment.recipientConfirmed ? ' / Empfang bestätigt' : ' / Eingang offen'}`}</Typography>;
+      } else {
+        action = <Typography variant="body2">Zahlung offen</Typography>;
       }
     } else if (m.uid === currentUid) {
       action = <Button size="small" variant="outlined" onClick={() => handleConfirm(m.uid)}>Zahlung bestätigen</Button>;
@@ -178,7 +184,7 @@ export const Payments = () => {
           <Button variant="contained" startIcon={<EuroIcon />} onClick={handlePay}>
             Beitrag bezahlen
           </Button>
-          <Button sx={{ ml: 2 }} variant="outlined" onClick={() => handleConfirm(currentUid || '')}>Zahlung bestätigen</Button>
+          <Button sx={{ ml: 2 }} variant="outlined" onClick={() => handleConfirm(currentUid || '')} disabled={payments.some(p => p.user.uid === currentUid && p.confirmed)}>Zahlung bestätigen</Button>
         </Box>
 
         {showList ? (
@@ -194,9 +200,12 @@ export const Payments = () => {
           </Paper>
         ) : (
           <Typography variant="body2">
-            {payments.find(p => p.user.uid === currentUid)
-              ? `Bezahlt am ${new Date((payments.find(p => p.user.uid === currentUid) as Payment).paidAt).toLocaleDateString()}${(payments.find(p => p.user.uid === currentUid) as Payment).recipientConfirmed ? ' / Empfang bestätigt' : ''}`
-              : 'Noch nicht bezahlt'}
+            {(() => {
+              const own = payments.find(p => p.user.uid === currentUid);
+              if (!own) return 'Noch nicht bezahlt';
+              if (!own.confirmed) return 'Zahlung offen';
+              return `Bezahlt am ${new Date(own.paidAt).toLocaleDateString()}${own.recipientConfirmed ? ' / Empfang bestätigt' : ' / Eingang offen'}`;
+            })()}
           </Typography>
         )}
         </Box>

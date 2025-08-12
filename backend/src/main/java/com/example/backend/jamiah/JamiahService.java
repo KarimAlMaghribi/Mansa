@@ -342,7 +342,15 @@ public class JamiahService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         java.util.Optional<JamiahPayment> existing = paymentRepository.findByCycleIdAndUserUid(cycleId, uid);
         if (existing.isPresent()) {
-            return existing.get();
+            JamiahPayment payment = existing.get();
+            if (Boolean.FALSE.equals(payment.getConfirmed())) {
+                payment.setConfirmed(true);
+                payment.setPaidAt(java.time.LocalDateTime.now());
+                JamiahPayment saved = paymentRepository.save(payment);
+                maybeCompleteCycle(cycle);
+                return saved;
+            }
+            return payment;
         }
         JamiahPayment payment = new JamiahPayment();
         payment.setCycle(cycle);

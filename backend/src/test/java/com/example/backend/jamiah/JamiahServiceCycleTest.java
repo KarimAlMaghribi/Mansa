@@ -142,6 +142,37 @@ public class JamiahServiceCycleTest {
     }
 
     @Test
+    void recordPaymentUpdatesExistingUnconfirmed() {
+        UserProfile owner = new UserProfile();
+        owner.setUsername("owner");
+        owner.setUid("u1");
+        userRepository.save(owner);
+        UserProfile member = new UserProfile();
+        member.setUsername("m");
+        member.setUid("u2");
+        userRepository.save(member);
+
+        JamiahDto created = createJamiah("u1");
+        Jamiah jamiah = jamiahRepository.findAll().get(0);
+        jamiah.getMembers().add(member);
+        member.getJamiahs().add(jamiah);
+        jamiahRepository.save(jamiah);
+
+        JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1", java.util.Arrays.asList("u1", "u2"));
+
+        JamiahPayment existing = new JamiahPayment();
+        existing.setCycle(cycle);
+        existing.setUser(member);
+        existing.setAmount(new BigDecimal("5"));
+        paymentRepository.save(existing);
+
+        JamiahPayment updated = service.recordPayment(cycle.getId(), "u2", new BigDecimal("5"));
+        assertEquals(existing.getId(), updated.getId());
+        assertTrue(updated.getConfirmed());
+        assertNotNull(updated.getPaidAt());
+    }
+
+    @Test
     void getPaymentsReturnsAccordingToRole() {
         UserProfile owner = new UserProfile();
         owner.setUsername("owner");
