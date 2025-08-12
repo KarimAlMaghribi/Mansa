@@ -94,8 +94,7 @@ export const Payments = () => {
   };
 
   const currentCycle = cycles.find(c => c.id === selectedCycle) || null;
-  const isRecipient = currentCycle?.recipient?.uid === currentUid;
-  const showList = isAdminView || isRecipient;
+  const showList = isAdminView;
 
   const totalMembers = members.length;
   const paidCount = payments.filter(p => p.confirmed).length;
@@ -110,7 +109,7 @@ export const Payments = () => {
   }
 
   const handleConfirm = (uid: string) => {
-    if (!selectedCycle) return;
+    if (selectedCycle == null) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/pay?uid=${encodeURIComponent(uid)}&amount=${amount}`, { method: 'POST' })
       .then(() => {
         setSnackbar('Zahlung bestätigt');
@@ -119,7 +118,7 @@ export const Payments = () => {
   };
 
   const handleReceiptConfirm = (paymentId: number) => {
-    if (!selectedCycle) return;
+    if (selectedCycle == null) return;
     const uid = currentUid || '';
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/payments/${paymentId}/confirm-receipt?uid=${encodeURIComponent(uid)}`, { method: 'POST' })
       .then(() => {
@@ -135,7 +134,7 @@ export const Payments = () => {
     if (payment) {
       if (!payment.confirmed && m.uid === currentUid) {
         action = <Button size="small" variant="outlined" onClick={() => handleConfirm(m.uid)}>Zahlung bestätigen</Button>;
-      } else if (isRecipient && payment.confirmed && !payment.recipientConfirmed && m.uid !== currentUid) {
+      } else if (isAdminView && payment.confirmed && !payment.recipientConfirmed && m.uid !== currentUid) {
         action = <Button size="small" variant="outlined" onClick={() => handleReceiptConfirm(payment.id)}>Erhalt bestätigen</Button>;
       } else if (payment.confirmed) {
         action = <Typography variant="body2">{`${new Date(payment.paidAt).toLocaleDateString()}${payment.recipientConfirmed ? ' / Empfang bestätigt' : ' / Eingang offen'}`}</Typography>;
@@ -191,7 +190,7 @@ export const Payments = () => {
           <Button variant="contained" startIcon={<EuroIcon />} onClick={handlePay}>
             Beitrag bezahlen
           </Button>
-          <Button sx={{ ml: 2 }} variant="outlined" onClick={() => handleConfirm(currentUid || '')} disabled={payments.some(p => p.user.uid === currentUid && p.confirmed)}>Zahlung bestätigen</Button>
+          <Button sx={{ ml: 2 }} variant="outlined" onClick={() => handleConfirm(currentUid || '')} disabled={selectedCycle == null || payments.some(p => p.user.uid === currentUid && p.confirmed)}>Zahlung bestätigen</Button>
         </Box>
 
         {showList ? (
