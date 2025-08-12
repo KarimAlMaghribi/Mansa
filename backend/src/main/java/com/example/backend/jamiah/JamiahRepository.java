@@ -9,6 +9,13 @@ import java.util.Optional;
 public interface JamiahRepository extends JpaRepository<Jamiah, Long> {
     Optional<Jamiah> findByInvitationCode(String invitationCode);
 
+    default Optional<Jamiah> findByPublicId(String publicId) {
+        java.util.UUID uuid = java.util.UUID.fromString(publicId);
+        return findAll().stream()
+                .filter(j -> java.util.UUID.nameUUIDFromBytes(j.getId().toString().getBytes()).equals(uuid))
+                .findFirst();
+    }
+
     @Query("select j from Jamiah j left join fetch j.members where j.invitationCode = :code")
     Optional<Jamiah> findWithMembersByInvitationCode(@Param("code") String invitationCode);
 

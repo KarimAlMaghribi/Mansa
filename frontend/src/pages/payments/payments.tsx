@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box, Typography, Paper, List, ListItem, ListItemText, Button,
-  Switch, FormControlLabel, TextField, MenuItem, Snackbar, Alert
+  TextField, MenuItem, Snackbar, Alert
 } from '@mui/material';
 import EuroIcon from '@mui/icons-material/Euro';
 import { API_BASE_URL } from '../../constants/api';
@@ -31,7 +31,6 @@ interface Cycle {
 }
 
 export const Payments = () => {
-  const [isAdminView, setIsAdminView] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -51,7 +50,6 @@ export const Payments = () => {
         setAmount(data.rateAmount || 50);
         const owner = data.ownerId === currentUid;
         setIsOwner(owner);
-        setIsAdminView(owner);
       });
 
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/members`)
@@ -65,7 +63,13 @@ export const Payments = () => {
         if (Array.isArray(data)) {
           setCycles(data);
           if (data.length > 0) {
-            setSelectedCycle(data[data.length - 1].id);
+            const today = new Date();
+            const parse = (s: string) => new Date(s);
+            const upcoming = data
+              .filter((c: Cycle) => !c.completed && parse(c.startDate) <= today)
+              .sort((a: Cycle, b: Cycle) => parse(a.startDate).getTime() - parse(b.startDate).getTime());
+            const initial = upcoming[0]?.id ?? data[data.length - 1].id;
+            setSelectedCycle(initial);
           }
         } else {
           setCycles([]);
@@ -98,7 +102,6 @@ export const Payments = () => {
 
   const currentCycle = cycles.find(c => c.id === selectedCycle) || null;
   const isRecipient = currentCycle?.recipient?.uid === currentUid;
-  const showList = isAdminView;
 
   const recipientUid = currentCycle?.recipient?.uid;
   const totalPayers = members.filter(m => m.uid !== recipientUid).length;
@@ -139,8 +142,11 @@ export const Payments = () => {
   const renderMemberRow = (m: Member) => {
     const payment = payments.find(p => p.user.uid === m.uid);
     const name = m.firstName || m.lastName ? `${m.firstName || ''} ${m.lastName || ''}`.trim() : m.username;
+    const isRoundRecipient = m.uid === currentCycle?.recipient?.uid;
     let action;
-    if (payment) {
+    if (m.uid === currentUid && isRecipient) {
+      action = <Typography variant="body2">Empfänger zahlt nicht</Typography>;
+    } else if (payment) {
       if (m.uid === currentUid) {
         if (!payment.confirmed) {
           action = (
@@ -148,7 +154,7 @@ export const Payments = () => {
               size="small"
               variant="outlined"
               onClick={() => handleConfirm(m.uid)}
-              disabled={selectedCycle === null || payment.confirmed}
+              disabled={selectedCycle === null || isRecipient}
             >
               Zahlung bestätigen
             </Button>
@@ -176,13 +182,12 @@ export const Payments = () => {
         action = <Typography variant="body2">Zahlung offen</Typography>;
       }
     } else if (m.uid === currentUid) {
-      const ownConfirmed = payments.some(p => p.user.uid === currentUid && p.confirmed);
       action = (
         <Button
           size="small"
           variant="outlined"
           onClick={() => handleConfirm(m.uid)}
-          disabled={selectedCycle === null || ownConfirmed}
+          disabled={selectedCycle === null || isRecipient}
         >
           Zahlung bestätigen
         </Button>
@@ -192,7 +197,7 @@ export const Payments = () => {
     }
     return (
       <ListItem key={m.uid} secondaryAction={action}>
-        <ListItemText primary={name} />
+        <ListItemText primary={`${name}${isRoundRecipient ? ' (Empfänger)' : ''}`} />
       </ListItem>
     );
   };
@@ -216,17 +221,6 @@ export const Payments = () => {
                 ))}
               </TextField>
             )}
-            {isOwner && (
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={isAdminView}
-                    onChange={() => setIsAdminView(!isAdminView)}
-                  />
-                }
-                label={isAdminView ? "Admin-Modus" : "Mitgliedsansicht"}
-              />
-            )}
           </Box>
         </Box>
 
@@ -234,12 +228,37 @@ export const Payments = () => {
           <Button variant="contained" startIcon={<EuroIcon />} onClick={handlePay}>
             Beitrag bezahlen
           </Button>
-          <Button sx={{ ml: 2 }} variant="outlined" onClick={() => handleConfirm(currentUid || '')} disabled={selectedCycle == null || payments.some(p => p.user.uid === currentUid && p.confirmed)}>Zahlung bestätigen</Button>
+          <Button
+            sx={{ ml: 2 }}
+            variant="outlined"
+            onClick={() => handleConfirm(currentUid || '')}
+            disabled={selectedCycle == null || isRecipient || payments.some(p => p.user.uid === currentUid && p.confirmed)}
+          >
+            Zahlung bestätigen
+          </Button>
         </Box>
 
-        {showList ? (
+        {/* Eigene Kurzansicht immer anzeigen */}
+        <Typography variant="body2" sx={{ mb: 2 }}>
+          {(() => {
+            const own = payments.find(p => p.user.uid === currentUid);
+            if (!own) return 'Noch nicht bezahlt';
+            if (!own.confirmed) return 'Zahlung offen';
+            return `Bezahlt am ${new Date(own.paidAt).toLocaleDateString()}${own.recipientConfirmed ? ' / Empfang bestätigt' : ' / Eingang offen'}`;
+          })()}
+        </Typography>
+
+        {/* Zusatz-Card für Admin oder Empfänger */}
+        {(isOwner || isRecipient) && (
           <Paper sx={{ p: 2 }}>
             <Box mb={2}>
+              <Typography variant="body2">Empfänger: {
+                (() => {
+                  const rUid = currentCycle?.recipient?.uid;
+                  const r = members.find(m => m.uid === rUid);
+                  return r ? (r.firstName || r.lastName ? `${r.firstName || ''} ${r.lastName || ''}`.trim() : r.username) : rUid;
+                })()
+              }</Typography>
               <Typography variant="body2">Bezahlt: {paidCount}/{totalPayers}</Typography>
               <Typography variant="body2">Empfang bestätigt: {receiptCount}/{totalPayers}</Typography>
               <Typography variant="body2">Rundenstatus: {roundStatus}</Typography>
@@ -248,15 +267,6 @@ export const Payments = () => {
               {members.map(renderMemberRow)}
             </List>
           </Paper>
-        ) : (
-          <Typography variant="body2">
-            {(() => {
-              const own = payments.find(p => p.user.uid === currentUid);
-              if (!own) return 'Noch nicht bezahlt';
-              if (!own.confirmed) return 'Zahlung offen';
-              return `Bezahlt am ${new Date(own.paidAt).toLocaleDateString()}${own.recipientConfirmed ? ' / Empfang bestätigt' : ' / Eingang offen'}`;
-            })()}
-          </Typography>
         )}
         </Box>
         <Snackbar open={!!snackbar} autoHideDuration={4000} onClose={() => setSnackbar(null)}>
