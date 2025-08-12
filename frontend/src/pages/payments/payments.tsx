@@ -55,24 +55,31 @@ export const Payments = () => {
       });
 
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/members`)
-      .then(r => r.json())
-      .then(data => setMembers(data));
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => setMembers(Array.isArray(data) ? data : []))
+      .catch(() => setMembers([]));
 
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
-        setCycles(data);
-        if (data.length > 0) {
-          setSelectedCycle(data[data.length - 1].id);
+        if (Array.isArray(data)) {
+          setCycles(data);
+          if (data.length > 0) {
+            setSelectedCycle(data[data.length - 1].id);
+          }
+        } else {
+          setCycles([]);
         }
-      });
+      })
+      .catch(() => setCycles([]));
   }, [groupId, currentUid]);
 
   const fetchPayments = (cycleId: number) => {
     const uid = currentUid || '';
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${cycleId}/payments?uid=${encodeURIComponent(uid)}`)
-      .then(r => r.json())
-      .then(data => setPayments(data));
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => setPayments(Array.isArray(data) ? data : []))
+      .catch(() => setPayments([]));
   };
 
   useEffect(() => {
