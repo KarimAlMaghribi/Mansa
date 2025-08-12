@@ -43,6 +43,7 @@ public class JamiahCycle {
     /** Whether the current recipient confirmed receipt. */
     private Boolean recipientConfirmed = false;
 
-    @OneToMany(mappedBy = "cycle")
+    @OneToMany
+    @JoinColumn(name = "cycle_id", referencedColumnName = "id")
     private Set<JamiahPayment> payments = new HashSet<>();
 }
