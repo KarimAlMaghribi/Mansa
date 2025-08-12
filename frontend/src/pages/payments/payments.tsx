@@ -326,7 +326,7 @@ export const Payments = () => {
         </Box>
 
         {isOwner && (
-          summary.length > 0 ? (
+          summary.length > 0 && (
             <Paper sx={{ p: 2, mb: 3 }}>
               <Typography variant="h6" mb={2}>Runden-Übersicht</Typography>
               {summary.map(s => {
