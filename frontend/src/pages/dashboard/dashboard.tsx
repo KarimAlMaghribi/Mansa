@@ -34,25 +34,29 @@ export const Dashboard = () => {
   useEffect(() => {
     if (!groupId) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}`)
-      .then(res => res.json())
+      .then(res => res.ok ? res.json() : Promise.reject())
       .then(data => setJamiah(data))
       .catch(() => setJamiah(null));
 
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/members`)
-      .then(res => res.json())
-      .then(data => setMembers(data))
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setMembers(Array.isArray(data) ? data : []))
       .catch(() => setMembers([]));
 
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles`)
-      .then(res => res.json())
+      .then(res => res.ok ? res.json() : Promise.reject())
       .then(data => {
-        const active = data[data.length - 1];
-        setCycle(active);
-        if (active) {
-          fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${active.id}/payments`)
-            .then(res => res.json())
-            .then(p => setPayments(p))
-            .catch(() => setPayments([]));
+        if (Array.isArray(data)) {
+          const active = data[data.length - 1];
+          setCycle(active);
+          if (active) {
+            fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${active.id}/payments`)
+              .then(res => res.ok ? res.json() : Promise.reject())
+              .then(p => setPayments(Array.isArray(p) ? p : []))
+              .catch(() => setPayments([]));
+          }
+        } else {
+          setCycle(null);
         }
       })
       .catch(() => setCycle(null));
