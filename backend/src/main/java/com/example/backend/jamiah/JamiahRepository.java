@@ -5,15 +5,28 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.UUID;
 
 public interface JamiahRepository extends JpaRepository<Jamiah, Long> {
     Optional<Jamiah> findByInvitationCode(String invitationCode);
 
-    default Optional<Jamiah> findByPublicId(String publicId) {
-        java.util.UUID uuid = java.util.UUID.fromString(publicId);
-        return findAll().stream()
-                .filter(j -> java.util.UUID.nameUUIDFromBytes(j.getId().toString().getBytes()).equals(uuid))
-                .findFirst();
+    Optional<Jamiah> findByPublicId(UUID publicId);
+
+    /**
+     * Fallback lookup for legacy deterministic IDs that were derived from the
+     * numeric database ID. This method can be dropped once all clients have
+     * migrated to the persisted {@code publicId} values.
+     */
+    default Optional<Jamiah> findByLegacyPublicId(String legacy) {
+        try {
+            UUID legacyUuid = UUID.fromString(legacy);
+            return findAll().stream()
+                    .filter(j -> UUID.nameUUIDFromBytes(
+                            j.getId().toString().getBytes()).equals(legacyUuid))
+                    .findFirst();
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
     }
 
     @Query("select j from Jamiah j left join fetch j.members where j.invitationCode = :code")

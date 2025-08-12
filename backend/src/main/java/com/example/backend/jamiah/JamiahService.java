@@ -254,10 +254,13 @@ public class JamiahService {
     }
 
     private Jamiah getByPublicId(String publicId) {
-        java.util.UUID uuid = java.util.UUID.fromString(publicId);
-        return repository.findAll().stream()
-                .filter(j -> java.util.UUID.nameUUIDFromBytes(j.getId().toString().getBytes()).equals(uuid))
-                .findFirst()
+        java.util.UUID uuid = null;
+        try {
+            uuid = java.util.UUID.fromString(publicId);
+        } catch (IllegalArgumentException ignored) {
+        }
+        return (uuid != null ? repository.findByPublicId(uuid) : java.util.Optional.<Jamiah>empty())
+                .or(() -> repository.findByLegacyPublicId(publicId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 

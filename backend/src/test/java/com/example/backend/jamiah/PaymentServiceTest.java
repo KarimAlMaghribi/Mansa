@@ -6,6 +6,7 @@ import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.dto.PaymentDto;
 import com.example.backend.jamiah.dto.CycleSummaryDto;
 import com.example.backend.jamiah.JamiahPayment;
+import com.example.backend.jamiah.JamiahCycle;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -256,6 +257,60 @@ public class PaymentServiceTest {
         JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1", java.util.Arrays.asList("u1", "u2"));
         assertThrows(ResponseStatusException.class, () ->
                 paymentService.confirmPayment(created.getId().toString(), cycle.getId(), "u1", new BigDecimal("5"), "u1"));
+    }
+
+    @Test
+    void nonMemberCannotConfirmPayment() {
+        UserProfile owner = new UserProfile();
+        owner.setUsername("owner");
+        owner.setUid("u1");
+        userRepository.save(owner);
+
+        UserProfile member = new UserProfile();
+        member.setUsername("member");
+        member.setUid("u2");
+        userRepository.save(member);
+
+        // intruder not added to jamiah
+        UserProfile intruder = new UserProfile();
+        intruder.setUsername("intruder");
+        intruder.setUid("u3");
+        userRepository.save(intruder);
+
+        JamiahDto created = createJamiah("u1");
+        Jamiah jamiah = jamiahRepository.findAll().get(0);
+        jamiah.getMembers().add(member);
+        member.getJamiahs().add(jamiah);
+        jamiahRepository.save(jamiah);
+
+        JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1", java.util.Arrays.asList("u1", "u2"));
+
+        assertThrows(ResponseStatusException.class, () ->
+                paymentService.confirmPayment(created.getId().toString(), cycle.getId(), "u3", new BigDecimal("5"), "u3"));
+    }
+
+    @Test
+    void paymentWithWrongAmountIsRejected() {
+        UserProfile owner = new UserProfile();
+        owner.setUsername("owner");
+        owner.setUid("u1");
+        userRepository.save(owner);
+
+        UserProfile member = new UserProfile();
+        member.setUsername("member");
+        member.setUid("u2");
+        userRepository.save(member);
+
+        JamiahDto created = createJamiah("u1");
+        Jamiah jamiah = jamiahRepository.findAll().get(0);
+        jamiah.getMembers().add(member);
+        member.getJamiahs().add(jamiah);
+        jamiahRepository.save(jamiah);
+
+        JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1", java.util.Arrays.asList("u1", "u2"));
+
+        assertThrows(ResponseStatusException.class, () ->
+                paymentService.confirmPayment(created.getId().toString(), cycle.getId(), "u2", new BigDecimal("10"), "u2"));
     }
 
     @Test
