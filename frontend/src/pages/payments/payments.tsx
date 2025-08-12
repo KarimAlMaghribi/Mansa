@@ -141,17 +141,52 @@ export const Payments = () => {
     const name = m.firstName || m.lastName ? `${m.firstName || ''} ${m.lastName || ''}`.trim() : m.username;
     let action;
     if (payment) {
-      if (!payment.confirmed && m.uid === currentUid) {
-        action = <Button size="small" variant="outlined" onClick={() => handleConfirm(m.uid)} disabled={selectedCycle === null}>Zahlung bestätigen</Button>;
-      } else if (isRecipient && payment.confirmed && !payment.recipientConfirmed && m.uid !== currentUid) {
-        action = <Button size="small" variant="outlined" onClick={() => handleReceiptConfirm(payment.id)}>Erhalt bestätigen</Button>;
+      if (m.uid === currentUid) {
+        if (!payment.confirmed) {
+          action = (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => handleConfirm(m.uid)}
+              disabled={selectedCycle === null || payment.confirmed}
+            >
+              Zahlung bestätigen
+            </Button>
+          );
+        } else {
+          action = (
+            <Typography variant="body2">
+              {`${new Date(payment.paidAt).toLocaleDateString()}${payment.recipientConfirmed ? ' / Empfang bestätigt' : ' / Eingang offen'}`}
+            </Typography>
+          );
+        }
+      } else if (isRecipient && payment.confirmed && !payment.recipientConfirmed) {
+        action = (
+          <Button size="small" variant="outlined" onClick={() => handleReceiptConfirm(payment.id)}>
+            Erhalt bestätigen
+          </Button>
+        );
       } else if (payment.confirmed) {
-        action = <Typography variant="body2">{`${new Date(payment.paidAt).toLocaleDateString()}${payment.recipientConfirmed ? ' / Empfang bestätigt' : ' / Eingang offen'}`}</Typography>;
+        action = (
+          <Typography variant="body2">
+            {`${new Date(payment.paidAt).toLocaleDateString()}${payment.recipientConfirmed ? ' / Empfang bestätigt' : ' / Eingang offen'}`}
+          </Typography>
+        );
       } else {
         action = <Typography variant="body2">Zahlung offen</Typography>;
       }
     } else if (m.uid === currentUid) {
-      action = <Button size="small" variant="outlined" onClick={() => handleConfirm(m.uid)} disabled={selectedCycle === null}>Zahlung bestätigen</Button>;
+      const ownConfirmed = payments.some(p => p.user.uid === currentUid && p.confirmed);
+      action = (
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={() => handleConfirm(m.uid)}
+          disabled={selectedCycle === null || ownConfirmed}
+        >
+          Zahlung bestätigen
+        </Button>
+      );
     } else {
       action = <Typography variant="body2">Nicht bestätigt</Typography>;
     }
