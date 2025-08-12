@@ -6,6 +6,7 @@ import {
 import EuroIcon from '@mui/icons-material/Euro';
 import { API_BASE_URL } from '../../constants/api';
 import { useAuth } from '../../context/AuthContext';
+import { useParams } from 'react-router-dom';
 
 interface Member {
   uid: string;
@@ -55,12 +56,13 @@ export const Payments = () => {
 
   const { user } = useAuth();
   const currentUid = user?.uid;
-  const groupId = window.location.pathname.split('/')[2];
+  const { groupId } = useParams<{ groupId: string }>();
 
   const parseErr = async (r: Response) =>
     Promise.reject(new Error((await r.text()) || r.statusText));
 
   useEffect(() => {
+    if (!groupId) return;
     let owner = false;
 
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}`)
@@ -107,6 +109,10 @@ export const Payments = () => {
   }, [isOwner, groupId, currentUid]);
 
   const fetchPayments = (cycleId: number, ac?: AbortController) => {
+    if (!groupId) {
+      setPayments([]);
+      return;
+    }
     const uid = currentUid || '';
     setLoadingPayments(true);
     fetch(
@@ -124,7 +130,7 @@ export const Payments = () => {
   };
 
   const fetchCycleSummary = () => {
-    if (!isOwner) return;
+    if (!groupId || !isOwner) return;
     const uid = currentUid || '';
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/summary?uid=${encodeURIComponent(uid)}`)
       .then(r => r.ok ? r.json() : Promise.reject())
@@ -133,7 +139,7 @@ export const Payments = () => {
   };
 
   useEffect(() => {
-    if (selectedCycle === null) return;
+    if (selectedCycle === null || !groupId) return;
     const ac = new AbortController();
     fetchPayments(selectedCycle, ac);
     return () => ac.abort();
@@ -161,7 +167,7 @@ export const Payments = () => {
   }
 
   const handleConfirm = (uid: string) => {
-    if (selectedCycle == null) return;
+    if (selectedCycle == null || !groupId) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/pay?uid=${encodeURIComponent(uid)}&amount=${amount}`, { method: 'POST' })
       .then(r => r.ok ? r.json() : parseErr(r))
       .then(() => {
@@ -173,7 +179,7 @@ export const Payments = () => {
   };
 
   const handleReceiptConfirm = (paymentId: number) => {
-    if (selectedCycle == null) return;
+    if (selectedCycle == null || !groupId) return;
     const uid = currentUid || '';
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/payments/${paymentId}/confirm-receipt?uid=${encodeURIComponent(uid)}`, { method: 'POST' })
       .then(r => r.ok ? r.json() : parseErr(r))
@@ -293,6 +299,14 @@ export const Payments = () => {
       </ListItem>
     );
   };
+
+  if (!groupId) {
+    return (
+      <Box p={4}>
+        <Typography variant="h6">Keine Jamiah ausgewählt</Typography>
+      </Box>
+    );
+  }
 
   const alreadyConfirmed = payments.some(p => p.user.uid === currentUid && p.confirmed);
   const disableTopConfirm = selectedCycle == null || isRecipient || alreadyConfirmed || loadingCycles || loadingPayments;
