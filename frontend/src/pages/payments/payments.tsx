@@ -38,7 +38,7 @@ export const Payments = () => {
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<number | null>(null);
   const [amount, setAmount] = useState<number>(50);
-  const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{message: string; severity: 'success' | 'error'} | null>(null);
 
   const { user } = useAuth();
   const currentUid = user?.uid;
@@ -79,7 +79,10 @@ export const Payments = () => {
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${cycleId}/payments?uid=${encodeURIComponent(uid)}`)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => setPayments(Array.isArray(data) ? data : []))
-      .catch(() => setPayments([]));
+      .catch(() => {
+        setPayments([]);
+        setSnackbar({ message: 'Fehler beim Laden', severity: 'error' });
+      });
   };
 
   useEffect(() => {
@@ -94,37 +97,43 @@ export const Payments = () => {
   };
 
   const currentCycle = cycles.find(c => c.id === selectedCycle) || null;
+  const isRecipient = currentCycle?.recipient?.uid === currentUid;
   const showList = isAdminView;
 
-  const totalMembers = members.length;
-  const paidCount = payments.filter(p => p.confirmed).length;
-  const receiptCount = payments.filter(p => p.recipientConfirmed).length;
+  const recipientUid = currentCycle?.recipient?.uid;
+  const totalPayers = members.filter(m => m.uid !== recipientUid).length;
+  const paidCount = payments.filter(p => p.confirmed && p.user.uid !== recipientUid).length;
+  const receiptCount = payments.filter(p => p.recipientConfirmed && p.user.uid !== recipientUid).length;
   let roundStatus = 'offen';
   if (currentCycle?.completed) {
     roundStatus = 'abgeschlossen';
-  } else if (receiptCount === totalMembers && totalMembers > 0) {
+  } else if (receiptCount === totalPayers && totalPayers > 0) {
     roundStatus = 'vollständig bestätigt';
-  } else if (paidCount === totalMembers && totalMembers > 0) {
+  } else if (paidCount === totalPayers && totalPayers > 0) {
     roundStatus = 'vollständig bezahlt';
   }
 
   const handleConfirm = (uid: string) => {
     if (selectedCycle == null) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/pay?uid=${encodeURIComponent(uid)}&amount=${amount}`, { method: 'POST' })
+      .then(r => r.ok ? r.json() : Promise.reject())
       .then(() => {
-        setSnackbar('Zahlung bestätigt');
+        setSnackbar({ message: 'Zahlung bestätigt', severity: 'success' });
         fetchPayments(selectedCycle);
-      });
+      })
+      .catch(() => setSnackbar({ message: 'Fehler bei Zahlungsbestätigung', severity: 'error' }));
   };
 
   const handleReceiptConfirm = (paymentId: number) => {
     if (selectedCycle == null) return;
     const uid = currentUid || '';
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/payments/${paymentId}/confirm-receipt?uid=${encodeURIComponent(uid)}`, { method: 'POST' })
+      .then(r => r.ok ? r.json() : Promise.reject())
       .then(() => {
-        setSnackbar('Empfang bestätigt');
+        setSnackbar({ message: 'Empfang bestätigt', severity: 'success' });
         fetchPayments(selectedCycle);
-      });
+      })
+      .catch(() => setSnackbar({ message: 'Fehler beim Empfangsbestätigen', severity: 'error' }));
   };
 
   const renderMemberRow = (m: Member) => {
@@ -133,8 +142,8 @@ export const Payments = () => {
     let action;
     if (payment) {
       if (!payment.confirmed && m.uid === currentUid) {
-        action = <Button size="small" variant="outlined" onClick={() => handleConfirm(m.uid)}>Zahlung bestätigen</Button>;
-      } else if (isAdminView && payment.confirmed && !payment.recipientConfirmed && m.uid !== currentUid) {
+        action = <Button size="small" variant="outlined" onClick={() => handleConfirm(m.uid)} disabled={selectedCycle === null}>Zahlung bestätigen</Button>;
+      } else if (isRecipient && payment.confirmed && !payment.recipientConfirmed && m.uid !== currentUid) {
         action = <Button size="small" variant="outlined" onClick={() => handleReceiptConfirm(payment.id)}>Erhalt bestätigen</Button>;
       } else if (payment.confirmed) {
         action = <Typography variant="body2">{`${new Date(payment.paidAt).toLocaleDateString()}${payment.recipientConfirmed ? ' / Empfang bestätigt' : ' / Eingang offen'}`}</Typography>;
@@ -142,7 +151,7 @@ export const Payments = () => {
         action = <Typography variant="body2">Zahlung offen</Typography>;
       }
     } else if (m.uid === currentUid) {
-      action = <Button size="small" variant="outlined" onClick={() => handleConfirm(m.uid)}>Zahlung bestätigen</Button>;
+      action = <Button size="small" variant="outlined" onClick={() => handleConfirm(m.uid)} disabled={selectedCycle === null}>Zahlung bestätigen</Button>;
     } else {
       action = <Typography variant="body2">Nicht bestätigt</Typography>;
     }
@@ -196,8 +205,8 @@ export const Payments = () => {
         {showList ? (
           <Paper sx={{ p: 2 }}>
             <Box mb={2}>
-              <Typography variant="body2">Bezahlt: {paidCount}/{totalMembers}</Typography>
-              <Typography variant="body2">Empfang bestätigt: {receiptCount}/{totalMembers}</Typography>
+              <Typography variant="body2">Bezahlt: {paidCount}/{totalPayers}</Typography>
+              <Typography variant="body2">Empfang bestätigt: {receiptCount}/{totalPayers}</Typography>
               <Typography variant="body2">Rundenstatus: {roundStatus}</Typography>
             </Box>
             <List>
@@ -216,8 +225,8 @@ export const Payments = () => {
         )}
         </Box>
         <Snackbar open={!!snackbar} autoHideDuration={4000} onClose={() => setSnackbar(null)}>
-          <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: '100%' }}>
-            {snackbar}
+          <Alert onClose={() => setSnackbar(null)} severity={snackbar?.severity || 'success'} sx={{ width: '100%' }}>
+            {snackbar?.message}
           </Alert>
         </Snackbar>
       </>

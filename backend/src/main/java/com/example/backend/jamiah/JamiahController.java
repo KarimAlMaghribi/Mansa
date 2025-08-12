@@ -2,7 +2,8 @@ package com.example.backend.jamiah;
 
 import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.JamiahCycle;
-import com.example.backend.jamiah.JamiahPayment;
+import com.example.backend.jamiah.dto.PaymentDto;
+import com.example.backend.jamiah.PaymentService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
@@ -17,9 +18,11 @@ import java.util.List;
 @CrossOrigin(origins = "*")
 public class JamiahController {
     private final JamiahService service;
+    private final PaymentService paymentService;
 
-    public JamiahController(JamiahService service) {
+    public JamiahController(JamiahService service, PaymentService paymentService) {
         this.service = service;
+        this.paymentService = paymentService;
     }
 
     @GetMapping
@@ -80,26 +83,26 @@ public class JamiahController {
     }
 
     @PostMapping("/{id}/cycles/{cycleId}/pay")
-    public JamiahPayment pay(@PathVariable String id,
-                             @PathVariable Long cycleId,
-                             @RequestParam String uid,
-                             @RequestParam BigDecimal amount) {
-        return service.recordPayment(cycleId, uid, amount);
+    public PaymentDto pay(@PathVariable String id,
+                          @PathVariable Long cycleId,
+                          @RequestParam String uid,
+                          @RequestParam BigDecimal amount) {
+        return paymentService.confirmPayment(id, cycleId, uid, amount, uid);
     }
 
     @GetMapping("/{id}/cycles/{cycleId}/payments")
-    public java.util.List<JamiahPayment> payments(@PathVariable String id,
-                                                  @PathVariable Long cycleId,
-                                                  @RequestParam String uid) {
-        return service.getPayments(cycleId, uid);
+    public java.util.List<PaymentDto> payments(@PathVariable String id,
+                                               @PathVariable Long cycleId,
+                                               @RequestParam String uid) {
+        return paymentService.getPayments(id, cycleId, uid);
     }
 
     @PostMapping("/{id}/cycles/{cycleId}/payments/{paymentId}/confirm-receipt")
-    public JamiahPayment confirmPaymentReceipt(@PathVariable String id,
-                                               @PathVariable Long cycleId,
-                                               @PathVariable Long paymentId,
-                                               @RequestParam String uid) {
-        return service.confirmPaymentReceipt(cycleId, paymentId, uid);
+    public PaymentDto confirmPaymentReceipt(@PathVariable String id,
+                                            @PathVariable Long cycleId,
+                                            @PathVariable Long paymentId,
+                                            @RequestParam String uid) {
+        return paymentService.confirmReceipt(id, cycleId, paymentId, uid, uid);
     }
 
     @PostMapping("/join")
