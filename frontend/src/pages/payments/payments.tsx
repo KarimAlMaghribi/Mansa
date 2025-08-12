@@ -143,6 +143,13 @@ export const Payments = () => {
     const payment = payments.find(p => p.user.uid === m.uid);
     const name = m.firstName || m.lastName ? `${m.firstName || ''} ${m.lastName || ''}`.trim() : m.username;
     const isRoundRecipient = m.uid === currentCycle?.recipient?.uid;
+    const disableMemberConfirm = selectedCycle === null || isRecipient;
+    if (m.uid === currentUid && disableMemberConfirm) {
+      console.log('Mitglieds-Button deaktiviert', {
+        selectedCycleNull: selectedCycle === null,
+        isRecipient,
+      });
+    }
     let action;
     if (m.uid === currentUid && isRecipient) {
       action = <Typography variant="body2">Empfänger zahlt nicht</Typography>;
@@ -154,7 +161,7 @@ export const Payments = () => {
               size="small"
               variant="outlined"
               onClick={() => handleConfirm(m.uid)}
-              disabled={selectedCycle === null || isRecipient}
+              disabled={disableMemberConfirm}
             >
               Zahlung bestätigen
             </Button>
@@ -187,7 +194,7 @@ export const Payments = () => {
           size="small"
           variant="outlined"
           onClick={() => handleConfirm(m.uid)}
-          disabled={selectedCycle === null || isRecipient}
+          disabled={disableMemberConfirm}
         >
           Zahlung bestätigen
         </Button>
@@ -201,6 +208,16 @@ export const Payments = () => {
       </ListItem>
     );
   };
+
+  const alreadyConfirmed = payments.some(p => p.user.uid === currentUid && p.confirmed);
+  const disableTopConfirm = selectedCycle == null || isRecipient || alreadyConfirmed;
+  if (disableTopConfirm) {
+    console.log('Haupt-Button deaktiviert', {
+      selectedCycleNull: selectedCycle == null,
+      isRecipient,
+      alreadyConfirmed,
+    });
+  }
 
   return (
       <>
@@ -232,7 +249,7 @@ export const Payments = () => {
             sx={{ ml: 2 }}
             variant="outlined"
             onClick={() => handleConfirm(currentUid || '')}
-            disabled={selectedCycle == null || isRecipient || payments.some(p => p.user.uid === currentUid && p.confirmed)}
+            disabled={disableTopConfirm}
           >
             Zahlung bestätigen
           </Button>
