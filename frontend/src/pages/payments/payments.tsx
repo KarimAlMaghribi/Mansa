@@ -261,9 +261,7 @@ export const Payments = () => {
         ? 'Keine aktive Runde'
         : isRecipient
           ? 'Du bist Empfänger'
-          : payment?.confirmed
-            ? 'Schon bestätigt'
-            : '';
+          : '';
       action = (
         <Tooltip title={tip} disableHoverListener={!tip} disableFocusListener={!tip} disableTouchListener={!tip}>
           <span>
