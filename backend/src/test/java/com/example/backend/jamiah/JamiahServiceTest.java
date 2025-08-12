@@ -47,6 +47,43 @@ class JamiahServiceTest {
     }
 
     @Test
+    void findByPublicIdPersists() {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("Persist");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(5);
+        dto.setCycleCount(2);
+        dto.setRateAmount(new BigDecimal("10"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        JamiahDto saved = service.create(dto);
+        Jamiah entity = repository.findByPublicId(saved.getId()).orElse(null);
+        assertNotNull(entity);
+        java.util.UUID legacy = java.util.UUID.nameUUIDFromBytes(entity.getId().toString().getBytes());
+        assertNotEquals(legacy, entity.getPublicId());
+    }
+
+    @Test
+    void legacyPublicIdFallbackWorks() {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("Legacy");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(5);
+        dto.setCycleCount(2);
+        dto.setRateAmount(new BigDecimal("10"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        JamiahDto saved = service.create(dto);
+        Jamiah entity = repository.findAll().get(0);
+        String legacy = java.util.UUID.nameUUIDFromBytes(entity.getId().toString().getBytes()).toString();
+
+        JamiahDto fetched = service.findByPublicId(legacy);
+        assertEquals(saved.getId().toString(), fetched.getId().toString());
+    }
+
+    @Test
     void createInvalidJamiah() {
         JamiahDto dto = new JamiahDto();
         dto.setName("Bad");

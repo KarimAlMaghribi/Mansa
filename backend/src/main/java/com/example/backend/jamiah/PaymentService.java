@@ -45,15 +45,30 @@ public class PaymentService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         Long jamiahId = cycle.getJamiah().getId();
         // verify jamiah id matches path
-        if (!matchesPublicId(jamiahId, jamiahPublicId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
+        ensureMatchesPublicId(jamiahId, jamiahPublicId);
         // recipient does not pay in own round
         if (cycle.getRecipient() != null && payerUid.equals(cycle.getRecipient().getUid())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipient can't pay in own round");
         }
-        userRepository.findByUid(payerUid)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        // payer must be a member of the jamiah
+        Jamiah jamiah = jamiahRepository.findWithMembersById(jamiahId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        boolean isMember = jamiah.getMembers().stream()
+                .anyMatch(m -> m.getUid().equals(payerUid));
+        if (!isMember) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        // amount must match jamiah rate
+        BigDecimal expected = jamiah.getRateAmount();
+        if (expected == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rate not configured");
+        }
+        if (amount == null) {
+            amount = expected;
+        }
+        if (expected.compareTo(amount) != 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid amount");
+        }
         Optional<JamiahPayment> existing = paymentRepository
                 .findByJamiahIdAndCycleIdAndPayerUid(jamiahId, cycleId, payerUid);
         JamiahPayment payment;
@@ -93,9 +108,7 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         Long jamiahId = cycle.getJamiah().getId();
-        if (!matchesPublicId(jamiahId, jamiahPublicId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
+        ensureMatchesPublicId(jamiahId, jamiahPublicId);
         JamiahPayment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (!payment.getJamiahId().equals(jamiahId) || !payment.getCycleId().equals(cycleId)) {
@@ -120,9 +133,7 @@ public class PaymentService {
         JamiahCycle cycle = cycleRepository.findById(cycleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         Long jamiahId = cycle.getJamiah().getId();
-        if (!matchesPublicId(jamiahId, jamiahPublicId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
+        ensureMatchesPublicId(jamiahId, jamiahPublicId);
         Jamiah jamiah = cycle.getJamiah();
         boolean isOwner = jamiah.getOwnerId() != null && jamiah.getOwnerId().equals(callerUid);
         boolean isRecipient = cycle.getRecipient() != null && cycle.getRecipient().getUid() != null
@@ -139,13 +150,21 @@ public class PaymentService {
     }
 
     public List<CycleSummaryDto> getCycleSummaries(String jamiahPublicId, String callerUid) {
-        Jamiah jamiah = jamiahRepository.findByPublicId(jamiahPublicId)
+        java.util.UUID uuid = null;
+        try {
+            uuid = java.util.UUID.fromString(jamiahPublicId);
+        } catch (IllegalArgumentException ignored) {
+        }
+        Jamiah jamiah = (uuid != null ? jamiahRepository.findByPublicId(uuid) : java.util.Optional.<Jamiah>empty())
+                .or(() -> jamiahRepository.findByLegacyPublicId(jamiahPublicId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (jamiah.getOwnerId() == null || !jamiah.getOwnerId().equals(callerUid)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         List<JamiahCycle> cycles = cycleRepository.findByJamiahId(jamiah.getId());
-        return cycles.stream().map(cycle -> {
+        return cycles.stream()
+                .sorted(java.util.Comparator.comparing(JamiahCycle::getCycleNumber))
+                .map(cycle -> {
             String recipientUid = cycle.getRecipient() != null ? cycle.getRecipient().getUid() : null;
             long totalPayers = cycle.getMemberOrder() != null && !cycle.getMemberOrder().isEmpty()
                     ? cycle.getMemberOrder().stream().filter(uid -> !uid.equals(recipientUid)).count()
@@ -228,10 +247,18 @@ public class PaymentService {
         }
     }
 
-    private boolean matchesPublicId(Long jamiahId, String publicId) {
-        if (publicId == null) return true;
-        return jamiahRepository.findByPublicId(publicId)
-                .map(j -> j.getId().equals(jamiahId))
-                .orElse(false);
+    private void ensureMatchesPublicId(Long jamiahId, String publicId) {
+        if (publicId == null) return;
+        java.util.UUID uuid = null;
+        try {
+            uuid = java.util.UUID.fromString(publicId);
+        } catch (IllegalArgumentException ignored) {
+        }
+        Jamiah jamiah = (uuid != null ? jamiahRepository.findByPublicId(uuid) : java.util.Optional.<Jamiah>empty())
+                .or(() -> jamiahRepository.findByLegacyPublicId(publicId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!jamiah.getId().equals(jamiahId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
     }
 }

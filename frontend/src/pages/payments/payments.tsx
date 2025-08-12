@@ -57,6 +57,9 @@ export const Payments = () => {
   const currentUid = user?.uid;
   const groupId = window.location.pathname.split('/')[2];
 
+  const parseErr = async (r: Response) =>
+    Promise.reject(new Error((await r.text()) || r.statusText));
+
   useEffect(() => {
     let owner = false;
 
@@ -103,15 +106,19 @@ export const Payments = () => {
     if (isOwner) fetchCycleSummary();
   }, [isOwner, groupId, currentUid]);
 
-  const fetchPayments = (cycleId: number) => {
+  const fetchPayments = (cycleId: number, ac?: AbortController) => {
     const uid = currentUid || '';
     setLoadingPayments(true);
-    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${cycleId}/payments?uid=${encodeURIComponent(uid)}`)
-      .then(r => r.ok ? r.json() : Promise.reject())
+    fetch(
+      `${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${cycleId}/payments?uid=${encodeURIComponent(uid)}`,
+      { signal: ac?.signal }
+    )
+      .then(r => (r.ok ? r.json() : parseErr(r)))
       .then(data => setPayments(Array.isArray(data) ? data : []))
-      .catch(() => {
+      .catch(err => {
+        if (err.name === 'AbortError') return;
         setPayments([]);
-        setSnackbar({ message: 'Fehler beim Laden', severity: 'error' });
+        setSnackbar({ message: err.message, severity: 'error' });
       })
       .finally(() => setLoadingPayments(false));
   };
@@ -126,9 +133,10 @@ export const Payments = () => {
   };
 
   useEffect(() => {
-    if (selectedCycle !== null) {
-      fetchPayments(selectedCycle);
-    }
+    if (selectedCycle === null) return;
+    const ac = new AbortController();
+    fetchPayments(selectedCycle, ac);
+    return () => ac.abort();
   }, [groupId, selectedCycle, currentUid]);
 
   const handlePay = () => {
@@ -155,25 +163,25 @@ export const Payments = () => {
   const handleConfirm = (uid: string) => {
     if (selectedCycle == null) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/pay?uid=${encodeURIComponent(uid)}&amount=${amount}`, { method: 'POST' })
-      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(r => r.ok ? r.json() : parseErr(r))
       .then(() => {
         setSnackbar({ message: 'Zahlung bestätigt', severity: 'success' });
         fetchPayments(selectedCycle);
         fetchCycleSummary(); // Admin-Übersicht sofort aktualisieren
       })
-      .catch(() => setSnackbar({ message: 'Fehler bei Zahlungsbestätigung', severity: 'error' }));
+      .catch(err => setSnackbar({ message: err.message, severity: 'error' }));
   };
 
   const handleReceiptConfirm = (paymentId: number) => {
     if (selectedCycle == null) return;
     const uid = currentUid || '';
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${selectedCycle}/payments/${paymentId}/confirm-receipt?uid=${encodeURIComponent(uid)}`, { method: 'POST' })
-      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(r => r.ok ? r.json() : parseErr(r))
       .then(() => {
         setSnackbar({ message: 'Empfang bestätigt', severity: 'success' });
         fetchPayments(selectedCycle);
         fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles`)
-          .then(r => r.ok ? r.json() : Promise.reject())
+          .then(r => r.ok ? r.json() : parseErr(r))
           .then(data => {
             if (Array.isArray(data)) {
               setCycles(data);
@@ -190,7 +198,7 @@ export const Payments = () => {
           })
           .finally(() => fetchCycleSummary());
       })
-      .catch(() => setSnackbar({ message: 'Fehler beim Empfangsbestätigen', severity: 'error' }));
+      .catch(err => setSnackbar({ message: err.message, severity: 'error' }));
   };
 
   const getSortKey = (m: Member) => {
@@ -206,7 +214,7 @@ export const Payments = () => {
     const payment = payments.find(p => p.user.uid === m.uid);
     const name = m.firstName || m.lastName ? `${m.firstName || ''} ${m.lastName || ''}`.trim() : m.username;
     const isRoundRecipient = m.uid === currentCycle?.recipient?.uid;
-    const disableMemberConfirm = selectedCycle === null || isRecipient || !!payment?.confirmed;
+    const disableMemberConfirm = selectedCycle === null || isRecipient || !!payment?.confirmed || loadingCycles || loadingPayments;
     let action;
     if (m.uid === currentUid && isRecipient) {
       action = <Typography variant="body2">Empfänger zahlt nicht</Typography>;
@@ -287,7 +295,7 @@ export const Payments = () => {
   };
 
   const alreadyConfirmed = payments.some(p => p.user.uid === currentUid && p.confirmed);
-  const disableTopConfirm = selectedCycle == null || isRecipient || alreadyConfirmed;
+  const disableTopConfirm = selectedCycle == null || isRecipient || alreadyConfirmed || loadingCycles || loadingPayments;
 
   return (
       <>
@@ -331,6 +339,11 @@ export const Payments = () => {
                     : s.paidCount === s.totalPayers
                       ? 'vollständig bezahlt'
                       : 'offen';
+                const chipColor: 'success' | 'warning' | 'default' = s.completed
+                  ? 'success'
+                  : s.receiptCount === s.totalPayers || s.paidCount === s.totalPayers
+                    ? 'warning'
+                    : 'default';
                 const paidPct = s.totalPayers ? (s.paidCount / s.totalPayers) * 100 : 0;
                 const receiptPct = s.totalPayers ? (s.receiptCount / s.totalPayers) * 100 : 0;
                 return (
@@ -339,23 +352,18 @@ export const Payments = () => {
                     <Box display="flex" alignItems="center" gap={1} mt={1}>
                       <LinearProgress variant="determinate" value={paidPct} sx={{ flex: 1 }} />
                       <LinearProgress variant="determinate" value={receiptPct} color="secondary" sx={{ flex: 1 }} />
-                      <Chip label={status} size="small" />
+                      <Chip label={status} size="small" color={chipColor} />
                     </Box>
                     <Typography variant="caption">Bezahlt {s.paidCount}/{s.totalPayers} – Empfang bestätigt {s.receiptCount}/{s.totalPayers}</Typography>
                   </Box>
                 );
               })}
             </Paper>
-          ) : (
-            <Alert severity="info" sx={{ mb: 3 }}>
-              Noch keine Runden – Jamiah starten
-            </Alert>
-          )
-        )}
+          ))}
 
         {cycles.length === 0 && (
           <Alert severity="info" sx={{ mb: 3 }}>
-            Keine aktive Runde – bitte vom Admin starten lassen.
+            {isOwner ? 'Noch keine Runden – Jamiah starten' : 'Keine aktive Runde – bitte vom Admin starten lassen.'}
           </Alert>
         )}
         <Box mb={3}>
@@ -397,8 +405,8 @@ export const Payments = () => {
           })()}
         </Typography>
 
-        {/* Details zur aktuellen Runde */}
-        {currentCycle && (
+        {/* Details zur aktuellen Runde NUR für Owner oder Empfänger */}
+        {currentCycle && (isOwner || isRecipient) && (
         <Paper sx={{ p: 2 }}>
             <Box mb={2}>
               <Typography variant="body2">Empfänger: {
