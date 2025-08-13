@@ -20,7 +20,7 @@ export const Profile = () => {
   const methods = useForm<ProfileFormValues>({
     resolver: yupResolver(profileSchema) as Resolver<ProfileFormValues>,
     mode: 'onChange',
-    defaultValues: { avatar: null } as Partial<ProfileFormValues>
+    defaultValues: { avatar: null, paypalEmail: '' } as Partial<ProfileFormValues>
   });
 
   const { handleSubmit, reset, formState, watch } = methods;
@@ -39,6 +39,7 @@ export const Profile = () => {
             birthDate: data.birthDate || '',
             address: data.address || '',
             phone: data.phone || '',
+            paypalEmail: data.paypalEmail || '',
             language: data.language || '',
             nationality: data.nationality || '',
             gender: data.gender || '',
@@ -130,6 +131,9 @@ export const Profile = () => {
                   </Grid>
                   <Grid item xs={12} md={6}>
                     <FormField name="phone" label={t('profile.phone')} control={methods.control} />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <FormField type="email" name="paypalEmail" label={t('profile.paypalEmail')} control={methods.control} />
                   </Grid>
                   <Grid item xs={12} md={6}>
                     <FormField
