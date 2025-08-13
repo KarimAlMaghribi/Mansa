@@ -3,6 +3,9 @@ package com.example.backend.jamiah;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -11,8 +14,10 @@ import java.util.Set;
 import java.util.UUID;
 
 @Data
+@JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
 @Entity
 @Table(name = "jamiah")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Jamiah {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
