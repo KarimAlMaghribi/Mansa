@@ -21,7 +21,7 @@ public class Jamiah {
     /**
      * Public identifier exposed via the API.
      */
-    @Column(name = "public_id", nullable = false, unique = true, updatable = false, columnDefinition = "UUID")
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false, length = 36)
     private UUID publicId;
 
     /**
