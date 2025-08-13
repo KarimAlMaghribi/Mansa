@@ -14,7 +14,7 @@ import java.util.Set;
 
 @Data
 @Entity
-@Table(name = "jamiah_cycle")
+@Table(name = "jamiah_cycles")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class JamiahCycle {
     @Id
