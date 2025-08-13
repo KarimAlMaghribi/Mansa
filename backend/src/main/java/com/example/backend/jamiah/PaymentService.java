@@ -197,8 +197,14 @@ public class PaymentService {
         ref.setUid(payment.getPayerUid());
         dto.setUser(ref);
         dto.setPaidAt(payment.getPaidAt());
-        dto.setConfirmed(Boolean.TRUE.equals(payment.getConfirmed()));
-        dto.setRecipientConfirmed(Boolean.TRUE.equals(payment.getRecipientConfirmed()));
+        dto.setAmount(payment.getAmount());
+        PaymentDto.PaymentStatus status = PaymentDto.PaymentStatus.UNPAID;
+        if (Boolean.TRUE.equals(payment.getRecipientConfirmed())) {
+            status = PaymentDto.PaymentStatus.RECEIPT_CONFIRMED;
+        } else if (Boolean.TRUE.equals(payment.getConfirmed())) {
+            status = PaymentDto.PaymentStatus.PAID_SELF_CONFIRMED;
+        }
+        dto.setStatus(status);
         return dto;
     }
 

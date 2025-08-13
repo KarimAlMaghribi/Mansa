@@ -173,7 +173,7 @@ public class PaymentServiceTest {
 
         PaymentDto updated = paymentService.confirmPayment(created.getId().toString(), cycle.getId(), "u2", new BigDecimal("5"), "u2");
         assertEquals(existing.getId(), updated.getId());
-        assertTrue(updated.getConfirmed());
+        assertEquals(PaymentDto.PaymentStatus.PAID_SELF_CONFIRMED, updated.getStatus());
         assertNotNull(updated.getPaidAt());
     }
 
