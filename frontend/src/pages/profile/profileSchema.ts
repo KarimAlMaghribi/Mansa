@@ -16,6 +16,7 @@ export const profileSchema = yup.object({
   username: yup.string().min(3).test('unique', 'Benutzername bereits vergeben', checkUsernameUnique).required(),
   birthDate: yup.date().test('age', 'Du musst mindestens 18 Jahre alt sein', value => dayjs().diff(value, 'year') >= 18).required(),
   phone: yup.string().matches(/^\+?[0-9]{7,15}$/, 'Ung\u00fcltige Telefonnummer').optional(),
+  paypalEmail: yup.string().email().optional(),
   address: yup.string().min(2).required(),
   language: yup.string().required(),
   nationality: yup.string().required(),

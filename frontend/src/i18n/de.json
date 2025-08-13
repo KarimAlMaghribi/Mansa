@@ -10,6 +10,7 @@
     "birthDate": "Geburtsdatum",
     "address": "Adresse",
     "phone": "Telefonnummer",
+    "paypalEmail": "PayPal E-Mail",
     "language": "Sprache",
     "nationality": "Nationalit\u00e4t",
     "gender": "Geschlecht",
