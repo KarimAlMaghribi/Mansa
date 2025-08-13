@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/userProfiles")
@@ -42,7 +43,7 @@ public class UserProfileController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public UserProfile create(@RequestBody UserProfile profile) {
+    public UserProfile create(@Valid @RequestBody UserProfile profile) {
         if (repository.existsByUsername(profile.getUsername())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username already taken");
         }
@@ -50,7 +51,7 @@ public class UserProfileController {
     }
 
     @PutMapping("/{id}")
-    public UserProfile update(@PathVariable Long id, @RequestBody UserProfile profile) {
+    public UserProfile update(@PathVariable Long id, @Valid @RequestBody UserProfile profile) {
         UserProfile existing = repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (!existing.getUsername().equals(profile.getUsername()) && repository.existsByUsername(profile.getUsername())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username already taken");
@@ -64,13 +65,14 @@ public class UserProfileController {
         existing.setNationality(profile.getNationality());
         existing.setAddress(profile.getAddress());
         existing.setPhone(profile.getPhone());
+        existing.setPaypalEmail(profile.getPaypalEmail());
         existing.setLanguage(profile.getLanguage());
         existing.setInterests(profile.getInterests());
         return repository.save(existing);
     }
 
     @PutMapping("/uid/{uid}")
-    public UserProfile updateByUid(@PathVariable String uid, @RequestBody UserProfile profile) {
+    public UserProfile updateByUid(@PathVariable String uid, @Valid @RequestBody UserProfile profile) {
         UserProfile entity = repository.findByUid(uid).orElse(null);
 
         // create new profile if none exists for the uid
@@ -93,13 +95,14 @@ public class UserProfileController {
         entity.setNationality(profile.getNationality());
         entity.setAddress(profile.getAddress());
         entity.setPhone(profile.getPhone());
+        entity.setPaypalEmail(profile.getPaypalEmail());
         entity.setLanguage(profile.getLanguage());
         entity.setInterests(profile.getInterests());
         return repository.save(entity);
     }
 
     @PutMapping("/profile/{uid}")
-    public UserProfile saveProfile(@PathVariable String uid, @RequestBody UserProfile profile) {
+    public UserProfile saveProfile(@PathVariable String uid, @Valid @RequestBody UserProfile profile) {
         return updateByUid(uid, profile);
     }
 

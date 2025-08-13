@@ -1,6 +1,7 @@
 package com.example.backend;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
 import java.util.HashSet;
 import java.util.Set;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -24,6 +25,9 @@ public class UserProfile {
     private String nationality;
     private String address;
     private String phone;
+    @Email
+    @Column(name = "paypal_email", unique = true)
+    private String paypalEmail;
     private String language;
     @Column(length = 2048)
     private String interests;
@@ -116,6 +120,18 @@ public class UserProfile {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getPaypalEmail() {
+        return paypalEmail;
+    }
+
+    public void setPaypalEmail(String paypalEmail) {
+        if (paypalEmail == null) {
+            this.paypalEmail = null;
+        } else {
+            this.paypalEmail = paypalEmail.trim().toLowerCase();
+        }
     }
 
     public String getLanguage() {
