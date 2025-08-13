@@ -2,6 +2,9 @@ package com.example.backend.jamiah;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIdentityReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.example.backend.UserProfile;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -11,14 +14,16 @@ import java.util.Set;
 
 @Data
 @Entity
-@Table(name = "jamiah_cycles")
+@Table(name = "jamiah_cycle")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class JamiahCycle {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "jamiah_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "jamiah_id", nullable = false)
+    @JsonIdentityReference(alwaysAsId = true)
     private Jamiah jamiah;
 
     private Integer cycleNumber;
@@ -38,7 +43,8 @@ public class JamiahCycle {
     /** Current recipient for this round. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recipient_id")
-    private com.example.backend.UserProfile recipient;
+    @JsonIdentityReference(alwaysAsId = true)
+    private UserProfile recipient;
 
     /** Whether the current recipient confirmed receipt. */
     private Boolean recipientConfirmed = false;
