@@ -1,6 +1,7 @@
 package com.example.backend.jamiah;
 
 import com.example.backend.jamiah.dto.JamiahDto;
+import com.example.backend.jamiah.dto.JoinRequestDto;
 import com.example.backend.jamiah.util.InviteCodeGenerator;
 import com.example.backend.jamiah.JamiahCycleRepository;
 import java.math.BigDecimal;
@@ -22,6 +23,7 @@ public class JamiahService {
     private final JamiahMapper mapper;
     private final com.example.backend.UserProfileRepository userRepository;
     private final JamiahCycleRepository cycleRepository;
+    private final JamiahJoinRequestRepository joinRequestRepository;
 
     private static final Logger log = LoggerFactory.getLogger(JamiahService.class);
 
@@ -37,11 +39,13 @@ public class JamiahService {
     public JamiahService(JamiahRepository repository,
                          JamiahMapper mapper,
                          com.example.backend.UserProfileRepository userRepository,
-                         JamiahCycleRepository cycleRepository) {
+                         JamiahCycleRepository cycleRepository,
+                         JamiahJoinRequestRepository joinRequestRepository) {
         this.repository = repository;
         this.mapper = mapper;
         this.userRepository = userRepository;
         this.cycleRepository = cycleRepository;
+        this.joinRequestRepository = joinRequestRepository;
     }
 
     public List<JamiahDto> findAll() {
@@ -191,24 +195,103 @@ public class JamiahService {
     }
 
     /**
-     * Join a public Jamiah without invitation code.
+     * Request to join a public Jamiah with an optional motivation text.
      */
-    public JamiahDto joinPublic(String publicId, String uid) {
+    public JoinRequestDto requestJoinPublic(String publicId, String uid, String motivation) {
         Jamiah entity = getByPublicId(publicId);
         if (!Boolean.TRUE.equals(entity.getIsPublic())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Jamiah is not public");
         }
         com.example.backend.UserProfile user = userRepository.findByUid(uid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        if (!entity.getMembers().contains(user)) {
-            if (entity.getMaxMembers() != null && entity.getMembers().size() >= entity.getMaxMembers()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member limit reached");
-            }
-            entity.getMembers().add(user);
-            user.getJamiahs().add(entity);
-            repository.save(entity);
+        if (entity.getMembers().contains(user)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Already member");
         }
-        return mapper.toDto(entity);
+        if (entity.getMaxMembers() != null && entity.getMembers().size() >= entity.getMaxMembers()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member limit reached");
+        }
+        JamiahJoinRequest req = joinRequestRepository.findByJamiahAndUser(entity, user).orElse(null);
+        if (req == null) {
+            req = new JamiahJoinRequest();
+            req.setJamiah(entity);
+            req.setUser(user);
+        }
+        req.setMotivation(motivation);
+        req.setStatus(JamiahJoinRequest.Status.PENDING);
+        JamiahJoinRequest saved = joinRequestRepository.save(req);
+        return toDto(saved);
+    }
+
+    /**
+     * Get join request status for a user and Jamiah.
+     */
+    public JoinRequestDto getJoinRequestStatus(String publicId, String uid) {
+        Jamiah entity = getByPublicId(publicId);
+        com.example.backend.UserProfile user = userRepository.findByUid(uid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        JamiahJoinRequest req = joinRequestRepository.findByJamiahAndUser(entity, user)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return toDto(req);
+    }
+
+    /**
+     * List join requests for the given Jamiah (owner only).
+     */
+    public List<JoinRequestDto> getJoinRequests(String publicId, String ownerUid) {
+        Jamiah entity = getByPublicId(publicId);
+        ensureOwner(entity, ownerUid);
+        return joinRequestRepository.findByJamiah(entity).stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Handle a join request decision by the Jamiah owner.
+     */
+    public JoinRequestDto handleJoinRequest(String publicId, Long requestId, String ownerUid, boolean accept) {
+        Jamiah jamiah = getByPublicId(publicId);
+        ensureOwner(jamiah, ownerUid);
+        JamiahJoinRequest req = joinRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!req.getJamiah().getId().equals(jamiah.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        if (req.getStatus() != JamiahJoinRequest.Status.PENDING) {
+            return toDto(req);
+        }
+        if (accept) {
+            req.setStatus(JamiahJoinRequest.Status.APPROVED);
+            jamiah.getMembers().add(req.getUser());
+            req.getUser().getJamiahs().add(jamiah);
+            repository.save(jamiah);
+        } else {
+            req.setStatus(JamiahJoinRequest.Status.REJECTED);
+        }
+        JamiahJoinRequest saved = joinRequestRepository.save(req);
+        return toDto(saved);
+    }
+
+    /**
+     * Retrieve all join requests for the specified user.
+     */
+    public List<JoinRequestDto> getJoinRequestsForUser(String uid) {
+        return joinRequestRepository.findByUserUid(uid).stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    private JoinRequestDto toDto(JamiahJoinRequest req) {
+        JoinRequestDto dto = new JoinRequestDto();
+        dto.setId(req.getId());
+        if (req.getJamiah() != null && req.getJamiah().getPublicId() != null) {
+            dto.setJamiahId(req.getJamiah().getPublicId().toString());
+        }
+        if (req.getUser() != null) {
+            dto.setUserUid(req.getUser().getUid());
+        }
+        dto.setMotivation(req.getMotivation());
+        dto.setStatus(req.getStatus().name());
+        return dto;
     }
 
     /**

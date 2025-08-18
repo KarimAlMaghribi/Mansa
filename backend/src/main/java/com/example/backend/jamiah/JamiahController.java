@@ -4,6 +4,7 @@ import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.JamiahCycle;
 import com.example.backend.jamiah.dto.PaymentDto;
 import com.example.backend.jamiah.PaymentService;
+import com.example.backend.jamiah.dto.JoinRequestCreateDto;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
@@ -117,8 +118,36 @@ public class JamiahController {
     }
 
     @PostMapping("/{id}/join-public")
-    public JamiahDto joinPublic(@PathVariable String id, @RequestParam String uid) {
-        return service.joinPublic(id, uid);
+    public com.example.backend.jamiah.dto.JoinRequestDto joinPublic(@PathVariable String id,
+                                                                    @RequestParam String uid,
+                                                                    @RequestBody(required = false) JoinRequestCreateDto body) {
+        String motivation = body != null ? body.getMotivation() : null;
+        return service.requestJoinPublic(id, uid, motivation);
+    }
+
+    @GetMapping("/{id}/join-public/status")
+    public com.example.backend.jamiah.dto.JoinRequestDto joinStatus(@PathVariable String id,
+                                                                    @RequestParam String uid) {
+        return service.getJoinRequestStatus(id, uid);
+    }
+
+    @GetMapping("/{id}/join-requests")
+    public java.util.List<com.example.backend.jamiah.dto.JoinRequestDto> listJoinRequests(@PathVariable String id,
+                                                                                          @RequestParam String uid) {
+        return service.getJoinRequests(id, uid);
+    }
+
+    @PostMapping("/{id}/join-requests/{requestId}")
+    public com.example.backend.jamiah.dto.JoinRequestDto decideJoinRequest(@PathVariable String id,
+                                                                           @PathVariable Long requestId,
+                                                                           @RequestParam String uid,
+                                                                           @RequestParam boolean accept) {
+        return service.handleJoinRequest(id, requestId, uid, accept);
+    }
+
+    @GetMapping("/join-requests")
+    public java.util.List<com.example.backend.jamiah.dto.JoinRequestDto> myJoinRequests(@RequestParam String uid) {
+        return service.getJoinRequestsForUser(uid);
     }
 
     @DeleteMapping("/{id}")
