@@ -26,6 +26,7 @@ import {
 } from "../../store/slices/my-bids";
 import { ChatStatusEnum } from "../../enums/ChatStatus.enum";
 import { auth } from "../../firebase_config";
+import { useAuth } from "../../context/AuthContext";
 
 interface Member {
   id: number;
@@ -47,12 +48,13 @@ interface JoinRequest {
 
 export const Members = () => {
   const { groupId } = useParams();
-  const [isAdminView, setIsAdminView] = useState(true);
+  const [isAdminView, setIsAdminView] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const dispatch: AppDispatch = useDispatch();
   const chats: Chat[] = useSelector(selectChats);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const fetchMembers = () => {
     if (!groupId) return;
@@ -94,6 +96,16 @@ export const Members = () => {
       fetchJoinRequests();
     }
   }, [groupId, isAdminView]);
+
+  useEffect(() => {
+    if (!groupId) return;
+    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}`)
+      .then(res => res.json())
+      .then(g => {
+        setIsAdminView(user?.uid === g.ownerId);
+      })
+      .catch(() => setIsAdminView(false));
+  }, [groupId, user]);
 
   const handleDecision = (requestId: number, accept: boolean) => {
     const uid = auth.currentUser?.uid;
