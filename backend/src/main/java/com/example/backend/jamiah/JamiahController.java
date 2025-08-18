@@ -4,7 +4,6 @@ import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.JamiahCycle;
 import com.example.backend.jamiah.dto.PaymentDto;
 import com.example.backend.jamiah.PaymentService;
-import com.example.backend.jamiah.dto.JoinRequestCreateDto;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
@@ -118,11 +117,8 @@ public class JamiahController {
     }
 
     @PostMapping("/{id}/join-public")
-    public com.example.backend.jamiah.dto.JoinRequestDto joinPublic(@PathVariable String id,
-                                                                    @RequestParam String uid,
-                                                                    @RequestBody(required = false) JoinRequestCreateDto body) {
-        String motivation = body != null ? body.getMotivation() : null;
-        return service.requestJoinPublic(id, uid, motivation);
+    public JamiahDto joinPublic(@PathVariable String id, @RequestParam String uid) {
+        return service.joinPublic(id, uid);
     }
 
     @GetMapping("/{id}/join-public/status")
