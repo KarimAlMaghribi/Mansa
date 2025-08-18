@@ -261,7 +261,9 @@ class JamiahControllerTest {
         user.setUid("uid1");
         userRepository.save(user);
 
-        mockMvc.perform(post("/api/jamiahs/" + created.getId() + "/join-public?uid=uid1"))
+        mockMvc.perform(post("/api/jamiahs/" + created.getId() + "/join-public")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"uid\":\"uid1\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(created.getId().toString()));
     }
