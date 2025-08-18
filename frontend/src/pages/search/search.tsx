@@ -11,7 +11,11 @@ import {
   Avatar,
   Chip,
   Snackbar,
-  Alert
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import KeyIcon from '@mui/icons-material/VpnKey';
 import { useNavigate } from 'react-router-dom';
@@ -28,6 +32,10 @@ export const SearchPage = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarError, setSnackbarError] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
+  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<Jamiah | null>(null);
+  const [motivation, setMotivation] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -42,43 +50,55 @@ export const SearchPage = () => {
     const uid = user?.uid;
     if (!uid) {
       setMyGroups([]);
+      setPendingIds([]);
       return;
     }
     fetch(`${API_BASE_URL}/api/userProfiles/uid/${uid}/jamiahs`)
       .then(res => res.json())
       .then(setMyGroups)
       .catch(() => setMyGroups([]));
+
+    fetch(`${API_BASE_URL}/api/jamiahs/join-requests?uid=${uid}`)
+      .then(res => res.json())
+      .then(data => setPendingIds(data.filter((r: any) => r.status === 'PENDING').map((r: any) => r.jamiahId)))
+      .catch(() => setPendingIds([]));
   }, [user]);
 
   const joinedIds = new Set(myGroups.filter(g => g.id).map(g => g.id as string));
+  const pendingSet = new Set(pendingIds);
 
-  const handleJoinPublic = (group: Jamiah) => {
+  const openJoinDialog = (group: Jamiah) => {
+    setSelectedGroup(group);
+    setMotivation('');
+    setJoinDialogOpen(true);
+  };
+
+  const submitJoinRequest = () => {
+    if (!selectedGroup) return;
     const uid = auth.currentUser?.uid || '';
-    fetch(`${API_BASE_URL}/api/jamiahs/${group.id}/join-public?uid=${encodeURIComponent(uid)}`, {
-      method: 'POST'
+    fetch(`${API_BASE_URL}/api/jamiahs/${selectedGroup.id}/join-public?uid=${encodeURIComponent(uid)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivation })
     })
-      .then(async res => {
+      .then(res => {
         if (res.ok) {
-          const j = await res.json();
-          setMyGroups([...myGroups, j]);
-          setSnackbarMessage('Beitritt erfolgreich');
+          setPendingIds([...pendingIds, selectedGroup.id as string]);
+          setSnackbarMessage('Bewerbung gesendet');
           setSnackbarError(false);
-        } else if (res.status === 400) {
-          setSnackbarMessage('Maximale Teilnehmerzahl erreicht');
-          setSnackbarError(true);
-        } else if (res.status === 404) {
-          setSnackbarMessage('Jamiah nicht gefunden');
-          setSnackbarError(true);
         } else {
-          setSnackbarMessage('Fehler beim Beitreten');
+          setSnackbarMessage('Fehler beim Bewerben');
           setSnackbarError(true);
         }
       })
       .catch(() => {
-        setSnackbarMessage('Fehler beim Beitreten');
+        setSnackbarMessage('Fehler beim Bewerben');
         setSnackbarError(true);
       })
-      .finally(() => setSnackbarOpen(true));
+      .finally(() => {
+        setSnackbarOpen(true);
+        setJoinDialogOpen(false);
+      });
   };
 
   const availablePublicGroups = publicGroups.filter(
@@ -108,6 +128,7 @@ export const SearchPage = () => {
       <Grid container spacing={4}>
         {filteredPublicGroups.map(pg => {
           const joined = joinedIds.has(pg.id as string);
+          const pending = pendingSet.has(pg.id as string);
           const isOwner = pg.ownerId === user?.uid;
           return (
             <Grid item xs={12} sm={6} md={4} key={pg.id}>
@@ -118,9 +139,11 @@ export const SearchPage = () => {
                     <Typography variant="h6">{pg.name}</Typography>
                     {isOwner ? (
                       <Chip label="Eigentümer" color="info" size="small" />
-                    ) : (
-                      joined && <Chip label="Beigetreten" color="success" size="small" />
-                    )}
+                    ) : joined ? (
+                      <Chip label="Beigetreten" color="success" size="small" />
+                    ) : pending ? (
+                      <Chip label="Bewerbung läuft" color="warning" size="small" />
+                    ) : null}
                   </Box>
                   {pg.description && (
                     <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
@@ -133,8 +156,10 @@ export const SearchPage = () => {
                     <Button disabled fullWidth>Eigentümer</Button>
                   ) : joined ? (
                     <Button disabled fullWidth>Beigetreten</Button>
+                  ) : pending ? (
+                    <Button disabled fullWidth>Bewerbung läuft</Button>
                   ) : (
-                    <Button variant="contained" fullWidth onClick={() => handleJoinPublic(pg)}>
+                    <Button variant="contained" fullWidth onClick={() => openJoinDialog(pg)}>
                       Beitreten
                     </Button>
                   )}
@@ -149,6 +174,23 @@ export const SearchPage = () => {
           {snackbarMessage}
         </Alert>
       </Snackbar>
+      <Dialog open={joinDialogOpen} onClose={() => setJoinDialogOpen(false)}>
+        <DialogTitle>Beitrittsanfrage</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Warum möchtest du beitreten?"
+            fullWidth
+            multiline
+            minRows={3}
+            value={motivation}
+            onChange={e => setMotivation(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setJoinDialogOpen(false)}>Abbrechen</Button>
+          <Button onClick={submitJoinRequest} variant="contained">Senden</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
