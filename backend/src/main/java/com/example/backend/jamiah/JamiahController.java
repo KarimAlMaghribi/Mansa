@@ -117,8 +117,9 @@ public class JamiahController {
     }
 
     @PostMapping("/{id}/join-public")
-    public JamiahDto joinPublic(@PathVariable String id, @RequestParam String uid) {
-        return service.joinPublic(id, uid);
+    public com.example.backend.jamiah.dto.JoinRequestDto joinPublic(@PathVariable String id,
+                                                                    @RequestBody JoinPublicRequest request) {
+        return service.requestJoinPublic(id, request.getUid(), request.getMotivation());
     }
 
     @GetMapping("/{id}/join-public/status")
@@ -162,6 +163,27 @@ public class JamiahController {
 
         public void setOrder(java.util.List<String> order) {
             this.order = order;
+        }
+    }
+
+    static class JoinPublicRequest {
+        private String uid;
+        private String motivation;
+
+        public String getUid() {
+            return uid;
+        }
+
+        public void setUid(String uid) {
+            this.uid = uid;
+        }
+
+        public String getMotivation() {
+            return motivation;
+        }
+
+        public void setMotivation(String motivation) {
+            this.motivation = motivation;
         }
     }
 }

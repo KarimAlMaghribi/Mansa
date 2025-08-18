@@ -197,24 +197,6 @@ public class JamiahService {
     /**
      * Join a public Jamiah directly.
      */
-    public JamiahDto joinPublic(String publicId, String uid) {
-        Jamiah entity = getByPublicId(publicId);
-        if (!Boolean.TRUE.equals(entity.getIsPublic())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Jamiah is not public");
-        }
-        com.example.backend.UserProfile user = userRepository.findByUid(uid)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        if (!entity.getMembers().contains(user)) {
-            if (entity.getMaxMembers() != null && entity.getMembers().size() >= entity.getMaxMembers()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member limit reached");
-            }
-            entity.getMembers().add(user);
-            user.getJamiahs().add(entity);
-            repository.save(entity);
-        }
-        return mapper.toDto(entity);
-    }
-
     /**
      * Request to join a public Jamiah with an optional motivation text.
      */
@@ -250,8 +232,12 @@ public class JamiahService {
         Jamiah entity = getByPublicId(publicId);
         com.example.backend.UserProfile user = userRepository.findByUid(uid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        JamiahJoinRequest req = joinRequestRepository.findByJamiahAndUser(entity, user)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        JamiahJoinRequest req = joinRequestRepository.findByJamiahAndUser(entity, user).orElse(null);
+        if (req == null) {
+            JoinRequestDto dto = new JoinRequestDto();
+            dto.setStatus("NONE");
+            return dto;
+        }
         return toDto(req);
     }
 
@@ -281,6 +267,9 @@ public class JamiahService {
             return toDto(req);
         }
         if (accept) {
+            if (jamiah.getMaxMembers() != null && jamiah.getMembers().size() >= jamiah.getMaxMembers()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Member limit reached");
+            }
             req.setStatus(JamiahJoinRequest.Status.APPROVED);
             jamiah.getMembers().add(req.getUser());
             req.getUser().getJamiahs().add(jamiah);

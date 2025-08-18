@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, Divider } from '@mui/material';
+import { Box, Typography, Button, Divider, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
 import { ROUTES } from '../../routing/routes';
@@ -14,6 +14,8 @@ export const GroupDetails = () => {
   const { user } = useAuth();
   const [cycleStarted, setCycleStarted] = useState(false);
   const [status, setStatus] = useState<"member" | "applicant" | null>(null);
+  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [motivation, setMotivation] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -95,9 +97,10 @@ export const GroupDetails = () => {
               <Typography color="textSecondary">Status: Bewerber</Typography>
             ) : status === "member" ? (
               <Typography color="textSecondary">Status: Mitglied</Typography>
-            ) : group.isPublic ? (
+          ) : group.isPublic ? (
               <Button
                 variant="contained"
+                onClick={() => setJoinDialogOpen(true)}
                 disabled={
                   group.maxMembers !== undefined &&
                   group.currentMembers !== undefined &&
@@ -114,6 +117,42 @@ export const GroupDetails = () => {
       ) : (
         <Typography>Gruppe nicht gefunden.</Typography>
       )}
+      <Dialog open={joinDialogOpen} onClose={() => setJoinDialogOpen(false)}>
+        <DialogTitle>Beitrittsanfrage</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Warum möchtest du beitreten?"
+            fullWidth
+            multiline
+            minRows={3}
+            value={motivation}
+            onChange={e => setMotivation(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setJoinDialogOpen(false)}>Abbrechen</Button>
+          <Button
+            onClick={async () => {
+              if (!id || !user) return;
+              await fetch(`${API_BASE_URL}/api/jamiahs/${id}/join-public`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: user.uid, motivation })
+              }).catch(() => undefined);
+              fetch(`${API_BASE_URL}/api/jamiahs/${id}/join-public/status?uid=${user.uid}`)
+                .then(r => (r.ok ? r.json() : null))
+                .then(d => {
+                  if (d?.status === 'PENDING') setStatus('applicant');
+                })
+                .catch(() => undefined);
+              setJoinDialogOpen(false);
+            }}
+            variant="contained"
+          >
+            Senden
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
