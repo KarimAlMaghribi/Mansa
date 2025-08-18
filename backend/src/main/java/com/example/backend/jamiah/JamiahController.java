@@ -117,8 +117,13 @@ public class JamiahController {
     }
 
     @PostMapping("/{id}/join-public")
-    public com.example.backend.jamiah.dto.JoinRequestDto joinPublic(@PathVariable String id,
-                                                                    @RequestBody JoinPublicRequest request) {
+    public JamiahDto joinPublic(@PathVariable String id, @RequestParam String uid) {
+        return service.joinPublic(id, uid);
+    }
+
+    @PostMapping("/{id}/join-public/request")
+    public com.example.backend.jamiah.dto.JoinRequestDto requestJoinPublic(@PathVariable String id,
+                                                                           @RequestBody JoinPublicRequest request) {
         return service.requestJoinPublic(id, request.getUid(), request.getMotivation());
     }
 
