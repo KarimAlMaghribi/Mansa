@@ -29,7 +29,7 @@ import {Payments} from "./pages/payments/payments";
 import {Votes} from "./pages/votes/votes";
 import {Documents} from "./pages/documents/documents";
 import {Reports} from "./pages/reports/reports";
-import {Members} from "./pages/memebers/members";
+import {Members} from "./pages/members/members";
 import JamiahLayout from "./components/layout/jamiah-layout";
 import {Onboarding} from "./pages/onboarding/onboarding";
 import SearchPage from "./pages/search/search";
