@@ -197,6 +197,24 @@ public class JamiahService {
     /**
      * Join a public Jamiah directly.
      */
+    public JamiahDto joinPublic(String publicId, String uid) {
+        Jamiah entity = getByPublicId(publicId);
+        if (!Boolean.TRUE.equals(entity.getIsPublic())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Jamiah is not public");
+        }
+        com.example.backend.UserProfile user = userRepository.findByUid(uid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (!entity.getMembers().contains(user)) {
+            if (entity.getMaxMembers() != null && entity.getMembers().size() >= entity.getMaxMembers()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member limit reached");
+            }
+            entity.getMembers().add(user);
+            user.getJamiahs().add(entity);
+            repository.save(entity);
+        }
+        return mapper.toDto(entity);
+    }
+
     /**
      * Request to join a public Jamiah with an optional motivation text.
      */
