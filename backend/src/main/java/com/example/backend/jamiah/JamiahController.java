@@ -117,8 +117,18 @@ public class JamiahController {
     }
 
     @PostMapping("/{id}/join-public")
-    public JamiahDto joinPublic(@PathVariable String id, @RequestParam String uid) {
-        return service.joinPublic(id, uid);
+    public JamiahDto joinPublic(@PathVariable String id,
+                                @RequestParam(required = false) String uid,
+                                @RequestBody(required = false) JoinPublicRequest request) {
+        String requestUid = uid;
+        if (requestUid == null && request != null) {
+            requestUid = request.getUid();
+        }
+        if (requestUid == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "uid is required");
+        }
+        return service.joinPublic(id, requestUid);
     }
 
     @PostMapping("/{id}/join-public/request")
