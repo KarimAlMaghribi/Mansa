@@ -35,21 +35,81 @@ interface Member {
   lastName?: string;
 }
 
+interface JoinRequest {
+  id: number;
+  userUid: string;
+  motivation?: string;
+  status: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
 export const Members = () => {
   const { groupId } = useParams();
   const [isAdminView, setIsAdminView] = useState(true);
   const [members, setMembers] = useState<Member[]>([]);
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const dispatch: AppDispatch = useDispatch();
   const chats: Chat[] = useSelector(selectChats);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const fetchMembers = () => {
     if (!groupId) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/members`)
       .then((res) => res.json())
       .then(setMembers)
       .catch(() => setMembers([]));
+  };
+
+  useEffect(() => {
+    fetchMembers();
   }, [groupId]);
+
+  const fetchJoinRequests = () => {
+    const uid = auth.currentUser?.uid;
+    if (!groupId || !uid) return;
+    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/join-requests?uid=${uid}`)
+      .then((res) => res.json())
+      .then(async (data: JoinRequest[]) => {
+        const enriched = await Promise.all(
+          data.map(async (jr) => {
+            try {
+              const profile = await fetch(
+                `${API_BASE_URL}/api/userProfiles/uid/${jr.userUid}`,
+              ).then((r) => r.json());
+              return { ...jr, ...profile };
+            } catch {
+              return jr;
+            }
+          }),
+        );
+        setJoinRequests(enriched);
+      })
+      .catch(() => setJoinRequests([]));
+  };
+
+  useEffect(() => {
+    if (isAdminView) {
+      fetchJoinRequests();
+    }
+  }, [groupId, isAdminView]);
+
+  const handleDecision = (requestId: number, accept: boolean) => {
+    const uid = auth.currentUser?.uid;
+    if (!groupId || !uid) return;
+    fetch(
+      `${API_BASE_URL}/api/jamiahs/${groupId}/join-requests/${requestId}?uid=${uid}&accept=${accept}`,
+      { method: "POST" },
+    )
+      .then(() => {
+        setJoinRequests((prev) => prev.filter((r) => r.id !== requestId));
+        if (accept) {
+          fetchMembers();
+        }
+      })
+      .catch(() => undefined);
+  };
 
   const startChat = (member: Member) => {
     const user = auth.currentUser;
@@ -109,7 +169,61 @@ export const Members = () => {
           label={isAdminView ? "Admin-Modus" : "Mitgliedsansicht"}
         />
       </Box>
+      {isAdminView && joinRequests.length > 0 && (
+        <Box mb={4}>
+          <Typography variant="h5" gutterBottom>
+            Bewerber
+          </Typography>
+          <Grid container spacing={3}>
+            {joinRequests.map((req) => {
+              const name =
+                `${req.firstName ?? ""} ${req.lastName ?? ""}`.trim() ||
+                req.username || req.userUid;
+              const initial = name.charAt(0).toUpperCase();
+              return (
+                <Grid item xs={12} md={6} key={req.id}>
+                  <Paper sx={{ p: 2 }}>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Avatar>{initial}</Avatar>
+                      <Box flexGrow={1}>
+                        <Typography variant="h6">{name}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Bewerber
+                        </Typography>
+                        {req.motivation && (
+                          <Typography variant="body2" mt={1}>
+                            {req.motivation}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          size="small"
+                          color="success"
+                          onClick={() => handleDecision(req.id, true)}
+                        >
+                          Annehmen
+                        </Button>
+                        <Button
+                          size="small"
+                          color="error"
+                          onClick={() => handleDecision(req.id, false)}
+                        >
+                          Ablehnen
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </Box>
+      )}
 
+      <Typography variant="h5" gutterBottom>
+        Mitglieder
+      </Typography>
       <Grid container spacing={3}>
         {members.map((member) => {
           const name =
@@ -123,6 +237,9 @@ export const Members = () => {
                   <Avatar>{initial}</Avatar>
                   <Box flexGrow={1}>
                     <Typography variant="h6">{name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Mitglied
+                    </Typography>
                     {isAdminView && (
                       <Typography variant="body2" color="text.secondary">
                         {member.username}

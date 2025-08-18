@@ -13,6 +13,7 @@ export const GroupDetails = () => {
   const [group, setGroup] = useState<Jamiah | null>(null);
   const { user } = useAuth();
   const [cycleStarted, setCycleStarted] = useState(false);
+  const [status, setStatus] = useState<"member" | "applicant" | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -24,6 +25,27 @@ export const GroupDetails = () => {
       })
       .catch(() => setGroup(null));
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !user) return;
+    fetch(`${API_BASE_URL}/api/jamiahs/${id}/members`)
+      .then(res => res.json())
+      .then((ms: any[]) => {
+        if (ms.some(m => m.uid === user.uid)) {
+          setStatus("member");
+        } else {
+          fetch(`${API_BASE_URL}/api/jamiahs/${id}/join-public/status?uid=${user.uid}`)
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+              if (data?.status === "PENDING") {
+                setStatus("applicant");
+              }
+            })
+            .catch(() => undefined);
+        }
+      })
+      .catch(() => undefined);
+  }, [id, user]);
 
   return (
     <Box p={4} maxWidth={600} mx="auto">
@@ -69,8 +91,19 @@ export const GroupDetails = () => {
             </Box>
           )}
           <Box mt={3}>
-            {group.isPublic ? (
-              <Button variant="contained" disabled={group.maxMembers !== undefined && group.currentMembers !== undefined && group.currentMembers >= group.maxMembers}>
+            {status === "applicant" ? (
+              <Typography color="textSecondary">Status: Bewerber</Typography>
+            ) : status === "member" ? (
+              <Typography color="textSecondary">Status: Mitglied</Typography>
+            ) : group.isPublic ? (
+              <Button
+                variant="contained"
+                disabled={
+                  group.maxMembers !== undefined &&
+                  group.currentMembers !== undefined &&
+                  group.currentMembers >= group.maxMembers
+                }
+              >
                 Jetzt bewerben
               </Button>
             ) : (
