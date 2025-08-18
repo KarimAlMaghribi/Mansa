@@ -60,8 +60,21 @@ export const Members = () => {
     if (!groupId) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/members`)
       .then((res) => res.json())
-      .then(setMembers)
-      .catch(() => setMembers([]));
+      .then((data: Member[]) => {
+        data.forEach((m) => {
+          const name =
+            `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim() ||
+            m.username ||
+            m.uid ||
+            m.id;
+          console.log(`[members] ${name} erscheint als Mitglied`);
+        });
+        setMembers(data);
+      })
+      .catch(() => {
+        console.log("[members] Fehler beim Laden der Mitglieder");
+        setMembers([]);
+      });
   };
 
   useEffect(() => {
@@ -86,9 +99,21 @@ export const Members = () => {
             }
           }),
         );
+        enriched.forEach((jr) => {
+          const name =
+            `${jr.firstName ?? ""} ${jr.lastName ?? ""}`.trim() ||
+            jr.username ||
+            jr.userUid;
+          console.log(
+            `[members] ${name} Bewerbungsstatus: ${jr.status} (noch kein Mitglied)`,
+          );
+        });
         setJoinRequests(enriched);
       })
-      .catch(() => setJoinRequests([]));
+      .catch(() => {
+        console.log("[members] Fehler beim Laden der Bewerbungen");
+        setJoinRequests([]);
+      });
   };
 
   useEffect(() => {

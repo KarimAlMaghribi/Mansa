@@ -14,6 +14,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -329,6 +331,25 @@ public class JamiahService {
         Jamiah base = getByPublicId(publicId);
         Jamiah withMembers = repository.findWithMembersById(base.getId())
                 .orElse(base);
+        java.util.List<JamiahJoinRequest> requests = joinRequestRepository.findByJamiah(withMembers);
+        Map<Long, JamiahJoinRequest.Status> statusByUserId = new HashMap<>();
+        for (JamiahJoinRequest req : requests) {
+            if (req.getUser() != null && req.getUser().getId() != null) {
+                statusByUserId.put(req.getUser().getId(), req.getStatus());
+            }
+        }
+
+        for (com.example.backend.UserProfile member : withMembers.getMembers()) {
+            JamiahJoinRequest.Status status = statusByUserId.get(member.getId());
+            if (status != null) {
+                log.info("User {} returned as member; join request status: {}", member.getUid(), status);
+            } else if (withMembers.getOwnerId() != null && withMembers.getOwnerId().equals(member.getUid())) {
+                log.info("User {} returned as member; reason: owner", member.getUid());
+            } else {
+                log.info("User {} returned as member; reason: directly added", member.getUid());
+            }
+        }
+
         return new java.util.ArrayList<>(withMembers.getMembers());
     }
 
