@@ -76,7 +76,7 @@ export const SearchPage = () => {
   const submitJoinRequest = () => {
     if (!selectedGroup) return;
     const uid = auth.currentUser?.uid || '';
-    fetch(`${API_BASE_URL}/api/jamiahs/${selectedGroup.id}/join-public`, {
+    fetch(`${API_BASE_URL}/api/jamiahs/${selectedGroup.id}/join-public/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ uid, motivation })

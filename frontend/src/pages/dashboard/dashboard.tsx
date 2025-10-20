@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Grid,
@@ -21,6 +21,17 @@ import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
 import CheckIcon from '@mui/icons-material/Check';
 import { auth } from '../../firebase_config';
+import { useAuth } from '../../context/AuthContext';
+
+interface JoinRequest {
+  id: number;
+  userUid: string;
+  status: string;
+  motivation?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+}
 
 export const Dashboard = () => {
   const { groupId } = useParams();
@@ -29,7 +40,57 @@ export const Dashboard = () => {
   const [cycle, setCycle] = useState<any | null>(null);
   const [payments, setPayments] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+  const { user } = useAuth();
   const votePageLink = groupId ? `/jamiah/${groupId}/votes` : '/groups';
+
+  const currentUid = user?.uid ?? auth.currentUser?.uid ?? null;
+
+  const loadMembers = useCallback(async () => {
+    if (!groupId) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/members`);
+      if (!res.ok) throw new Error('failed to load members');
+      const data = await res.json();
+      setMembers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('[dashboard] Fehler beim Laden der Mitglieder', error);
+      setMembers([]);
+    }
+  }, [groupId]);
+
+  const loadJoinRequests = useCallback(async (ownerUid: string) => {
+    if (!groupId) return;
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/jamiahs/${groupId}/join-requests?uid=${ownerUid}`
+      );
+      if (!res.ok) throw new Error('failed to load join requests');
+      const data: JoinRequest[] = await res.json();
+      const enriched = await Promise.all(
+        data.map(async (request) => {
+          try {
+            const profileRes = await fetch(
+              `${API_BASE_URL}/api/userProfiles/uid/${request.userUid}`
+            );
+            if (!profileRes.ok) throw new Error('profile not found');
+            const profile = await profileRes.json();
+            return { ...request, ...profile };
+          } catch (profileError) {
+            console.warn(
+              `[dashboard] Profil konnte nicht geladen werden für ${request.userUid}`,
+              profileError
+            );
+            return request;
+          }
+        })
+      );
+      setJoinRequests(enriched);
+    } catch (error) {
+      console.error('[dashboard] Fehler beim Laden der Bewerbungen', error);
+      setJoinRequests([]);
+    }
+  }, [groupId]);
 
   useEffect(() => {
     if (!groupId) return;
@@ -38,10 +99,7 @@ export const Dashboard = () => {
       .then(data => setJamiah(data))
       .catch(() => setJamiah(null));
 
-    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/members`)
-      .then(res => res.ok ? res.json() : Promise.reject())
-      .then(data => setMembers(Array.isArray(data) ? data : []))
-      .catch(() => setMembers([]));
+    void loadMembers();
 
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles`)
       .then(res => res.ok ? res.json() : Promise.reject())
@@ -60,9 +118,47 @@ export const Dashboard = () => {
         }
       })
       .catch(() => setCycle(null));
-  }, [groupId]);
+  }, [groupId, loadMembers]);
 
-  const stats = [
+  const isOwner = useMemo(
+    () => Boolean(jamiah && currentUid && jamiah.ownerId === currentUid),
+    [jamiah, currentUid]
+  );
+
+  useEffect(() => {
+    if (!isOwner || !currentUid) {
+      setJoinRequests([]);
+      return;
+    }
+    void loadJoinRequests(currentUid);
+  }, [isOwner, currentUid, loadJoinRequests]);
+
+  const handleDecision = useCallback(
+    async (requestId: number, accept: boolean) => {
+      if (!groupId || !currentUid) return;
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/api/jamiahs/${groupId}/join-requests/${requestId}?uid=${currentUid}&accept=${accept}`,
+          { method: 'POST' }
+        );
+        if (!res.ok) throw new Error('decision failed');
+        await loadJoinRequests(currentUid);
+        if (accept) {
+          await loadMembers();
+        }
+      } catch (error) {
+        console.error('[dashboard] Entscheidung für Beitrittsanfrage fehlgeschlagen', error);
+      }
+    },
+    [groupId, currentUid, loadJoinRequests, loadMembers]
+  );
+
+  const pendingRequests = useMemo(
+    () => joinRequests.filter((request) => request.status === 'PENDING'),
+    [joinRequests]
+  );
+
+  const stats = useMemo(() => [
     {
       label: 'Meine Jamiahs',
       value: 3,
@@ -83,11 +179,11 @@ export const Dashboard = () => {
     },
     {
       label: 'Offene Anträge',
-      value: 2,
+      value: pendingRequests.length,
       href: votePageLink,
       tooltip: 'Anträge, über die aktuell abgestimmt wird.'
     }
-  ];
+  ], [pendingRequests.length, votePageLink]);
 
   const recentVotes = [
     { title: 'Neuer Vorstand ab Juli', status: 'Läuft' },
@@ -135,6 +231,71 @@ export const Dashboard = () => {
               </Grid>
           ))}
         </Grid>
+
+        {isOwner && (
+          <Box mb={4}>
+            <Typography variant="h5" fontWeight="bold" gutterBottom>
+              Beitrittsanfragen
+            </Typography>
+            {pendingRequests.length === 0 ? (
+              <Paper sx={{ p: 3 }}>
+                <Typography>
+                  Aktuell liegen keine offenen Beitrittsanfragen vor.
+                </Typography>
+              </Paper>
+            ) : (
+              <Stack spacing={2}>
+                {pendingRequests.map((request) => {
+                  const displayName = (
+                    `${request.firstName ?? ''} ${request.lastName ?? ''}`.trim() ||
+                    request.username ||
+                    request.userUid
+                  );
+                  return (
+                    <Paper key={request.id} sx={{ p: 2 }}>
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={2}
+                        justifyContent="space-between"
+                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                      >
+                        <Box>
+                          <Typography variant="subtitle1">{displayName}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Möchte der Jamiah beitreten
+                          </Typography>
+                          {request.motivation && (
+                            <Typography variant="body2" mt={1}>
+                              {request.motivation}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            color="success"
+                            variant="contained"
+                            onClick={() => handleDecision(request.id, true)}
+                          >
+                            Annehmen
+                          </Button>
+                          <Button
+                            size="small"
+                            color="error"
+                            variant="contained"
+                            onClick={() => handleDecision(request.id, false)}
+                          >
+                            Ablehnen
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            )}
+          </Box>
+        )}
 
         {jamiah && cycle && (
           <Box mb={4}>
