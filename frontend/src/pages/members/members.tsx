@@ -6,8 +6,6 @@ import {
   Grid,
   Paper,
   Button,
-  Switch,
-  FormControlLabel,
   Avatar,
   Stack,
   IconButton,
@@ -48,13 +46,14 @@ interface JoinRequest {
 
 export const Members = () => {
   const { groupId } = useParams();
-  const [isAdminView, setIsAdminView] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const dispatch: AppDispatch = useDispatch();
   const chats: Chat[] = useSelector(selectChats);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const userUid = user?.uid;
 
   const fetchMembers = () => {
     if (!groupId) return;
@@ -117,20 +116,23 @@ export const Members = () => {
   };
 
   useEffect(() => {
-    if (isAdminView) {
-      fetchJoinRequests();
-    }
-  }, [groupId, isAdminView]);
-
-  useEffect(() => {
     if (!groupId) return;
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}`)
       .then(res => res.json())
       .then(g => {
-        setIsAdminView(user?.uid === g.ownerId);
+        const userIsOwner = userUid === g.ownerId;
+        setIsAdmin(userIsOwner);
+        if (userIsOwner) {
+          fetchJoinRequests();
+        } else {
+          setJoinRequests([]);
+        }
       })
-      .catch(() => setIsAdminView(false));
-  }, [groupId, user]);
+      .catch(() => {
+        setIsAdmin(false);
+        setJoinRequests([]);
+      });
+  }, [groupId, userUid]);
 
   const handleDecision = (requestId: number, accept: boolean) => {
     const uid = auth.currentUser?.uid;
@@ -196,17 +198,11 @@ export const Members = () => {
         <Typography variant="h4" fontWeight="bold">
           Mitgliederbereich
         </Typography>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={isAdminView}
-              onChange={() => setIsAdminView(!isAdminView)}
-            />
-          }
-          label={isAdminView ? "Admin-Modus" : "Mitgliedsansicht"}
-        />
+        <Typography variant="body1" color="text.secondary">
+          {isAdmin ? "Admin-Ansicht" : "Mitgliedsansicht"}
+        </Typography>
       </Box>
-      {isAdminView && joinRequests.length > 0 && (
+      {isAdmin && joinRequests.length > 0 && (
         <Box mb={4}>
           <Typography variant="h5" gutterBottom>
             Bewerber
@@ -277,13 +273,13 @@ export const Members = () => {
                     <Typography variant="body2" color="text.secondary">
                       Mitglied
                     </Typography>
-                    {isAdminView && (
+                    {isAdmin && (
                       <Typography variant="body2" color="text.secondary">
                         {member.username}
                       </Typography>
                     )}
                   </Box>
-                  {isAdminView ? (
+                  {isAdmin ? (
                     <Stack direction="row" spacing={1}>
                       <Button size="small" startIcon={<EditIcon />}>
                         Bearbeiten

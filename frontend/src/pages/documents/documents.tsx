@@ -1,14 +1,42 @@
 import React from 'react';
 import {
-  Box, Typography, Paper, List, ListItem, ListItemText, Button, Divider, Stack,
-  Switch, FormControlLabel, IconButton
+  Box,
+  Typography,
+  Paper,
+  List,
+  ListItem,
+  ListItemText,
+  Button,
+  Divider,
+  Stack,
+  IconButton,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
+import { useParams } from 'react-router-dom';
+import { API_BASE_URL } from '../../constants/api';
+import { useAuth } from '../../context/AuthContext';
 
 export const Documents = () => {
-  const [isAdminView, setIsAdminView] = React.useState(true);
+  const [isAdmin, setIsAdmin] = React.useState(false);
+  const { groupId } = useParams();
+  const { user } = useAuth();
+  const userUid = user?.uid;
+
+  React.useEffect(() => {
+    if (!groupId || !userUid) {
+      setIsAdmin(false);
+      return;
+    }
+
+    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}`)
+      .then((res) => res.json())
+      .then((jamiah) => {
+        setIsAdmin(jamiah.ownerId === userUid);
+      })
+      .catch(() => setIsAdmin(false));
+  }, [groupId, userUid]);
 
   const allDocuments = [
     { name: 'Satzung Jamiah Berlin.pdf', owner: 'Admin', date: '01.01.2025' },
@@ -16,9 +44,9 @@ export const Documents = () => {
     { name: 'Protokoll März.pdf', owner: 'Admin', date: '15.03.2025' },
   ];
 
-  const memberName = 'Amina Yusuf';
+  const memberName = user?.displayName || user?.email || 'Amina Yusuf';
 
-  const visibleDocs = isAdminView
+  const visibleDocs = isAdmin
       ? allDocuments
       : allDocuments.filter(doc => doc.owner === 'Admin' || doc.owner === memberName);
 
@@ -26,18 +54,12 @@ export const Documents = () => {
       <Box p={4}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
           <Typography variant="h4" fontWeight="bold">Dokumente</Typography>
-          <FormControlLabel
-              control={
-                <Switch
-                    checked={isAdminView}
-                    onChange={() => setIsAdminView(!isAdminView)}
-                />
-              }
-              label={isAdminView ? "Admin-Modus" : "Mitgliedsansicht"}
-          />
+          <Typography variant="body1" color="text.secondary">
+            {isAdmin ? 'Admin-Ansicht' : 'Mitgliedsansicht'}
+          </Typography>
         </Box>
 
-        {isAdminView && (
+        {isAdmin && (
             <Box mb={3}>
               <Button variant="contained" startIcon={<UploadFileIcon />}>
                 Dokument hochladen
@@ -55,7 +77,7 @@ export const Documents = () => {
                           <IconButton edge="end">
                             <DownloadIcon />
                           </IconButton>
-                          {isAdminView && (
+                          {isAdmin && (
                               <IconButton edge="end" color="error">
                                 <DeleteIcon />
                               </IconButton>
@@ -65,7 +87,7 @@ export const Documents = () => {
                   >
                     <ListItemText
                         primary={doc.name}
-                        secondary={`Hochgeladen am ${doc.date} ${isAdminView ? `| Eigentümer: ${doc.owner}` : ''}`}
+                        secondary={`Hochgeladen am ${doc.date} ${isAdmin ? `| Eigentümer: ${doc.owner}` : ''}`}
                     />
                   </ListItem>
                   {i < visibleDocs.length - 1 && <Divider />}
