@@ -305,7 +305,7 @@ public class JamiahService {
      * Retrieve all join requests for the specified user.
      */
     public List<JoinRequestDto> getJoinRequestsForUser(String uid) {
-        return joinRequestRepository.findByUserUid(uid).stream()
+        return joinRequestRepository.findByUser_Uid(uid).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }

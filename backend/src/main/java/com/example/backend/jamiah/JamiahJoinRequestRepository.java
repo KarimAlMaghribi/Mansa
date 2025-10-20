@@ -8,5 +8,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface JamiahJoinRequestRepository extends JpaRepository<JamiahJoinRequest, Long> {
     Optional<JamiahJoinRequest> findByJamiahAndUser(Jamiah jamiah, com.example.backend.UserProfile user);
     List<JamiahJoinRequest> findByJamiah(Jamiah jamiah);
-    List<JamiahJoinRequest> findByUserUid(String uid);
+    List<JamiahJoinRequest> findByUser_Uid(String uid);
 }
