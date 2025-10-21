@@ -2,160 +2,304 @@ package com.example.backend.jamiah;
 
 import com.example.backend.UserProfile;
 import com.example.backend.UserProfileRepository;
-import com.example.backend.jamiah.dto.PaymentDto;
 import com.example.backend.jamiah.dto.CycleSummaryDto;
+import com.example.backend.jamiah.dto.PaymentConfirmationDto;
+import com.example.backend.jamiah.dto.PaymentDto;
+import com.example.backend.jamiah.dto.RoundDto;
+import com.example.backend.jamiah.dto.WalletDto;
+import com.example.backend.payment.StripePaymentProvider;
+import com.example.backend.wallet.Wallet;
+import com.example.backend.wallet.WalletRepository;
+import com.stripe.exception.StripeException;
+import com.stripe.model.PaymentIntent;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 @Transactional
 public class PaymentService {
+    private static final String STRIPE_SUCCESS_STATUS = "succeeded";
+    private static final String DEFAULT_CURRENCY = "eur";
+
     private final JamiahPaymentRepository paymentRepository;
     private final JamiahCycleRepository cycleRepository;
     private final JamiahRepository jamiahRepository;
     private final UserProfileRepository userRepository;
+    private final StripePaymentProvider stripePaymentProvider;
+    private final WalletRepository walletRepository;
+    private final String publishableKey;
 
     public PaymentService(JamiahPaymentRepository paymentRepository,
                           JamiahCycleRepository cycleRepository,
                           JamiahRepository jamiahRepository,
-                          UserProfileRepository userRepository) {
+                          UserProfileRepository userRepository,
+                          StripePaymentProvider stripePaymentProvider,
+                          WalletRepository walletRepository,
+                          @Value("${stripe.publishable-key:}") String publishableKey) {
         this.paymentRepository = paymentRepository;
         this.cycleRepository = cycleRepository;
         this.jamiahRepository = jamiahRepository;
         this.userRepository = userRepository;
+        this.stripePaymentProvider = stripePaymentProvider;
+        this.walletRepository = walletRepository;
+        this.publishableKey = publishableKey;
     }
 
-    public PaymentDto confirmPayment(String jamiahPublicId,
-                                     Long cycleId,
-                                     String payerUid,
-                                     BigDecimal amount,
-                                     String callerUid) {
-        if (callerUid == null || !callerUid.equals(payerUid)) {
+    public RoundDto getRound(String jamiahPublicId, Long cycleId, String callerUid) {
+        if (callerUid == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         JamiahCycle cycle = cycleRepository.findById(cycleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        Long jamiahId = cycle.getJamiah().getId();
-        // verify jamiah id matches path
-        ensureMatchesPublicId(jamiahId, jamiahPublicId);
-        // recipient does not pay in own round
-        if (cycle.getRecipient() != null && payerUid.equals(cycle.getRecipient().getUid())) {
+        Jamiah jamiah = ensureMatchesPublicId(cycle.getJamiah().getId(), jamiahPublicId);
+        Jamiah jamiahWithMembers = jamiahRepository.findWithMembersById(jamiah.getId()).orElse(jamiah);
+        ensureMembership(callerUid, jamiahWithMembers);
+        List<JamiahPayment> payments = ensurePaymentsForCycle(jamiahWithMembers, cycle);
+        Map<String, UserProfile> users = loadUsers(payments, cycle);
+        return buildRoundDto(cycle, jamiahWithMembers, payments, users);
+    }
+
+    public PaymentDto initiatePayment(Long paymentId, String callerUid) {
+        if (callerUid == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        JamiahPayment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!callerUid.equals(payment.getPayerUid())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        JamiahCycle cycle = cycleRepository.findById(payment.getCycleId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (cycle.getRecipient() != null && callerUid.equals(cycle.getRecipient().getUid())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipient can't pay in own round");
         }
-        // payer must be a member of the jamiah
-        Jamiah jamiah = jamiahRepository.findWithMembersById(jamiahId)
+        Jamiah jamiah = jamiahRepository.findById(cycle.getJamiah().getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        boolean isMember = jamiah.getMembers().stream()
-                .anyMatch(m -> m.getUid().equals(payerUid));
-        if (!isMember) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
-        // amount must match jamiah rate
-        BigDecimal expected = jamiah.getRateAmount();
-        if (expected == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rate not configured");
-        }
-        if (amount == null) {
-            amount = expected;
-        }
-        if (expected.compareTo(amount) != 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid amount");
-        }
-        Optional<JamiahPayment> existing = paymentRepository
-                .findByJamiahIdAndCycleIdAndPayerUid(jamiahId, cycleId, payerUid);
-        JamiahPayment payment;
-        if (existing.isPresent()) {
-            payment = existing.get();
-            if (Boolean.FALSE.equals(payment.getConfirmed())) {
-                payment.setAmount(amount);
-                payment.setConfirmed(true);
-                payment.setPaidAt(Instant.now());
+        Jamiah jamiahWithMembers = jamiahRepository.findWithMembersById(jamiah.getId()).orElse(jamiah);
+        ensureMembership(callerUid, jamiahWithMembers);
+        BigDecimal expectedAmount = requireRateAmount(jamiahWithMembers);
+
+        PaymentIntent paymentIntent;
+        try {
+            if (payment.getStripePaymentIntentId() != null) {
+                paymentIntent = stripePaymentProvider.retrievePaymentIntent(payment.getStripePaymentIntentId());
+                Long stripeAmount = paymentIntent.getAmount();
+                long expectedStripeAmount = toStripeAmount(expectedAmount);
+                if (stripeAmount == null || stripeAmount != expectedStripeAmount) {
+                    Map<String, Object> params = new HashMap<>();
+                    params.put("amount", expectedStripeAmount);
+                    paymentIntent = stripePaymentProvider.updatePaymentIntent(payment.getStripePaymentIntentId(), params);
+                }
+            } else {
+                Map<String, Object> params = new HashMap<>();
+                params.put("amount", toStripeAmount(expectedAmount));
+                params.put("currency", DEFAULT_CURRENCY);
+                Map<String, Object> automatic = new HashMap<>();
+                automatic.put("enabled", true);
+                params.put("automatic_payment_methods", automatic);
+                Map<String, String> metadata = new HashMap<>();
+                metadata.put("jamiahId", jamiah.getId().toString());
+                metadata.put("cycleId", cycle.getId().toString());
+                metadata.put("payerUid", callerUid);
+                params.put("metadata", metadata);
+                if (jamiah.getName() != null) {
+                    params.put("description", String.format("Jamiah %s – Runde %d", jamiah.getName(), cycle.getCycleNumber()));
+                }
+                paymentIntent = stripePaymentProvider.createPaymentIntent(params);
+                payment.setStripePaymentIntentId(paymentIntent.getId());
+                payment.setAmount(expectedAmount);
                 paymentRepository.save(payment);
             }
-            return toDto(payment);
+        } catch (StripeException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
         }
-        payment = new JamiahPayment();
-        payment.setJamiahId(jamiahId);
-        payment.setCycleId(cycleId);
-        payment.setPayerUid(payerUid);
-        payment.setAmount(amount);
-        payment.setConfirmed(true);
-        payment.setPaidAt(Instant.now());
-        JamiahPayment saved = paymentRepository.save(payment);
-        return toDto(saved);
+
+        if (payment.getAmount() == null || payment.getAmount().compareTo(expectedAmount) != 0) {
+            payment.setAmount(expectedAmount);
+            paymentRepository.save(payment);
+        }
+        UserProfile payer = userRepository.findByUid(payment.getPayerUid()).orElse(null);
+        PaymentDto dto = toDto(payment, payer, expectedAmount);
+        dto.setStripePaymentIntentId(paymentIntent.getId());
+        dto.setClientSecret(paymentIntent.getClientSecret());
+        dto.setPublishableKey(publishableKey);
+        return dto;
     }
 
-    public PaymentDto confirmReceipt(String jamiahPublicId,
-                                     Long cycleId,
-                                     Long paymentId,
-                                     String recipientUid,
-                                     String callerUid) {
-        if (callerUid == null || !callerUid.equals(recipientUid)) {
+    public PaymentConfirmationDto confirmPayment(Long paymentId, String callerUid) {
+        if (callerUid == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        JamiahPayment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!callerUid.equals(payment.getPayerUid())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        JamiahCycle cycle = cycleRepository.findById(payment.getCycleId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (cycle.getRecipient() != null && callerUid.equals(cycle.getRecipient().getUid())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipient can't pay in own round");
+        }
+        Jamiah jamiah = jamiahRepository.findById(cycle.getJamiah().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        Jamiah jamiahWithMembers = jamiahRepository.findWithMembersById(jamiah.getId()).orElse(jamiah);
+        ensureMembership(callerUid, jamiahWithMembers);
+        BigDecimal expectedAmount = requireRateAmount(jamiahWithMembers);
+        if (payment.getStripePaymentIntentId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment has not been initiated");
+        }
+
+        PaymentIntent paymentIntent;
+        try {
+            paymentIntent = stripePaymentProvider.retrievePaymentIntent(payment.getStripePaymentIntentId());
+        } catch (StripeException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
+        }
+        if (!STRIPE_SUCCESS_STATUS.equalsIgnoreCase(paymentIntent.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "PaymentIntent not completed");
+        }
+        Long stripeAmount = paymentIntent.getAmount();
+        if (stripeAmount == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stripe amount missing");
+        }
+        BigDecimal settledAmount = fromStripeAmount(stripeAmount);
+        if (expectedAmount.compareTo(settledAmount) != 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount mismatch");
+        }
+        if (paymentIntent.getCurrency() != null && !DEFAULT_CURRENCY.equalsIgnoreCase(paymentIntent.getCurrency())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported currency");
+        }
+
+        if (!Boolean.TRUE.equals(payment.getConfirmed())) {
+            payment.setAmount(expectedAmount);
+            payment.setConfirmed(true);
+            payment.setPaidAt(Instant.now());
+            paymentRepository.save(payment);
+        }
+        UserProfile payer = userRepository.findByUid(callerUid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        Wallet wallet = walletRepository.findById(payer.getId()).orElseGet(() -> {
+            Wallet w = new Wallet();
+            w.setMemberId(payer.getId());
+            w.setMember(payer);
+            w.setBalance(BigDecimal.ZERO);
+            return w;
+        });
+        wallet.setMember(payer);
+        BigDecimal current = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
+        wallet.setBalance(current.add(expectedAmount));
+        wallet = walletRepository.save(wallet);
+
+        PaymentConfirmationDto confirmation = new PaymentConfirmationDto();
+        confirmation.setPayment(toDto(payment, payer, expectedAmount));
+        confirmation.setWallet(toWalletDto(wallet, payer));
+        return confirmation;
+    }
+
+    public RoundDto confirmReceipt(String jamiahPublicId, Long cycleId, String callerUid) {
+        if (callerUid == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         JamiahCycle cycle = cycleRepository.findById(cycleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        Jamiah jamiah = ensureMatchesPublicId(cycle.getJamiah().getId(), jamiahPublicId);
         if (cycle.getRecipient() == null || cycle.getRecipient().getUid() == null ||
                 !cycle.getRecipient().getUid().equals(callerUid)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        Long jamiahId = cycle.getJamiah().getId();
-        ensureMatchesPublicId(jamiahId, jamiahPublicId);
-        JamiahPayment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!payment.getJamiahId().equals(jamiahId) || !payment.getCycleId().equals(cycleId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        Jamiah jamiahWithMembers = jamiahRepository.findWithMembersById(jamiah.getId()).orElse(jamiah);
+        List<JamiahPayment> payments = ensurePaymentsForCycle(jamiahWithMembers, cycle);
+        boolean allPaid = payments.stream().allMatch(p -> Boolean.TRUE.equals(p.getConfirmed()));
+        if (!allPaid) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not all payments have been confirmed");
         }
-        if (payment.getPayerUid().equals(recipientUid)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
-        if (!Boolean.TRUE.equals(payment.getConfirmed())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
-        payment.setRecipientConfirmed(true);
-        payment.setRecipientConfirmedAt(Instant.now());
-        JamiahPayment saved = paymentRepository.save(payment);
-        maybeCompleteCycle(cycle);
-        return toDto(saved);
+        Instant now = Instant.now();
+        payments.forEach(payment -> {
+            payment.setRecipientConfirmed(true);
+            payment.setRecipientConfirmedAt(now);
+        });
+        paymentRepository.saveAll(payments);
+        cycle.setRecipientConfirmed(true);
+        cycle.setCompleted(true);
+        cycleRepository.save(cycle);
+        startNextRoundIfNeeded(cycle);
+        Map<String, UserProfile> users = loadUsers(payments, cycle);
+        return buildRoundDto(cycle, jamiahWithMembers, payments, users);
     }
 
-    public List<PaymentDto> getPayments(String jamiahPublicId,
-                                        Long cycleId,
-                                        String callerUid) {
-        JamiahCycle cycle = cycleRepository.findById(cycleId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        Long jamiahId = cycle.getJamiah().getId();
-        ensureMatchesPublicId(jamiahId, jamiahPublicId);
-        Jamiah jamiah = cycle.getJamiah();
-        boolean isOwner = jamiah.getOwnerId() != null && jamiah.getOwnerId().equals(callerUid);
-        boolean isRecipient = cycle.getRecipient() != null && cycle.getRecipient().getUid() != null
-                && cycle.getRecipient().getUid().equals(callerUid);
-        List<JamiahPayment> payments;
-        if (isOwner || isRecipient) {
-            payments = paymentRepository.findAllByJamiahIdAndCycleId(jamiahId, cycleId);
-        } else {
-            payments = paymentRepository.findByJamiahIdAndCycleIdAndPayerUid(jamiahId, cycleId, callerUid)
-                    .map(java.util.List::of)
-                    .orElse(java.util.Collections.emptyList());
+    public List<WalletDto> getWallets(String jamiahPublicId, String callerUid) {
+        if (callerUid == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        return payments.stream().map(this::toDto).collect(Collectors.toList());
+        Jamiah jamiah = findJamiahByPublicId(jamiahPublicId);
+        Jamiah jamiahWithMembers = jamiahRepository.findWithMembersById(jamiah.getId()).orElse(jamiah);
+        boolean isOwner = jamiah.getOwnerId() != null && jamiah.getOwnerId().equals(callerUid);
+        Optional<UserProfile> callerProfile = jamiahWithMembers.getMembers().stream()
+                .filter(member -> callerUid.equals(member.getUid())).findFirst();
+        if (!isOwner && callerProfile.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        if (!isOwner) {
+            Wallet wallet = callerProfile.map(member -> walletRepository.findById(member.getId()).orElseGet(() -> {
+                Wallet w = new Wallet();
+                w.setMemberId(member.getId());
+                w.setMember(member);
+                w.setBalance(BigDecimal.ZERO);
+                return w;
+            })).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+            WalletDto dto = toWalletDto(wallet, callerProfile.get());
+            return java.util.List.of(dto);
+        }
+        List<UserProfile> members = new ArrayList<>(jamiahWithMembers.getMembers());
+        if (members.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        List<Long> memberIds = members.stream()
+                .map(UserProfile::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        Map<Long, Wallet> wallets = walletRepository.findByMemberIdIn(memberIds).stream()
+                .collect(Collectors.toMap(Wallet::getMemberId, wallet -> wallet));
+        List<WalletDto> dtos = new ArrayList<>();
+        for (UserProfile member : members) {
+            Wallet wallet = wallets.get(member.getId());
+            if (wallet == null) {
+                wallet = new Wallet();
+                wallet.setMemberId(member.getId());
+                wallet.setMember(member);
+                wallet.setBalance(BigDecimal.ZERO);
+            }
+            dtos.add(toWalletDto(wallet, member));
+        }
+        dtos.sort(Comparator.comparing(WalletDto::getUsername, Comparator.nullsLast(String::compareToIgnoreCase)));
+        return dtos;
     }
 
     public List<CycleSummaryDto> getCycleSummaries(String jamiahPublicId, String callerUid) {
-        java.util.UUID uuid = null;
+        UUID uuid = null;
         try {
-            uuid = java.util.UUID.fromString(jamiahPublicId);
+            uuid = UUID.fromString(jamiahPublicId);
         } catch (IllegalArgumentException ignored) {
         }
-        Jamiah jamiah = (uuid != null ? jamiahRepository.findByPublicId(uuid) : java.util.Optional.<Jamiah>empty())
+        Jamiah jamiah = (uuid != null ? jamiahRepository.findByPublicId(uuid) : Optional.<Jamiah>empty())
                 .or(() -> jamiahRepository.findByLegacyPublicId(jamiahPublicId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (jamiah.getOwnerId() == null || !jamiah.getOwnerId().equals(callerUid)) {
@@ -163,67 +307,200 @@ public class PaymentService {
         }
         List<JamiahCycle> cycles = cycleRepository.findByJamiahId(jamiah.getId());
         return cycles.stream()
-                .sorted(java.util.Comparator.comparing(JamiahCycle::getCycleNumber))
+                .sorted(Comparator.comparing(JamiahCycle::getCycleNumber))
                 .map(cycle -> {
-            String recipientUid = cycle.getRecipient() != null ? cycle.getRecipient().getUid() : null;
-            long totalPayers = cycle.getMemberOrder() != null && !cycle.getMemberOrder().isEmpty()
-                    ? cycle.getMemberOrder().stream().filter(uid -> !uid.equals(recipientUid)).count()
-                    : jamiahRepository.countMembers(jamiah.getId()) - (recipientUid != null ? 1 : 0);
-            List<JamiahPayment> payments = paymentRepository
-                    .findAllByJamiahIdAndCycleId(jamiah.getId(), cycle.getId());
-            long paidCount = payments.stream()
-                    .filter(p -> Boolean.TRUE.equals(p.getConfirmed()) && !p.getPayerUid().equals(recipientUid))
-                    .count();
-            long receiptCount = payments.stream()
-                    .filter(p -> Boolean.TRUE.equals(p.getRecipientConfirmed()) && !p.getPayerUid().equals(recipientUid))
-                    .count();
-            CycleSummaryDto dto = new CycleSummaryDto();
-            dto.setId(cycle.getId());
-            dto.setCycleNumber(cycle.getCycleNumber());
-            dto.setStartDate(cycle.getStartDate());
-            dto.setCompleted(Boolean.TRUE.equals(cycle.getCompleted()));
-            dto.setRecipientUid(recipientUid);
-            dto.setTotalPayers((int) totalPayers);
-            dto.setPaidCount((int) paidCount);
-            dto.setReceiptCount((int) receiptCount);
-            return dto;
-        }).collect(Collectors.toList());
+                    String recipientUid = cycle.getRecipient() != null ? cycle.getRecipient().getUid() : null;
+                    long totalPayers = cycle.getMemberOrder() != null && !cycle.getMemberOrder().isEmpty()
+                            ? cycle.getMemberOrder().stream().filter(uid -> !Objects.equals(uid, recipientUid)).count()
+                            : jamiahRepository.countMembers(jamiah.getId()) - (recipientUid != null ? 1 : 0);
+                    List<JamiahPayment> payments = paymentRepository
+                            .findAllByJamiahIdAndCycleId(jamiah.getId(), cycle.getId());
+                    long paidCount = payments.stream()
+                            .filter(p -> Boolean.TRUE.equals(p.getConfirmed()) && !Objects.equals(p.getPayerUid(), recipientUid))
+                            .count();
+                    long receiptCount = payments.stream()
+                            .filter(p -> Boolean.TRUE.equals(p.getRecipientConfirmed()) && !Objects.equals(p.getPayerUid(), recipientUid))
+                            .count();
+                    CycleSummaryDto dto = new CycleSummaryDto();
+                    dto.setId(cycle.getId());
+                    dto.setCycleNumber(cycle.getCycleNumber());
+                    dto.setStartDate(cycle.getStartDate());
+                    dto.setCompleted(Boolean.TRUE.equals(cycle.getCompleted()));
+                    dto.setRecipientUid(recipientUid);
+                    dto.setTotalPayers((int) totalPayers);
+                    dto.setPaidCount((int) paidCount);
+                    dto.setReceiptCount((int) receiptCount);
+                    return dto;
+                }).collect(Collectors.toList());
     }
 
-    private PaymentDto toDto(JamiahPayment payment) {
+    private BigDecimal requireRateAmount(Jamiah jamiah) {
+        if (jamiah.getRateAmount() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rate not configured");
+        }
+        return jamiah.getRateAmount();
+    }
+
+    private RoundDto buildRoundDto(JamiahCycle cycle,
+                                   Jamiah jamiah,
+                                   List<JamiahPayment> payments,
+                                   Map<String, UserProfile> users) {
+        RoundDto dto = new RoundDto();
+        dto.setId(cycle.getId());
+        dto.setCycleNumber(cycle.getCycleNumber());
+        dto.setStartDate(cycle.getStartDate());
+        dto.setCompleted(Boolean.TRUE.equals(cycle.getCompleted()));
+        dto.setReceiptConfirmed(Boolean.TRUE.equals(cycle.getRecipientConfirmed()));
+        dto.setExpectedAmount(jamiah.getRateAmount());
+        RoundDto.Recipient recipientDto = new RoundDto.Recipient();
+        if (cycle.getRecipient() != null) {
+            String recipientUid = cycle.getRecipient().getUid();
+            recipientDto.setUid(recipientUid);
+            UserProfile profile = users.getOrDefault(recipientUid, cycle.getRecipient());
+            if (profile != null) {
+                recipientDto.setUsername(profile.getUsername());
+                recipientDto.setFirstName(profile.getFirstName());
+                recipientDto.setLastName(profile.getLastName());
+            }
+        }
+        dto.setRecipient(recipientDto);
+        List<String> order = cycle.getMemberOrder() != null ? cycle.getMemberOrder() : java.util.Collections.emptyList();
+        Map<String, Integer> orderIndex = new HashMap<>();
+        for (int i = 0; i < order.size(); i++) {
+            orderIndex.putIfAbsent(order.get(i), i);
+        }
+        payments.sort(Comparator.comparingInt(payment -> orderIndex.getOrDefault(payment.getPayerUid(), Integer.MAX_VALUE)));
+        List<PaymentDto> paymentDtos = payments.stream()
+                .map(payment -> toDto(payment, users.get(payment.getPayerUid()), jamiah.getRateAmount()))
+                .collect(Collectors.toList());
+        dto.setPayments(paymentDtos);
+        dto.setAllPaid(paymentDtos.stream().allMatch(paymentDto ->
+                paymentDto.getStatus() == PaymentDto.PaymentStatus.PAID_SELF_CONFIRMED
+                        || paymentDto.getStatus() == PaymentDto.PaymentStatus.RECEIPT_CONFIRMED));
+        return dto;
+    }
+
+    private Map<String, UserProfile> loadUsers(List<JamiahPayment> payments, JamiahCycle cycle) {
+        Set<String> uids = payments.stream()
+                .map(JamiahPayment::getPayerUid)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(HashSet::new));
+        if (cycle.getRecipient() != null && cycle.getRecipient().getUid() != null) {
+            uids.add(cycle.getRecipient().getUid());
+        }
+        if (uids.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        return userRepository.findByUidIn(uids).stream()
+                .collect(Collectors.toMap(UserProfile::getUid, profile -> profile));
+    }
+
+    private PaymentDto toDto(JamiahPayment payment, UserProfile user, BigDecimal defaultAmount) {
         PaymentDto dto = new PaymentDto();
         dto.setId(payment.getId());
         PaymentDto.UserRef ref = new PaymentDto.UserRef();
         ref.setUid(payment.getPayerUid());
+        if (user != null) {
+            ref.setUsername(user.getUsername());
+            ref.setFirstName(user.getFirstName());
+            ref.setLastName(user.getLastName());
+        }
         dto.setUser(ref);
         dto.setPaidAt(payment.getPaidAt());
-        dto.setAmount(payment.getAmount());
+        dto.setRecipientConfirmedAt(payment.getRecipientConfirmedAt());
+        dto.setAmount(payment.getAmount() != null ? payment.getAmount() : defaultAmount);
+        dto.setStripePaymentIntentId(payment.getStripePaymentIntentId());
         PaymentDto.PaymentStatus status = PaymentDto.PaymentStatus.UNPAID;
         if (Boolean.TRUE.equals(payment.getRecipientConfirmed())) {
             status = PaymentDto.PaymentStatus.RECEIPT_CONFIRMED;
         } else if (Boolean.TRUE.equals(payment.getConfirmed())) {
             status = PaymentDto.PaymentStatus.PAID_SELF_CONFIRMED;
+        } else if (payment.getStripePaymentIntentId() != null) {
+            status = PaymentDto.PaymentStatus.INITIATED;
         }
         dto.setStatus(status);
+        dto.setClientSecret(null);
+        dto.setPublishableKey(null);
         return dto;
     }
 
-    private void maybeCompleteCycle(JamiahCycle cycle) {
-        String recipientUid = cycle.getRecipient() != null ? cycle.getRecipient().getUid() : null;
-        long memberCount = cycle.getMemberOrder() != null && !cycle.getMemberOrder().isEmpty()
-                ? cycle.getMemberOrder().stream().filter(uid -> !uid.equals(recipientUid)).count()
-                : jamiahRepository.countMembers(cycle.getJamiah().getId()) - (recipientUid != null ? 1 : 0);
+    private WalletDto toWalletDto(Wallet wallet, UserProfile member) {
+        WalletDto dto = new WalletDto();
+        dto.setMemberId(member.getUid());
+        dto.setUsername(member.getUsername());
+        dto.setBalance(wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance());
+        dto.setLastUpdated(wallet.getUpdatedAt());
+        return dto;
+    }
+
+    private List<JamiahPayment> ensurePaymentsForCycle(Jamiah jamiah, JamiahCycle cycle) {
         List<JamiahPayment> payments = paymentRepository
-                .findAllByJamiahIdAndCycleId(cycle.getJamiah().getId(), cycle.getId());
-        boolean allConfirmed = payments.stream()
-                .filter(p -> !p.getPayerUid().equals(recipientUid))
-                .allMatch(p -> Boolean.TRUE.equals(p.getRecipientConfirmed()));
-        if (memberCount > 0 && allConfirmed && payments.stream()
-                .filter(p -> !p.getPayerUid().equals(recipientUid)).count() >= memberCount) {
-            cycle.setCompleted(true);
-            cycleRepository.save(cycle);
-            startNextRoundIfNeeded(cycle);
+                .findAllByJamiahIdAndCycleId(jamiah.getId(), cycle.getId());
+        Map<String, JamiahPayment> byUid = payments.stream()
+                .collect(Collectors.toMap(JamiahPayment::getPayerUid, payment -> payment, (existing, replacement) -> existing));
+        String recipientUid = cycle.getRecipient() != null ? cycle.getRecipient().getUid() : null;
+        List<String> order = cycle.getMemberOrder();
+        List<String> payerUids = new ArrayList<>();
+        if (order != null && !order.isEmpty()) {
+            payerUids.addAll(order);
+        } else {
+            payerUids.addAll(jamiah.getMembers().stream()
+                    .map(UserProfile::getUid)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList()));
         }
+        List<String> uniquePayers = payerUids.stream()
+                .filter(Objects::nonNull)
+                .filter(uid -> !Objects.equals(uid, recipientUid))
+                .distinct()
+                .collect(Collectors.toList());
+        boolean created = false;
+        for (String uid : uniquePayers) {
+            if (!byUid.containsKey(uid)) {
+                JamiahPayment newPayment = new JamiahPayment();
+                newPayment.setJamiahId(jamiah.getId());
+                newPayment.setCycleId(cycle.getId());
+                newPayment.setPayerUid(uid);
+                newPayment.setAmount(jamiah.getRateAmount());
+                paymentRepository.save(newPayment);
+                byUid.put(uid, newPayment);
+                created = true;
+            }
+        }
+        if (created) {
+            payments = paymentRepository.findAllByJamiahIdAndCycleId(jamiah.getId(), cycle.getId());
+        }
+        return payments;
+    }
+
+    private void ensureMembership(String uid, Jamiah jamiah) {
+        boolean isOwner = jamiah.getOwnerId() != null && jamiah.getOwnerId().equals(uid);
+        boolean isMember = jamiah.getMembers().stream().anyMatch(member -> uid.equals(member.getUid()));
+        if (!isOwner && !isMember) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private Jamiah ensureMatchesPublicId(Long jamiahId, String publicId) {
+        Jamiah jamiah = findJamiahByPublicId(publicId);
+        if (!jamiah.getId().equals(jamiahId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        return jamiah;
+    }
+
+    private Jamiah findJamiahByPublicId(String publicId) {
+        if (publicId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Jamiah id required");
+        }
+        UUID uuid = null;
+        try {
+            uuid = UUID.fromString(publicId);
+        } catch (IllegalArgumentException ignored) {
+        }
+        return (uuid != null ? jamiahRepository.findByPublicId(uuid) : Optional.<Jamiah>empty())
+                .or(() -> jamiahRepository.findByLegacyPublicId(publicId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     private void startNextRoundIfNeeded(JamiahCycle current) {
@@ -253,18 +530,15 @@ public class PaymentService {
         }
     }
 
-    private void ensureMatchesPublicId(Long jamiahId, String publicId) {
-        if (publicId == null) return;
-        java.util.UUID uuid = null;
+    private long toStripeAmount(BigDecimal amount) {
         try {
-            uuid = java.util.UUID.fromString(publicId);
-        } catch (IllegalArgumentException ignored) {
+            return amount.setScale(2, RoundingMode.HALF_UP).movePointRight(2).longValueExact();
+        } catch (ArithmeticException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid amount precision");
         }
-        Jamiah jamiah = (uuid != null ? jamiahRepository.findByPublicId(uuid) : java.util.Optional.<Jamiah>empty())
-                .or(() -> jamiahRepository.findByLegacyPublicId(publicId))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!jamiah.getId().equals(jamiahId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
+    }
+
+    private BigDecimal fromStripeAmount(Long amount) {
+        return BigDecimal.valueOf(amount).movePointLeft(2);
     }
 }

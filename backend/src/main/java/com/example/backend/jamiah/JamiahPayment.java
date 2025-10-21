@@ -35,4 +35,7 @@ public class JamiahPayment {
     private Boolean recipientConfirmed = false;
 
     private Instant recipientConfirmedAt;
+
+    @Column(name = "stripe_payment_intent_id")
+    private String stripePaymentIntentId;
 }
