@@ -2,14 +2,13 @@ package com.example.backend.jamiah;
 
 import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.JamiahCycle;
-import com.example.backend.jamiah.dto.PaymentDto;
 import com.example.backend.jamiah.PaymentService;
+import com.example.backend.jamiah.dto.RoundDto;
+import com.example.backend.jamiah.dto.WalletDto;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import java.math.BigDecimal;
-
 import java.util.List;
 
 @RestController
@@ -82,33 +81,23 @@ public class JamiahController {
         return service.getCycles(id);
     }
 
-    @PostMapping("/{id}/cycles/{cycleId}/pay")
-    public PaymentDto pay(@PathVariable String id,
-                          @PathVariable Long cycleId,
-                          @RequestParam String uid,
-                          @RequestParam BigDecimal amount) {
-        return paymentService.confirmPayment(id, cycleId, uid, amount, uid);
-    }
-
-    @GetMapping("/{id}/cycles/{cycleId}/payments")
-    public java.util.List<PaymentDto> payments(@PathVariable String id,
-                                               @PathVariable Long cycleId,
-                                               @RequestParam String uid) {
-        return paymentService.getPayments(id, cycleId, uid);
-    }
-
     @GetMapping("/{id}/cycles/summary")
     public java.util.List<com.example.backend.jamiah.dto.CycleSummaryDto> cycleSummary(@PathVariable String id,
                                                                                        @RequestParam String uid) {
         return paymentService.getCycleSummaries(id, uid);
     }
 
-    @PostMapping("/{id}/cycles/{cycleId}/payments/{paymentId}/confirm-receipt")
-    public PaymentDto confirmPaymentReceipt(@PathVariable String id,
-                                            @PathVariable Long cycleId,
-                                            @PathVariable Long paymentId,
-                                            @RequestParam String uid) {
-        return paymentService.confirmReceipt(id, cycleId, paymentId, uid, uid);
+    @GetMapping("/{id}/cycles/{cycleId}/round")
+    public RoundDto round(@PathVariable String id,
+                          @PathVariable Long cycleId,
+                          @RequestParam String uid) {
+        return paymentService.getRound(id, cycleId, uid);
+    }
+
+    @GetMapping("/{id}/wallets")
+    public java.util.List<WalletDto> wallets(@PathVariable String id,
+                                             @RequestParam String uid) {
+        return paymentService.getWallets(id, uid);
     }
 
     @PostMapping("/join")
