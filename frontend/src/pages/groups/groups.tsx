@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -31,10 +31,7 @@ import {
   IconButton,
   useMediaQuery,
   useTheme,
-  Fade,
-  Stepper,
-  Step,
-  StepLabel
+  Fade
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -44,31 +41,30 @@ import LockIcon from '@mui/icons-material/Lock';
 import CloseIcon from '@mui/icons-material/Close';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
-import { auth } from '../../firebase_config';
 import { useAuth } from '../../context/AuthContext';
 import { GenerateInviteButton } from '../../components/jamiah/GenerateInviteButton';
-import { StartCycleButton } from '../../components/jamiah/StartCycleButton';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../routing/routes';
 import { motion } from 'framer-motion';
 import dayjs from 'dayjs';
+import SettingsIcon from '@mui/icons-material/Settings';
+import { JamiahWizard } from '../../components/jamiah/JamiahWizard';
+import { JAMIAH_GROUPS_REFRESH_EVENT } from '../../constants/events';
+
+const DEFAULT_NEW_GROUP: Partial<Jamiah> = {
+  name: '',
+  description: '',
+  isPublic: false,
+  rateInterval: 'MONTHLY',
+};
 
 export const Groups = () => {
   const [groups, setGroups] = useState<Jamiah[]>([]);
   const [openModal, setOpenModal] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Jamiah | null>(null);
   const [openCreateModal, setOpenCreateModal] = useState(false);
-  const [newGroup, setNewGroup] = useState<Partial<Jamiah>>({
-    name: '',
-    description: '',
-    isPublic: false,
-    maxGroupSize: undefined,
-    cycleCount: undefined,
-    rateAmount: undefined,
-    rateInterval: 'MONTHLY',
-    startDate: undefined
-  });
-  const [createErrors, setCreateErrors] = useState<{ name?: boolean }>({});
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createWizardKey, setCreateWizardKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
@@ -79,11 +75,9 @@ export const Groups = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:600px)');
-  const steps = ['Name & Typ', 'Beitrag & Zyklus', 'Gruppengröße & Startdatum'];
-  const [activeStep, setActiveStep] = useState(0);
   const { user } = useAuth();
 
-  useEffect(() => {
+  const refreshGroups = useCallback(async () => {
     const uid = user?.uid;
     if (!uid) {
       setGroups([]);
@@ -91,20 +85,81 @@ export const Groups = () => {
       return;
     }
     setLoading(true);
-    fetch(`${API_BASE_URL}/api/userProfiles/uid/${uid}/jamiahs`)
-      .then(res => res.json())
-      .then(setGroups)
-      .catch(() => setGroups([]))
-      .finally(() => setLoading(false));
-  }, [user]);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/userProfiles/uid/${uid}/jamiahs`);
+      if (!res.ok) {
+        throw new Error('Failed to load groups');
+      }
+      const data = await res.json();
+      setGroups(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('[groups] Fehler beim Laden der Jamiahs', error);
+      setGroups([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    void refreshGroups();
+  }, [refreshGroups]);
+
+  useEffect(() => {
+    const handler = () => {
+      void refreshGroups();
+    };
+    window.addEventListener(JAMIAH_GROUPS_REFRESH_EVENT, handler);
+    return () => window.removeEventListener(JAMIAH_GROUPS_REFRESH_EVENT, handler);
+  }, [refreshGroups]);
 
 
   const navigate = useNavigate();
-  const handleCreateOpen = () => setOpenCreateModal(true);
+  const handleCreateOpen = () => {
+    setOpenCreateModal(true);
+  };
+  const handleCreateClose = () => {
+    setOpenCreateModal(false);
+    setCreateWizardKey(key => key + 1);
+  };
   const handleJoinOpen = () => navigate(`/${ROUTES.JOIN_JAMIAH}`);
   const handleCloseModal = () => setOpenModal(false);
   const handleDetails = (group: Jamiah) => {
     navigate(`/jamiah/${group.id}`);
+  };
+
+  const handleCreateJamiah = async (data: Partial<Jamiah>) => {
+    const payload = { ...DEFAULT_NEW_GROUP, ...data };
+    if (!payload.name || payload.name.trim().length === 0) {
+      throw new Error('Name ist erforderlich');
+    }
+    setCreateLoading(true);
+    try {
+      const uid = user?.uid;
+      const url = uid
+        ? `${API_BASE_URL}/api/jamiahs?uid=${encodeURIComponent(uid)}`
+        : `${API_BASE_URL}/api/jamiahs`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error('Jamiah konnte nicht erstellt werden');
+      }
+      const created = await response.json();
+      setSnackbarMessage('Erfolgreich erstellt');
+      setSnackbarError(false);
+      setSnackbarOpen(true);
+      handleCreateClose();
+      await refreshGroups();
+      return created;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Jamiah konnte nicht erstellt werden';
+      throw new Error(message);
+    } finally {
+      setCreateLoading(false);
+    }
   };
 
 
@@ -124,8 +179,6 @@ export const Groups = () => {
     const unit = g.rateInterval === 'WEEKLY' ? 'week' : 'month';
     return dayjs().diff(dayjs(g.startDate), unit) >= g.cycleCount;
   };
-
-  const joinedIds = new Set(groups.filter(g => g.id).map(g => g.id as string));
 
   useEffect(() => {
     setPage(1);
@@ -283,10 +336,16 @@ export const Groups = () => {
                           <GenerateInviteButton jamiahId={group.id} />
                         )}
                         {group.ownerId === user?.uid && !group.startDate && group.id && (
-                          <StartCycleButton
-                            jamiahId={group.id}
-                            onStarted={() => setGroups(gs => gs.map(g => g.id === group.id ? { ...g, startDate: new Date().toISOString() } : g))}
-                          />
+                          <Button
+                            size="small"
+                            variant="contained"
+                            fullWidth
+                            startIcon={<SettingsIcon />}
+                            onClick={() => navigate(`/jamiah/${group.id}/setup`)}
+                            sx={{ mt: 1, '&:focus': { outline: '2px solid', outlineColor: 'primary.main' } }}
+                          >
+                            Setup starten
+                          </Button>
                         )}
                      </CardActions>
                     </Card>
@@ -378,6 +437,20 @@ export const Groups = () => {
                 {!selectedGroup.isPublic && selectedGroup.id && (
                   <GenerateInviteButton jamiahId={selectedGroup.id} />
                 )}
+                {selectedGroup.ownerId === user?.uid && !selectedGroup.startDate && selectedGroup.id && (
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    startIcon={<SettingsIcon />}
+                    onClick={() => {
+                      setOpenModal(false);
+                      navigate(`/jamiah/${selectedGroup.id}/setup`);
+                    }}
+                    sx={{ '&:focus': { outline: '2px solid', outlineColor: 'primary.main' } }}
+                  >
+                    Setup öffnen
+                  </Button>
+                )}
                 <Button
                   variant="contained"
                   color="primary"
@@ -389,9 +462,9 @@ export const Groups = () => {
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify(selectedGroup)
                     })
-                      .then(res => {
+                      .then(async res => {
                         if (res.ok) {
-                          setGroups(groups.map(g => (g.id === selectedGroup.id ? selectedGroup : g)));
+                          await refreshGroups();
                           setSnackbarMessage('Erfolgreich gespeichert');
                           setSnackbarError(false);
                         } else {
@@ -416,10 +489,9 @@ export const Groups = () => {
                   onClick={() => {
                     fetch(`${API_BASE_URL}/api/jamiahs/${selectedGroup.id}`, {
                       method: 'DELETE'
-                    }).then(() => {
-                      setGroups(groups.filter(g => g.id !== selectedGroup.id));
-                      setOpenModal(false);
-                    });
+                    })
+                      .then(() => refreshGroups())
+                      .finally(() => setOpenModal(false));
                   }}
                 >
                   Löschen
@@ -430,169 +502,23 @@ export const Groups = () => {
         </Dialog>
 
         {/* Create Modal */}
-        <Dialog open={openCreateModal} onClose={() => setOpenCreateModal(false)} maxWidth="sm" fullWidth TransitionComponent={Fade}>
+        <Dialog open={openCreateModal} onClose={handleCreateClose} maxWidth="sm" fullWidth TransitionComponent={Fade}>
           <DialogTitle>
             Neue Jamiah gründen
-            <IconButton aria-label="Schließen" onClick={() => setOpenCreateModal(false)} sx={{ position: 'absolute', right: 8, top: 8 }}>
+            <IconButton aria-label="Schließen" onClick={handleCreateClose} sx={{ position: 'absolute', right: 8, top: 8 }}>
               <CloseIcon />
             </IconButton>
           </DialogTitle>
           <DialogContent sx={{ mt: 1 }}>
-            <Stepper activeStep={activeStep} sx={{ mb: 2 }}>
-              {steps.map(label => (
-                <Step key={label}>
-                  <StepLabel>{label}</StepLabel>
-                </Step>
-              ))}
-            </Stepper>
-            {activeStep === 0 && (
-              <Box display="flex" flexDirection="column" gap={2}>
-                <TextField
-                  label="Name der Jamiah"
-                  fullWidth
-                  required
-                  error={createErrors.name && !newGroup.name}
-                  helperText={createErrors.name && !newGroup.name ? 'Name erforderlich' : ''}
-                  value={newGroup.name}
-                  onChange={e => setNewGroup({ ...newGroup, name: e.target.value })}
-                />
-                <TextField
-                  select
-                  label="Typ"
-                  value={newGroup.isPublic ? 'public' : 'private'}
-                  onChange={e => setNewGroup({ ...newGroup, isPublic: e.target.value === 'public' })}
-                >
-                  <MenuItem value="private">Privat (nur mit Einladung)</MenuItem>
-                  <MenuItem value="public">Öffentlich (sichtbar für alle)</MenuItem>
-                </TextField>
-                <TextField
-                  label="Beschreibung"
-                  fullWidth
-                  multiline
-                  value={newGroup.description}
-                  onChange={e => setNewGroup({ ...newGroup, description: e.target.value })}
-                />
-              </Box>
-            )}
-            {activeStep === 1 && (
-              <Box display="flex" flexDirection="column" gap={2}>
-                <TextField
-                  label="Ratenhöhe"
-                  type="number"
-                  fullWidth
-                  value={newGroup.rateAmount ?? ''}
-                  inputProps={{ min: 1 }}
-                  onChange={e => setNewGroup({ ...newGroup, rateAmount: Number(e.target.value) })}
-                />
-                <TextField
-                  select
-                  label="Raten-Rhythmus"
-                  value={newGroup.rateInterval}
-                  onChange={e => setNewGroup({ ...newGroup, rateInterval: e.target.value as 'WEEKLY' | 'MONTHLY' })}
-                >
-                  <MenuItem value="WEEKLY">Wöchentlich</MenuItem>
-                  <MenuItem value="MONTHLY">Monatlich</MenuItem>
-                </TextField>
-                <TextField
-                  label="Anzahl Zyklen"
-                  type="number"
-                  fullWidth
-                  value={newGroup.cycleCount ?? ''}
-                  inputProps={{ min: 1 }}
-                  onChange={e => setNewGroup({ ...newGroup, cycleCount: Number(e.target.value) })}
-                />
-              </Box>
-            )}
-            {activeStep === 2 && (
-              <Box display="flex" flexDirection="column" gap={2}>
-                <TextField
-                  label="Maximale Gruppengröße"
-                  type="number"
-                  fullWidth
-                  value={newGroup.maxGroupSize ?? ''}
-                  inputProps={{ min: 2 }}
-                  onChange={e => setNewGroup({ ...newGroup, maxGroupSize: Number(e.target.value) })}
-                />
-                <TextField
-                  label="Startdatum"
-                  type="date"
-                  fullWidth
-                  InputLabelProps={{ shrink: true }}
-                  value={newGroup.startDate ?? ''}
-                  onChange={e => setNewGroup({ ...newGroup, startDate: e.target.value })}
-                />
-              </Box>
-            )}
-            <Typography variant="body2" sx={{ mt: 2 }}>
-              Schritt {activeStep + 1} von 3
-            </Typography>
+            <JamiahWizard
+              key={createWizardKey}
+              initialValue={DEFAULT_NEW_GROUP}
+              submitLabel="Jamiah erstellen"
+              onSubmit={handleCreateJamiah}
+              onCancel={handleCreateClose}
+              submitting={createLoading}
+            />
           </DialogContent>
-          <DialogActions sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 1 }}>
-            {activeStep > 0 && (
-              <Button variant="text" fullWidth onClick={() => setActiveStep(s => s - 1)} sx={{ mt: 1, '&:focus': { outline: '2px solid', outlineColor: 'primary.main' } }} aria-label="Zurück">
-                Zurück
-              </Button>
-            )}
-            {activeStep < steps.length - 1 ? (
-              <Button variant="contained" color="primary" fullWidth onClick={() => setActiveStep(s => s + 1)} sx={{ mt: 1, '&:focus': { outline: '2px solid', outlineColor: 'primary.main' } }} aria-label="Weiter">
-                Weiter
-              </Button>
-            ) : (
-              <Button
-                variant="contained"
-                color="primary"
-                fullWidth
-                onClick={() => {
-                  if (!newGroup.name) {
-                    setCreateErrors({ name: true });
-                    return;
-                  }
-                  const uid = user?.uid;
-                  const url = uid
-                    ? `${API_BASE_URL}/api/jamiahs?uid=${encodeURIComponent(uid)}`
-                    : `${API_BASE_URL}/api/jamiahs`;
-                  fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newGroup)
-                  })
-                    .then(res => res.json())
-                    .then(j => {
-                      setGroups([...groups, j]);
-                      setSnackbarMessage('Erfolgreich erstellt');
-                      setSnackbarError(false);
-                    })
-                    .catch(() => {
-                      setSnackbarMessage('Fehler beim Erstellen');
-                      setSnackbarError(true);
-                    })
-                    .finally(() => {
-                      setSnackbarOpen(true);
-                      setOpenCreateModal(false);
-                      setActiveStep(0);
-                      setCreateErrors({});
-                      setNewGroup({
-                        name: '',
-                        description: '',
-                        isPublic: false,
-                        maxGroupSize: undefined,
-                        cycleCount: undefined,
-                        rateAmount: undefined,
-                        rateInterval: 'MONTHLY',
-                        startDate: undefined
-                      });
-                    });
-                }}
-                sx={{ mt: 1, '&:focus': { outline: '2px solid', outlineColor: 'primary.main' } }}
-                aria-label="Erstellen"
-              >
-                Erstellen
-              </Button>
-            )}
-            <Button variant="text" fullWidth onClick={() => { setOpenCreateModal(false); setActiveStep(0); }} sx={{ mt: 1, '&:focus': { outline: '2px solid', outlineColor: 'primary.main' } }} aria-label="Abbrechen">
-              Abbrechen
-            </Button>
-          </DialogActions>
         </Dialog>
         <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={() => setSnackbarOpen(false)}>
           <Alert severity={snackbarError ? 'error' : 'success'} onClose={() => setSnackbarOpen(false)} sx={{ width: '100%' }}>

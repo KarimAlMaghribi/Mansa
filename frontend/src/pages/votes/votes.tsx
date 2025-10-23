@@ -9,9 +9,10 @@ import AddIcon from '@mui/icons-material/Add';
 import { API_BASE_URL } from '../../constants/api';
 import { auth } from '../../firebase_config';
 import { useParams } from 'react-router-dom';
-import { StartCycleButton } from '../../components/jamiah/StartCycleButton';
 import { Jamiah } from '../../models/Jamiah';
 import { useAuth } from '../../context/AuthContext';
+import SettingsIcon from '@mui/icons-material/Settings';
+import { useNavigate } from 'react-router-dom';
 
 interface Vote {
   id: number;
@@ -37,6 +38,7 @@ export const Votes = () => {
   const [cycleStarted, setCycleStarted] = useState(false);
   const { user } = useAuth();
   const { groupId } = useParams();
+  const navigate = useNavigate();
 
   const uid = auth.currentUser?.uid || '';
 
@@ -118,11 +120,14 @@ export const Votes = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" fontWeight="bold">Abstimmungen</Typography>
         <Stack direction="row" spacing={2}>
-          {jamiah && user?.uid === jamiah.ownerId && !cycleStarted && (jamiah.currentMembers || 0) >= 2 && (
-            <StartCycleButton
-              jamiahId={jamiah.id as string}
-              onStarted={() => setCycleStarted(true)}
-            />
+          {jamiah && user?.uid === jamiah.ownerId && !cycleStarted && (
+            <Button
+              variant="contained"
+              startIcon={<SettingsIcon />}
+              onClick={() => navigate(`/jamiah/${jamiah.id}/setup`)}
+            >
+              Setup starten
+            </Button>
           )}
           <Button
             startIcon={<AddIcon />}
