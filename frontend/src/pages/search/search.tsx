@@ -22,7 +22,6 @@ import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../routing/routes';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
-import { auth } from '../../firebase_config';
 import { useAuth } from '../../context/AuthContext';
 import { fetchJoinStatus, JoinRequestStatus } from '../../api/jamiah-status';
 
@@ -37,7 +36,8 @@ export const SearchPage = () => {
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Jamiah | null>(null);
   const [motivation, setMotivation] = useState('');
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const uid = user?.uid;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,7 +48,6 @@ export const SearchPage = () => {
   }, []);
 
   useEffect(() => {
-    const uid = user?.uid;
     if (!uid) {
       setMyGroups([]);
       setStatusMap({});
@@ -58,10 +57,9 @@ export const SearchPage = () => {
       .then(res => res.json())
       .then(setMyGroups)
       .catch(() => setMyGroups([]));
-  }, [user]);
+  }, [uid]);
 
   useEffect(() => {
-    const uid = user?.uid;
     if (!uid) {
       setStatusMap({});
       return;
@@ -87,7 +85,7 @@ export const SearchPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [publicGroups, user?.uid]);
+  }, [publicGroups, uid]);
 
   const joinedIds = useMemo(
     () => new Set(myGroups.filter(g => g.id).map(g => g.id as string)),
@@ -102,7 +100,12 @@ export const SearchPage = () => {
 
   const submitJoinRequest = () => {
     if (!selectedGroup) return;
-    const uid = auth.currentUser?.uid || '';
+    if (loading || !uid) {
+      setSnackbarMessage('Bitte warte, bis deine Benutzerkennung verfügbar ist.');
+      setSnackbarError(true);
+      setSnackbarOpen(true);
+      return;
+    }
     fetch(`${API_BASE_URL}/api/jamiahs/${selectedGroup.id}/join-public/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -131,7 +134,7 @@ export const SearchPage = () => {
   };
 
   const availablePublicGroups = publicGroups.filter(
-    pg => !joinedIds.has(pg.id as string) && pg.ownerId !== user?.uid
+    pg => !joinedIds.has(pg.id as string) && pg.ownerId !== uid
   );
 
   const filteredPublicGroups = availablePublicGroups.filter(pg =>
@@ -160,7 +163,7 @@ export const SearchPage = () => {
           const joined = joinedIds.has(pg.id as string) || rawStatus === 'accepted';
           const pending = rawStatus === 'pending';
           const rejected = rawStatus === 'rejected';
-          const isOwner = pg.ownerId === user?.uid;
+          const isOwner = pg.ownerId === uid;
           return (
             <Grid item xs={12} sm={6} md={4} key={pg.id}>
               <Card>
