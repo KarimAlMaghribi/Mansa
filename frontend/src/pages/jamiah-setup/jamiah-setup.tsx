@@ -13,6 +13,16 @@ export const JamiahSetup: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
 
+  const initialValue = useMemo(() => {
+    if (!jamiah) {
+      return {};
+    }
+    return {
+      ...jamiah,
+      startDate: jamiah.startDate ? jamiah.startDate.substring(0, 10) : undefined,
+    };
+  }, [jamiah]);
+
   if (!roles.isOwner) {
     return (
       <Box p={4}>
@@ -32,11 +42,6 @@ export const JamiahSetup: React.FC = () => {
   }
 
   const cycleStarted = Boolean(jamiah.startDate);
-
-  const initialValue = useMemo(() => ({
-    ...jamiah,
-    startDate: jamiah.startDate ? jamiah.startDate.substring(0, 10) : undefined,
-  }), [jamiah]);
 
   const handleSubmit = async (data: Partial<Jamiah>) => {
     if (!groupId) {
@@ -104,11 +109,13 @@ export const JamiahSetup: React.FC = () => {
         onClose={() => setSnackbar(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        {snackbar && (
-          <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)} sx={{ width: '100%' }}>
-            {snackbar.message}
-          </Alert>
-        )}
+        {snackbar
+          ? (
+              <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)} sx={{ width: '100%' }}>
+                {snackbar.message}
+              </Alert>
+            )
+          : undefined}
       </Snackbar>
     </Box>
   );
