@@ -37,6 +37,8 @@ import { JoinJamiahPage } from "./pages/join-jamiah/join-jamiah";
 import { GroupDetails } from "./pages/group-details/group-details";
 import {VerifyEmail} from "./pages/authentication/verifyEmail";
 import {HelloBackend} from "./pages/hello-backend/hello-backend";
+import { JamiahEntryRedirect } from "./components/layout/jamiah-entry-redirect";
+import { JamiahSetup } from "./pages/jamiah-setup/jamiah-setup";
 
 function App() {
     return (
@@ -50,8 +52,9 @@ function App() {
 
                 {/* Private routes */}
                 <Route path="/jamiah/:groupId/*" element={<PrivateRoute><JamiahLayout /></PrivateRoute>}>
-                    <Route index element={<Navigate to="dashboard" replace />} />
+                    <Route index element={<JamiahEntryRedirect />} />
                     <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="setup" element={<JamiahSetup />} />
                     <Route path="members" element={<Members />} />
                     <Route path="payments" element={<Payments />} />
                     <Route path="votes" element={<Votes />} />
