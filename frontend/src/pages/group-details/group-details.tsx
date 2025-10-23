@@ -4,8 +4,8 @@ import { Box, Typography, Button, Divider, Dialog, DialogTitle, DialogContent, D
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
 import { ROUTES } from '../../routing/routes';
-import { StartCycleButton } from '../../components/jamiah/StartCycleButton';
 import { useAuth } from '../../context/AuthContext';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 export const GroupDetails = () => {
   const { id } = useParams();
@@ -80,13 +80,18 @@ export const GroupDetails = () => {
             Sichtbarkeit: <b>{group.isPublic ? 'Öffentlich' : 'Privat'}</b>
           </Typography>
           {user?.uid === group.ownerId && (
-            <Box mt={2}>
-              <StartCycleButton
-                jamiahId={group.id as string}
-                onStarted={() => setCycleStarted(true)}
-              />
+            <Box mt={2} display="flex" flexDirection="column" gap={1}>
+              {!cycleStarted && (
+                <Button
+                  variant="contained"
+                  startIcon={<SettingsIcon />}
+                  onClick={() => navigate(`/jamiah/${group.id}/setup`)}
+                >
+                  Setup starten
+                </Button>
+              )}
               {cycleStarted && (
-                <Typography variant="body2" mt={1}>
+                <Typography variant="body2">
                   Aktiver Zyklus läuft
                 </Typography>
               )}
