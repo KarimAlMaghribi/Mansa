@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -319,23 +320,133 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         Jamiah jamiahWithMembers = jamiahRepository.findWithMembersById(jamiah.getId()).orElse(jamiah);
-        List<JamiahPayment> payments = ensurePaymentsForCycle(jamiahWithMembers, cycle);
-        boolean allPaid = payments.stream().allMatch(p -> Boolean.TRUE.equals(p.getConfirmed()));
+        ensurePaymentsForCycle(jamiahWithMembers, cycle);
+
+        String recipientUid = cycle.getRecipient().getUid();
+        List<JamiahPayment> payments = paymentRepository
+                .findAllByJamiahIdAndCycleIdForUpdate(jamiahWithMembers.getId(), cycle.getId());
+        Map<String, UserProfile> users = loadUsers(payments, cycle);
+        UserProfile recipientProfile = users.getOrDefault(recipientUid, cycle.getRecipient());
+        if (recipientProfile == null || recipientProfile.getId() == null) {
+            recipientProfile = userRepository.findByUid(recipientUid)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipient not found"));
+            users.put(recipientUid, recipientProfile);
+        }
+        UserProfile effectiveRecipient = recipientProfile;
+
+        BigDecimal expectedAmount = requireRateAmount(jamiahWithMembers);
+        boolean allPaid = payments.stream()
+                .filter(payment -> !Objects.equals(payment.getPayerUid(), recipientUid))
+                .allMatch(payment -> Boolean.TRUE.equals(payment.getConfirmed()));
         if (!allPaid) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not all payments have been confirmed");
         }
+
+        List<JamiahPayment> newlyConfirmed = payments.stream()
+                .filter(payment -> Boolean.TRUE.equals(payment.getConfirmed()))
+                .filter(payment -> !Boolean.TRUE.equals(payment.getRecipientConfirmed()))
+                .collect(Collectors.toList());
+
+        if (!newlyConfirmed.isEmpty()) {
+            Map<Long, UserProfile> lockProfiles = new LinkedHashMap<>();
+            if (effectiveRecipient.getId() != null) {
+                lockProfiles.put(effectiveRecipient.getId(), effectiveRecipient);
+            }
+            for (JamiahPayment payment : newlyConfirmed) {
+                UserProfile payerProfile = users.get(payment.getPayerUid());
+                if (payerProfile == null) {
+                    payerProfile = userRepository.findByUid(payment.getPayerUid())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payer not found"));
+                    users.put(payment.getPayerUid(), payerProfile);
+                }
+                if (payerProfile.getId() == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payer profile incomplete");
+                }
+                UserProfile effectivePayer = payerProfile;
+                lockProfiles.putIfAbsent(effectivePayer.getId(), effectivePayer);
+            }
+            List<Long> memberIds = lockProfiles.keySet().stream()
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            Map<Long, Wallet> walletMap = memberIds.isEmpty()
+                    ? new HashMap<>()
+                    : walletRepository.findAllByMemberIdIn(memberIds).stream()
+                    .collect(Collectors.toMap(Wallet::getMemberId, wallet -> wallet));
+            Set<Long> touchedWallets = new HashSet<>();
+            List<Wallet> walletsToSave = new ArrayList<>();
+            BigDecimal totalIncoming = BigDecimal.ZERO;
+            for (JamiahPayment payment : newlyConfirmed) {
+                UserProfile payerProfile = users.get(payment.getPayerUid());
+                UserProfile effectivePayer = payerProfile;
+                Wallet payerWallet = walletMap.computeIfAbsent(effectivePayer.getId(), id -> {
+                    Wallet w = new Wallet();
+                    w.setMemberId(id);
+                    w.setMember(effectivePayer);
+                    w.setBalance(BigDecimal.ZERO);
+                    return w;
+                });
+                payerWallet.setMember(effectivePayer);
+                BigDecimal transferAmount = payment.getAmount() != null ? payment.getAmount() : expectedAmount;
+                BigDecimal currentBalance = payerWallet.getBalance() == null ? BigDecimal.ZERO : payerWallet.getBalance();
+                BigDecimal newBalance = currentBalance.subtract(transferAmount);
+                if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance");
+                }
+                payerWallet.setBalance(newBalance);
+                if (touchedWallets.add(effectivePayer.getId())) {
+                    walletsToSave.add(payerWallet);
+                }
+                totalIncoming = totalIncoming.add(transferAmount);
+            }
+            if (effectiveRecipient.getId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipient profile incomplete");
+            }
+            Wallet recipientWallet = walletMap.computeIfAbsent(effectiveRecipient.getId(), id -> {
+                Wallet w = new Wallet();
+                w.setMemberId(id);
+                w.setMember(effectiveRecipient);
+                w.setBalance(BigDecimal.ZERO);
+                return w;
+            });
+            recipientWallet.setMember(effectiveRecipient);
+            BigDecimal recipientBalance = recipientWallet.getBalance() == null ? BigDecimal.ZERO : recipientWallet.getBalance();
+            recipientWallet.setBalance(recipientBalance.add(totalIncoming));
+            if (touchedWallets.add(effectiveRecipient.getId())) {
+                walletsToSave.add(recipientWallet);
+            }
+            walletRepository.saveAll(walletsToSave);
+        }
+
         Instant now = Instant.now();
-        payments.forEach(payment -> {
-            payment.setRecipientConfirmed(true);
-            payment.setRecipientConfirmedAt(now);
-        });
-        paymentRepository.saveAll(payments);
-        cycle.setRecipientConfirmed(true);
-        cycle.setCompleted(true);
+        List<JamiahPayment> updatedPayments = new ArrayList<>();
+        for (JamiahPayment payment : payments) {
+            if (!Boolean.TRUE.equals(payment.getRecipientConfirmed())) {
+                payment.setRecipientConfirmed(true);
+                payment.setRecipientConfirmedAt(now);
+                updatedPayments.add(payment);
+            }
+        }
+        if (!updatedPayments.isEmpty()) {
+            paymentRepository.saveAll(updatedPayments);
+        }
+
+        boolean wasCompleted = Boolean.TRUE.equals(cycle.getCompleted());
+        boolean receiptConfirmed = Boolean.TRUE.equals(cycle.getRecipientConfirmed());
+        if (!receiptConfirmed) {
+            cycle.setRecipientConfirmed(true);
+        }
+        if (!wasCompleted) {
+            cycle.setCompleted(true);
+        }
         cycleRepository.save(cycle);
-        startNextRoundIfNeeded(cycle);
-        Map<String, UserProfile> users = loadUsers(payments, cycle);
-        return buildRoundDto(cycle, jamiahWithMembers, payments, users);
+        if (!wasCompleted) {
+            startNextRoundIfNeeded(cycle);
+        }
+
+        List<WalletDto> walletDtos = collectWalletDtos(payments, users, effectiveRecipient);
+        RoundDto dto = buildRoundDto(cycle, jamiahWithMembers, payments, users);
+        dto.setWallets(walletDtos);
+        return dto;
     }
 
     public List<PaymentDto> getPayments(String jamiahPublicId, Long cycleId, String callerUid) {
@@ -555,6 +666,58 @@ public class PaymentService {
         dto.setBalance(wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance());
         dto.setLastUpdated(wallet.getUpdatedAt());
         return dto;
+    }
+
+    private List<WalletDto> collectWalletDtos(List<JamiahPayment> payments,
+                                              Map<String, UserProfile> users,
+                                              UserProfile recipient) {
+        LinkedHashMap<String, UserProfile> participants = new LinkedHashMap<>();
+        if (recipient != null && recipient.getUid() != null) {
+            participants.put(recipient.getUid(), recipient);
+        }
+        for (JamiahPayment payment : payments) {
+            String payerUid = payment.getPayerUid();
+            if (payerUid == null) {
+                continue;
+            }
+            UserProfile profile = users.get(payerUid);
+            if (profile == null) {
+                profile = userRepository.findByUid(payerUid).orElse(null);
+                if (profile != null) {
+                    users.put(payerUid, profile);
+                }
+            }
+            if (profile != null && profile.getUid() != null) {
+                participants.putIfAbsent(profile.getUid(), profile);
+            }
+        }
+        List<UserProfile> memberProfiles = participants.values().stream()
+                .filter(Objects::nonNull)
+                .filter(profile -> profile.getId() != null)
+                .collect(Collectors.toList());
+        if (memberProfiles.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        List<Long> memberIds = memberProfiles.stream()
+                .map(UserProfile::getId)
+                .collect(Collectors.toList());
+        Map<Long, Wallet> wallets = walletRepository.findByMemberIdIn(memberIds).stream()
+                .collect(Collectors.toMap(Wallet::getMemberId, wallet -> wallet));
+        List<WalletDto> walletDtos = new ArrayList<>();
+        for (UserProfile profile : memberProfiles) {
+            Wallet wallet = wallets.get(profile.getId());
+            if (wallet == null) {
+                wallet = new Wallet();
+                wallet.setMemberId(profile.getId());
+                wallet.setMember(profile);
+                wallet.setBalance(BigDecimal.ZERO);
+            } else {
+                wallet.setMember(profile);
+            }
+            walletDtos.add(toWalletDto(wallet, profile));
+        }
+        walletDtos.sort(Comparator.comparing(WalletDto::getUsername, Comparator.nullsLast(String::compareToIgnoreCase)));
+        return walletDtos;
     }
 
     private List<JamiahPayment> ensurePaymentsForCycle(Jamiah jamiah, JamiahCycle cycle) {

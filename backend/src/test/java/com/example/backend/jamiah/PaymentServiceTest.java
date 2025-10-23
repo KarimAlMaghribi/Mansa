@@ -4,9 +4,12 @@ import com.example.backend.UserProfile;
 import com.example.backend.UserProfileRepository;
 import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.dto.PaymentDto;
+import com.example.backend.jamiah.dto.RoundDto;
+import com.example.backend.jamiah.dto.WalletDto;
 import com.example.backend.jamiah.dto.CycleSummaryDto;
 import com.example.backend.jamiah.JamiahPayment;
 import com.example.backend.jamiah.JamiahCycle;
+import com.example.backend.wallet.WalletRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +36,8 @@ public class PaymentServiceTest {
     JamiahPaymentRepository paymentRepository;
     @Autowired
     UserProfileRepository userRepository;
+    @Autowired
+    WalletRepository walletRepository;
 
     private JamiahDto createJamiah(String ownerUid) {
         JamiahDto dto = new JamiahDto();
@@ -98,6 +103,103 @@ public class PaymentServiceTest {
                 .orElse(null);
         assertNotNull(next);
         assertEquals(completed.getStartDate().plusMonths(1), next.getStartDate());
+    }
+
+    @Test
+    void confirmReceiptTransfersWalletBalances() {
+        UserProfile owner = new UserProfile();
+        owner.setUsername("owner");
+        owner.setUid("u1");
+        userRepository.save(owner);
+        UserProfile recipient = new UserProfile();
+        recipient.setUsername("rec");
+        recipient.setUid("u2");
+        userRepository.save(recipient);
+        UserProfile payerOne = new UserProfile();
+        payerOne.setUsername("p1");
+        payerOne.setUid("u3");
+        userRepository.save(payerOne);
+        UserProfile payerTwo = new UserProfile();
+        payerTwo.setUsername("p2");
+        payerTwo.setUid("u4");
+        userRepository.save(payerTwo);
+
+        JamiahDto created = createJamiah("u1");
+        Jamiah jamiah = jamiahRepository.findAll().get(0);
+        jamiah.getMembers().add(recipient);
+        recipient.getJamiahs().add(jamiah);
+        jamiah.getMembers().add(payerOne);
+        payerOne.getJamiahs().add(jamiah);
+        jamiah.getMembers().add(payerTwo);
+        payerTwo.getJamiahs().add(jamiah);
+        jamiahRepository.save(jamiah);
+
+        JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1",
+                java.util.Arrays.asList("u2", "u3", "u4"));
+
+        paymentService.confirmPayment(created.getId().toString(), cycle.getId(), "u3", new BigDecimal("5"), "u3");
+        paymentService.confirmPayment(created.getId().toString(), cycle.getId(), "u4", new BigDecimal("5"), "u4");
+
+        RoundDto round = paymentService.confirmReceipt(created.getId().toString(), cycle.getId(), "u2");
+
+        assertEquals(new BigDecimal("0.00"), walletRepository.findById(payerOne.getId()).orElseThrow().getBalance());
+        assertEquals(new BigDecimal("0.00"), walletRepository.findById(payerTwo.getId()).orElseThrow().getBalance());
+        assertEquals(new BigDecimal("10.00"), walletRepository.findById(recipient.getId()).orElseThrow().getBalance());
+
+        assertNotNull(round.getWallets());
+        assertEquals(3, round.getWallets().size());
+        java.util.Map<String, BigDecimal> balances = round.getWallets().stream()
+                .collect(java.util.stream.Collectors.toMap(WalletDto::getMemberId, WalletDto::getBalance));
+        assertEquals(new BigDecimal("10.00"), balances.get("u2"));
+        assertEquals(new BigDecimal("0.00"), balances.get("u3"));
+        assertEquals(new BigDecimal("0.00"), balances.get("u4"));
+    }
+
+    @Test
+    void confirmReceiptIsIdempotentForWallets() {
+        UserProfile owner = new UserProfile();
+        owner.setUsername("owner");
+        owner.setUid("u1");
+        userRepository.save(owner);
+        UserProfile recipient = new UserProfile();
+        recipient.setUsername("rec");
+        recipient.setUid("u2");
+        userRepository.save(recipient);
+        UserProfile payer = new UserProfile();
+        payer.setUsername("payer");
+        payer.setUid("u3");
+        userRepository.save(payer);
+
+        JamiahDto created = createJamiah("u1");
+        Jamiah jamiah = jamiahRepository.findAll().get(0);
+        jamiah.getMembers().add(recipient);
+        recipient.getJamiahs().add(jamiah);
+        jamiah.getMembers().add(payer);
+        payer.getJamiahs().add(jamiah);
+        jamiahRepository.save(jamiah);
+
+        JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1",
+                java.util.Arrays.asList("u2", "u3"));
+
+        paymentService.confirmPayment(created.getId().toString(), cycle.getId(), "u3", new BigDecimal("5"), "u3");
+
+        paymentService.confirmReceipt(created.getId().toString(), cycle.getId(), "u2");
+
+        BigDecimal recipientBalanceAfterFirst = walletRepository.findById(recipient.getId()).orElseThrow().getBalance();
+        BigDecimal payerBalanceAfterFirst = walletRepository.findById(payer.getId()).orElseThrow().getBalance();
+
+        paymentService.confirmReceipt(created.getId().toString(), cycle.getId(), "u2");
+
+        BigDecimal recipientBalanceAfterSecond = walletRepository.findById(recipient.getId()).orElseThrow().getBalance();
+        BigDecimal payerBalanceAfterSecond = walletRepository.findById(payer.getId()).orElseThrow().getBalance();
+
+        assertEquals(recipientBalanceAfterFirst, recipientBalanceAfterSecond);
+        assertEquals(payerBalanceAfterFirst, payerBalanceAfterSecond);
+
+        long nextCycles = cycleRepository.findByJamiahId(jamiah.getId()).stream()
+                .filter(c -> c.getCycleNumber() == 2)
+                .count();
+        assertEquals(1, nextCycles);
     }
 
     @Test

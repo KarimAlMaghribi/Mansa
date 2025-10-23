@@ -17,6 +17,7 @@ public class RoundDto {
     private BigDecimal expectedAmount;
     private Recipient recipient;
     private List<PaymentDto> payments;
+    private List<WalletDto> wallets;
 
     @Data
     public static class Recipient {
