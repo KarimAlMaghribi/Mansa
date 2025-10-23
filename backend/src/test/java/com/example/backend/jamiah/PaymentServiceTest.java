@@ -2,20 +2,29 @@ package com.example.backend.jamiah;
 
 import com.example.backend.UserProfile;
 import com.example.backend.UserProfileRepository;
+import com.example.backend.jamiah.dto.CycleSummaryDto;
 import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.dto.PaymentDto;
-import com.example.backend.jamiah.dto.CycleSummaryDto;
-import com.example.backend.jamiah.JamiahPayment;
 import com.example.backend.jamiah.JamiahCycle;
+import com.example.backend.jamiah.JamiahPayment;
+import com.example.backend.payment.StripePaymentProvider;
+import com.example.backend.wallet.WalletRepository;
+import com.stripe.exception.StripeException;
+import com.stripe.model.PaymentIntent;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import org.mockito.Mockito;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
@@ -33,6 +42,10 @@ public class PaymentServiceTest {
     JamiahPaymentRepository paymentRepository;
     @Autowired
     UserProfileRepository userRepository;
+    @MockBean
+    StripePaymentProvider stripePaymentProvider;
+    @SpyBean
+    WalletRepository walletRepository;
 
     private JamiahDto createJamiah(String ownerUid) {
         JamiahDto dto = new JamiahDto();
@@ -340,6 +353,53 @@ public class PaymentServiceTest {
 
         assertThrows(ResponseStatusException.class, () ->
                 paymentService.confirmReceipt(created.getId().toString(), cycle.getId(), payment.getId(), "u1", "u1"));
+    }
+
+    @Test
+    void confirmPaymentTranslatesWalletInsertFailure() throws StripeException {
+        UserProfile owner = new UserProfile();
+        owner.setUsername("owner");
+        owner.setUid("u1");
+        userRepository.save(owner);
+
+        UserProfile member = new UserProfile();
+        member.setUsername("m");
+        member.setUid("u2");
+        userRepository.save(member);
+
+        JamiahDto created = createJamiah("u1");
+        Jamiah jamiah = jamiahRepository.findAll().get(0);
+        jamiah.getMembers().add(member);
+        member.getJamiahs().add(jamiah);
+        jamiahRepository.save(jamiah);
+
+        JamiahCycle cycle = service.startCycle(created.getId().toString(), "u1", java.util.Arrays.asList("u1", "u2"));
+
+        JamiahPayment payment = paymentRepository.findAllByJamiahIdAndCycleId(jamiah.getId(), cycle.getId()).stream()
+                .filter(p -> "u2".equals(p.getPayerUid()))
+                .findFirst()
+                .orElseThrow();
+        payment.setStripePaymentIntentId("pi_test");
+        paymentRepository.save(payment);
+
+        PaymentIntent paymentIntent = Mockito.mock(PaymentIntent.class);
+        Mockito.when(paymentIntent.getStatus()).thenReturn("succeeded");
+        Mockito.when(paymentIntent.getAmount()).thenReturn(500L);
+        Mockito.when(paymentIntent.getCurrency()).thenReturn("eur");
+        Mockito.when(stripePaymentProvider.retrievePaymentIntent("pi_test")).thenReturn(paymentIntent);
+
+        Mockito.doThrow(new DataIntegrityViolationException("duplicate key"))
+                .when(walletRepository).save(Mockito.any());
+
+        try {
+            ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                    () -> paymentService.confirmPayment(payment.getId(), "u2"));
+            assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+            assertEquals("Unable to update wallet", ex.getReason());
+        } finally {
+            Mockito.reset(walletRepository);
+            Mockito.reset(stripePaymentProvider);
+        }
     }
 
     @Test

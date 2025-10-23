@@ -13,6 +13,7 @@ import com.example.backend.wallet.WalletRepository;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -260,6 +261,9 @@ public class PaymentService {
         }
         UserProfile payer = userRepository.findByUid(callerUid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (payer.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User profile is missing member id");
+        }
         Wallet wallet = walletRepository.findById(payer.getId()).orElseGet(() -> {
             Wallet w = new Wallet();
             w.setMemberId(payer.getId());
@@ -270,7 +274,11 @@ public class PaymentService {
         wallet.setMember(payer);
         BigDecimal current = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
         wallet.setBalance(current.add(expectedAmount));
-        wallet = walletRepository.save(wallet);
+        try {
+            wallet = walletRepository.save(wallet);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Unable to update wallet", ex);
+        }
 
         PaymentConfirmationDto confirmation = new PaymentConfirmationDto();
         confirmation.setPayment(toDto(payment, payer, expectedAmount));
