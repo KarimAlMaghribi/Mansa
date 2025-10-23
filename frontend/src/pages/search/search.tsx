@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -24,6 +24,7 @@ import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
 import { auth } from '../../firebase_config';
 import { useAuth } from '../../context/AuthContext';
+import { fetchJoinStatus, JoinRequestStatus } from '../../api/jamiah-status';
 
 export const SearchPage = () => {
   const [publicGroups, setPublicGroups] = useState<Jamiah[]>([]);
@@ -32,7 +33,7 @@ export const SearchPage = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarError, setSnackbarError] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [pendingIds, setPendingIds] = useState<string[]>([]);
+  const [statusMap, setStatusMap] = useState<Record<string, JoinRequestStatus>>({});
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Jamiah | null>(null);
   const [motivation, setMotivation] = useState('');
@@ -50,22 +51,48 @@ export const SearchPage = () => {
     const uid = user?.uid;
     if (!uid) {
       setMyGroups([]);
-      setPendingIds([]);
+      setStatusMap({});
       return;
     }
     fetch(`${API_BASE_URL}/api/userProfiles/uid/${uid}/jamiahs`)
       .then(res => res.json())
       .then(setMyGroups)
       .catch(() => setMyGroups([]));
-
-    fetch(`${API_BASE_URL}/api/jamiahs/join-requests?uid=${uid}`)
-      .then(res => res.json())
-      .then(data => setPendingIds(data.filter((r: any) => r.status === 'PENDING').map((r: any) => r.jamiahId)))
-      .catch(() => setPendingIds([]));
   }, [user]);
 
-  const joinedIds = new Set(myGroups.filter(g => g.id).map(g => g.id as string));
-  const pendingSet = new Set(pendingIds);
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) {
+      setStatusMap({});
+      return;
+    }
+    const ids = publicGroups.map(pg => pg.id).filter((id): id is string => Boolean(id));
+    if (ids.length === 0) {
+      setStatusMap({});
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          const { status } = await fetchJoinStatus(id, uid);
+          return [id, status] as [string, JoinRequestStatus];
+        })
+      );
+      if (!cancelled) {
+        setStatusMap(Object.fromEntries(entries));
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [publicGroups, user?.uid]);
+
+  const joinedIds = useMemo(
+    () => new Set(myGroups.filter(g => g.id).map(g => g.id as string)),
+    [myGroups]
+  );
 
   const openJoinDialog = (group: Jamiah) => {
     setSelectedGroup(group);
@@ -83,7 +110,9 @@ export const SearchPage = () => {
     })
       .then(res => {
         if (res.ok) {
-          setPendingIds([...pendingIds, selectedGroup.id as string]);
+          if (selectedGroup.id) {
+            setStatusMap((current) => ({ ...current, [selectedGroup.id as string]: 'pending' }));
+          }
           setSnackbarMessage('Bewerbung gesendet');
           setSnackbarError(false);
         } else {
@@ -127,8 +156,10 @@ export const SearchPage = () => {
       </Box>
       <Grid container spacing={4}>
         {filteredPublicGroups.map(pg => {
-          const joined = joinedIds.has(pg.id as string);
-          const pending = pendingSet.has(pg.id as string);
+          const rawStatus = statusMap[pg.id as string] ?? 'none';
+          const joined = joinedIds.has(pg.id as string) || rawStatus === 'accepted';
+          const pending = rawStatus === 'pending';
+          const rejected = rawStatus === 'rejected';
           const isOwner = pg.ownerId === user?.uid;
           return (
             <Grid item xs={12} sm={6} md={4} key={pg.id}>
@@ -141,6 +172,8 @@ export const SearchPage = () => {
                       <Chip label="Eigentümer" color="info" size="small" />
                     ) : joined ? (
                       <Chip label="Beigetreten" color="success" size="small" />
+                    ) : rejected ? (
+                      <Chip label="Abgelehnt" color="error" size="small" />
                     ) : pending ? (
                       <Chip label="Bewerbung läuft" color="warning" size="small" />
                     ) : null}
@@ -156,6 +189,8 @@ export const SearchPage = () => {
                     <Button disabled fullWidth>Eigentümer</Button>
                   ) : joined ? (
                     <Button disabled fullWidth>Beigetreten</Button>
+                  ) : rejected ? (
+                    <Button disabled fullWidth>Abgelehnt</Button>
                   ) : pending ? (
                     <Button disabled fullWidth>Bewerbung läuft</Button>
                   ) : (
