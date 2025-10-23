@@ -75,7 +75,7 @@ export const Groups = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:600px)');
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const refreshGroups = useCallback(async () => {
     const uid = user?.uid;
@@ -127,17 +127,28 @@ export const Groups = () => {
     navigate(`/jamiah/${group.id}`);
   };
 
+  const isCreateDisabled = authLoading || !user?.uid;
+  const createDisabledMessage = authLoading
+    ? 'Benutzerdaten werden geladen. Bitte warte einen Moment.'
+    : !user?.uid
+    ? 'Bitte melde dich an, um eine Jamiah zu erstellen.'
+    : undefined;
+
   const handleCreateJamiah = async (data: Partial<Jamiah>) => {
     const payload = { ...DEFAULT_NEW_GROUP, ...data };
     if (!payload.name || payload.name.trim().length === 0) {
       throw new Error('Name ist erforderlich');
     }
+    if (authLoading) {
+      throw new Error('Benutzerdaten werden noch geladen. Bitte versuche es in Kürze erneut.');
+    }
+    const uid = user?.uid;
+    if (!uid) {
+      throw new Error('Du musst angemeldet sein, um eine Jamiah zu erstellen.');
+    }
     setCreateLoading(true);
     try {
-      const uid = user?.uid;
-      const url = uid
-        ? `${API_BASE_URL}/api/jamiahs?uid=${encodeURIComponent(uid)}`
-        : `${API_BASE_URL}/api/jamiahs`;
+      const url = `${API_BASE_URL}/api/jamiahs?uid=${encodeURIComponent(uid)}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -517,6 +528,8 @@ export const Groups = () => {
               onSubmit={handleCreateJamiah}
               onCancel={handleCreateClose}
               submitting={createLoading}
+              submitDisabled={isCreateDisabled}
+              submitDisabledMessage={createDisabledMessage}
             />
           </DialogContent>
         </Dialog>
