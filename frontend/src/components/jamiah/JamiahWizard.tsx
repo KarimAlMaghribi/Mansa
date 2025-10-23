@@ -24,6 +24,8 @@ export interface JamiahWizardProps {
   onSubmit: (data: Partial<Jamiah>) => Promise<Partial<Jamiah> | void> | Partial<Jamiah> | void;
   onCancel?: () => void;
   submitting?: boolean;
+  submitDisabled?: boolean;
+  submitDisabledMessage?: string;
   renderSummaryExtras?: (data: Partial<Jamiah>) => React.ReactNode;
 }
 
@@ -44,6 +46,8 @@ export const JamiahWizard: React.FC<JamiahWizardProps> = ({
   onSubmit,
   onCancel,
   submitting = false,
+  submitDisabled = false,
+  submitDisabledMessage,
   renderSummaryExtras,
 }) => {
   const [activeStep, setActiveStep] = useState(0);
@@ -132,6 +136,9 @@ export const JamiahWizard: React.FC<JamiahWizardProps> = ({
       return;
     }
     setSubmitError(null);
+    if (submitDisabled) {
+      return;
+    }
     try {
       const result = await onSubmit(formData);
       if (result) {
@@ -311,6 +318,12 @@ export const JamiahWizard: React.FC<JamiahWizardProps> = ({
 
       <Box>{renderStepContent()}</Box>
 
+      {submitDisabled && submitDisabledMessage && (
+        <Alert severity="error" sx={{ mt: 3 }}>
+          {submitDisabledMessage}
+        </Alert>
+      )}
+
       {submitError && (
         <Alert severity="error" sx={{ mt: 3 }}>
           {submitError}
@@ -333,7 +346,7 @@ export const JamiahWizard: React.FC<JamiahWizardProps> = ({
             Weiter
           </Button>
         ) : (
-          <Button variant="contained" onClick={handleSubmit} disabled={submitting}>
+          <Button variant="contained" onClick={handleSubmit} disabled={submitting || submitDisabled}>
             {submitLabel}
           </Button>
         )}
