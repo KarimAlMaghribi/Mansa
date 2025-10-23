@@ -20,6 +20,7 @@ export interface JamiahJoinRequest {
   username?: string;
   firstName?: string;
   lastName?: string;
+  profileId?: number;
 }
 
 export interface JamiahCycle {
@@ -123,7 +124,8 @@ export const JamiahProvider: React.FC<JamiahProviderProps> = ({ groupId, childre
                 throw new Error('profile not found');
               }
               const profile = await profileResponse.json();
-              return { ...request, ...profile };
+              const { id: profileId, ...profileData } = profile ?? {};
+              return { ...request, ...profileData, profileId };
             } catch (error) {
               console.warn(
                 `[jamiah-context] Profil konnte nicht geladen werden für ${request.userUid}`,
