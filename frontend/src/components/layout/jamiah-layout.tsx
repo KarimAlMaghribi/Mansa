@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import {
+  Badge,
   Box,
   Drawer,
   List,
@@ -31,6 +32,7 @@ import { JamiahProvider, useJamiahContext } from '../../context/JamiahContext';
 interface MenuBadge {
   label: string;
   color?: ChipProps['color'];
+  count?: number;
 }
 
 interface MenuItem {
@@ -109,7 +111,7 @@ const JamiahLayoutShell: React.FC = () => {
         icon: <GroupIcon fontSize="small" />,
         badge:
           status.pendingJoinRequests > 0
-            ? { label: `${status.pendingJoinRequests}`, color: 'secondary' }
+            ? { label: `${status.pendingJoinRequests}`, color: 'secondary', count: status.pendingJoinRequests }
             : undefined,
       },
       {
@@ -195,6 +197,18 @@ const JamiahLayoutShell: React.FC = () => {
         <List sx={{ flexGrow: 1 }}>
           {menuItems.map((item) => {
             const isActive = activeSegment ? activeSegment.startsWith(item.path) : item.path === 'dashboard';
+            const iconWrapper = (
+              <Box component="span" sx={{ display: 'flex' }}>
+                {item.icon}
+              </Box>
+            );
+            const iconWithBadge = item.badge?.count ? (
+              <Badge color={item.badge.color ?? 'secondary'} badgeContent={item.badge.count} overlap="circular">
+                {iconWrapper}
+              </Badge>
+            ) : (
+              iconWrapper
+            );
             return (
               <Tooltip key={item.path} title={open ? undefined : item.text} placement="right">
                 <ListItemButton
@@ -202,8 +216,16 @@ const JamiahLayoutShell: React.FC = () => {
                   selected={isActive}
                   sx={{ justifyContent: open ? 'flex-start' : 'center', px: open ? 2 : 1 }}
                 >
-                  <ListItemIcon sx={{ minWidth: open ? 36 : 'auto' }}>{item.icon}</ListItemIcon>
-                  {open ? (
+                  <ListItemIcon sx={{ minWidth: open ? 36 : 'auto' }}>{iconWithBadge}</ListItemIcon>
+                  {!open && item.badge && !item.badge.count && (
+                    <Chip
+                      label={item.badge.label}
+                      color={item.badge.color ?? 'default'}
+                      size="small"
+                      sx={{ ml: 1 }}
+                    />
+                  )}
+                  {open && (
                     <Box display="flex" alignItems="center" justifyContent="space-between" flexGrow={1}>
                       <Typography variant="body2" fontWeight={isActive ? 600 : 500} noWrap>
                         {item.text}
@@ -216,15 +238,6 @@ const JamiahLayoutShell: React.FC = () => {
                         />
                       )}
                     </Box>
-                  ) : (
-                    item.badge && (
-                      <Chip
-                        label={item.badge.label}
-                        color={item.badge.color ?? 'default'}
-                        size="small"
-                        sx={{ ml: 1 }}
-                      />
-                    )
                   )}
                 </ListItemButton>
               </Tooltip>

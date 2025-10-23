@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, Divider, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
+import { Box, Typography, Button, Divider, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Chip } from '@mui/material';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
 import { ROUTES } from '../../routing/routes';
 import { useAuth } from '../../context/AuthContext';
 import SettingsIcon from '@mui/icons-material/Settings';
+import useJoinStatus from '../../hooks/useJoinStatus';
 
 export const GroupDetails = () => {
   const { id } = useParams();
@@ -13,9 +14,10 @@ export const GroupDetails = () => {
   const [group, setGroup] = useState<Jamiah | null>(null);
   const { user } = useAuth();
   const [cycleStarted, setCycleStarted] = useState(false);
-  const [status, setStatus] = useState<"member" | "applicant" | null>(null);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [motivation, setMotivation] = useState('');
+  const [isMember, setIsMember] = useState(false);
+  const { status: joinStatus, refresh: refreshJoinStatus, loading: statusLoading } = useJoinStatus(id, user?.uid);
 
   useEffect(() => {
     if (!id) return;
@@ -33,21 +35,40 @@ export const GroupDetails = () => {
     fetch(`${API_BASE_URL}/api/jamiahs/${id}/members`)
       .then(res => res.json())
       .then((ms: any[]) => {
-        if (ms.some(m => m.uid === user.uid)) {
-          setStatus("member");
-        } else {
-          fetch(`${API_BASE_URL}/api/jamiahs/${id}/join-public/status?uid=${user.uid}`)
-            .then(r => (r.ok ? r.json() : null))
-            .then(data => {
-              if (data?.status === "PENDING") {
-                setStatus("applicant");
-              }
-            })
-            .catch(() => undefined);
-        }
+        setIsMember(ms.some(m => m.uid === user.uid));
       })
       .catch(() => undefined);
   }, [id, user]);
+
+  useEffect(() => {
+    if (joinStatus === 'accepted') {
+      setIsMember(true);
+    }
+  }, [joinStatus]);
+
+  const ownership = user && group && user.uid === group.ownerId;
+  const statusState = useMemo(() => {
+    if (ownership) return 'owner';
+    if (isMember) return 'member';
+    return joinStatus;
+  }, [ownership, isMember, joinStatus]);
+
+  const statusChip = useMemo(() => {
+    if (!user) return null;
+    switch (statusState) {
+      case 'owner':
+        return <Chip label="Eigentümer" color="info" size="small" />;
+      case 'member':
+      case 'accepted':
+        return <Chip label="Mitglied" color="success" size="small" />;
+      case 'pending':
+        return <Chip label="Bewerbung läuft" color="warning" size="small" />;
+      case 'rejected':
+        return <Chip label="Abgelehnt" color="error" size="small" />;
+      default:
+        return statusLoading ? <Chip label="Status wird geladen" size="small" /> : null;
+    }
+  }, [statusState, statusLoading, user]);
 
   return (
     <Box p={4} maxWidth={600} mx="auto">
@@ -59,6 +80,11 @@ export const GroupDetails = () => {
           <Typography variant="h4" gutterBottom>{group.name}</Typography>
           {group.description && (
             <Typography variant="body1" gutterBottom>{group.description}</Typography>
+          )}
+          {statusChip && (
+            <Box mt={1}>
+              {statusChip}
+            </Box>
           )}
           <Divider sx={{ my: 2 }} />
           {group.language && (
@@ -98,11 +124,15 @@ export const GroupDetails = () => {
             </Box>
           )}
           <Box mt={3}>
-            {status === "applicant" ? (
-              <Typography color="textSecondary">Status: Bewerber</Typography>
-            ) : status === "member" ? (
+            {statusState === 'pending' ? (
+              <Typography color="textSecondary">Status: Bewerbung läuft</Typography>
+            ) : statusState === 'rejected' ? (
+              <Typography color="textSecondary">Status: Abgelehnt</Typography>
+            ) : statusState === 'member' || statusState === 'accepted' ? (
               <Typography color="textSecondary">Status: Mitglied</Typography>
-          ) : group.isPublic ? (
+            ) : statusState === 'owner' ? (
+              <Typography color="textSecondary">Status: Eigentümer</Typography>
+            ) : group.isPublic ? (
               <Button
                 variant="contained"
                 onClick={() => setJoinDialogOpen(true)}
@@ -144,12 +174,7 @@ export const GroupDetails = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ uid: user.uid, motivation })
               }).catch(() => undefined);
-              fetch(`${API_BASE_URL}/api/jamiahs/${id}/join-public/status?uid=${user.uid}`)
-                .then(r => (r.ok ? r.json() : null))
-                .then(d => {
-                  if (d?.status === 'PENDING') setStatus('applicant');
-                })
-                .catch(() => undefined);
+              await refreshJoinStatus();
               setJoinDialogOpen(false);
             }}
             variant="contained"

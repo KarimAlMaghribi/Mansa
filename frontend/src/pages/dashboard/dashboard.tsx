@@ -14,11 +14,13 @@ import {
   Typography,
 } from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
+import GroupAddIcon from '@mui/icons-material/GroupAdd';
+import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
+import PaymentsIcon from '@mui/icons-material/Payments';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { selectName } from '../../store/slices/user-profile';
 import {
-  JamiahJoinRequest,
   JamiahMember,
   JamiahPayment,
   JamiahCycle,
@@ -32,50 +34,6 @@ const getDisplayName = (
   const fullName = `${person.firstName ?? ''} ${person.lastName ?? ''}`.trim();
   return fullName || person.username || person.uid || person.userUid;
 };
-
-const OwnerJoinRequestsCard: React.FC<{
-  pendingRequests: JamiahJoinRequest[];
-  onDecision: (requestId: number, accept: boolean) => Promise<boolean>;
-}> = ({ pendingRequests, onDecision }) => (
-  <Paper sx={{ p: 3, height: '100%' }}>
-    <Typography variant="h6" gutterBottom>
-      Beitrittsanfragen
-    </Typography>
-    {pendingRequests.length === 0 ? (
-      <Typography variant="body2" color="text.secondary">
-        Es liegen aktuell keine offenen Anfragen vor.
-      </Typography>
-    ) : (
-      <Stack spacing={2}>
-        {pendingRequests.map((request) => {
-          const displayName = getDisplayName(request) ?? request.userUid;
-          return (
-            <Paper key={request.id} variant="outlined" sx={{ p: 2 }}>
-              <Stack spacing={1}>
-                <Typography variant="subtitle1" fontWeight={600}>
-                  {displayName}
-                </Typography>
-                {request.motivation && (
-                  <Typography variant="body2" color="text.secondary">
-                    {request.motivation}
-                  </Typography>
-                )}
-                <Stack direction="row" spacing={1} justifyContent="flex-end">
-                  <Button size="small" color="success" variant="contained" onClick={() => onDecision(request.id, true)}>
-                    Annehmen
-                  </Button>
-                  <Button size="small" color="error" variant="outlined" onClick={() => onDecision(request.id, false)}>
-                    Ablehnen
-                  </Button>
-                </Stack>
-              </Stack>
-            </Paper>
-          );
-        })}
-      </Stack>
-    )}
-  </Paper>
-);
 
 const OwnerCycleCard: React.FC<{
   cycle: JamiahCycle | null;
@@ -174,9 +132,30 @@ const PaymentStatusWidget: React.FC<{
 const PersonalNotesWidget: React.FC<{
   roles: ReturnType<typeof useJamiahContext>['roles'];
   statusNeedsSetup: boolean;
+  pendingJoinRequests: number;
   jamiahName?: string;
-}> = ({ roles, statusNeedsSetup, jamiahName }) => {
+  onMembersClick: () => void;
+}> = ({ roles, statusNeedsSetup, pendingJoinRequests, jamiahName, onMembersClick }) => {
   const notes: React.ReactNode[] = [];
+
+  if (roles.isOwner && pendingJoinRequests > 0) {
+    notes.push(
+      <Alert
+        key="applications"
+        severity="warning"
+        variant="outlined"
+        action={
+          <Button size="small" color="warning" onClick={onMembersClick}>
+            Prüfen
+          </Button>
+        }
+      >
+        {pendingJoinRequests === 1
+          ? 'Eine offene Bewerbung wartet auf deine Entscheidung.'
+          : `${pendingJoinRequests} offene Bewerbungen warten auf deine Entscheidung.`}
+      </Alert>
+    );
+  }
 
   if (statusNeedsSetup && roles.isOwner) {
     notes.push(
@@ -223,8 +202,7 @@ const PersonalNotesWidget: React.FC<{
 export const Dashboard = () => {
   const navigate = useNavigate();
   const userName = useSelector(selectName);
-  const { jamiah, cycle, members, payments, pendingRequests, roles, status, currentUid, respondToJoinRequest } =
-    useJamiahContext();
+  const { jamiah, cycle, members, payments, pendingRequests, roles, status, currentUid } = useJamiahContext();
 
   const stats = useMemo(
     () => [
@@ -258,6 +236,9 @@ export const Dashboard = () => {
     [members.length, navigate, payments.length, pendingRequests.length, roles.hasOpenPayment]
   );
 
+  const showNotificationBar =
+    (roles.isOwner && pendingRequests.length > 0) || status.needsSetup || roles.hasOpenPayment;
+
   const recentVotes = [
     { title: 'Neuer Vorstand ab Juli', status: 'Läuft' },
     { title: 'Ramadan-Spendenaktion', status: 'Abgeschlossen' },
@@ -282,6 +263,44 @@ export const Dashboard = () => {
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         Willkommen zurück{userName ? `, ${userName}` : ''} 👋
       </Typography>
+
+      {showNotificationBar && (
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1}
+          mb={3}
+          useFlexGap
+          flexWrap="wrap"
+        >
+          {roles.isOwner && pendingRequests.length > 0 && (
+            <Chip
+              icon={<GroupAddIcon />}
+              color="secondary"
+              label={`${pendingRequests.length} offene Bewerbungen`}
+              onClick={() => navigate('members')}
+              sx={{ cursor: 'pointer' }}
+            />
+          )}
+          {roles.isOwner && status.needsSetup && (
+            <Chip
+              icon={<SettingsSuggestIcon />}
+              color="warning"
+              label="Setup erforderlich"
+              onClick={() => navigate('setup')}
+              sx={{ cursor: 'pointer' }}
+            />
+          )}
+          {roles.hasOpenPayment && (
+            <Chip
+              icon={<PaymentsIcon />}
+              color="error"
+              label="Zahlung offen"
+              onClick={() => navigate('payments')}
+              sx={{ cursor: 'pointer' }}
+            />
+          )}
+        </Stack>
+      )}
 
       <Grid container spacing={3} mb={4}>
         {stats.map((stat) => (
@@ -315,11 +334,6 @@ export const Dashboard = () => {
       <Grid container spacing={3} mb={4}>
         {roles.isOwner && (
           <Grid item xs={12} md={6}>
-            <OwnerJoinRequestsCard pendingRequests={pendingRequests} onDecision={respondToJoinRequest} />
-          </Grid>
-        )}
-        {roles.isOwner && (
-          <Grid item xs={12} md={6}>
             <OwnerCycleCard
               cycle={cycle}
               members={members}
@@ -334,7 +348,13 @@ export const Dashboard = () => {
           </Grid>
         )}
         <Grid item xs={12} md={personalCols}>
-          <PersonalNotesWidget roles={roles} statusNeedsSetup={status.needsSetup} jamiahName={jamiah?.name} />
+          <PersonalNotesWidget
+            roles={roles}
+            statusNeedsSetup={status.needsSetup}
+            pendingJoinRequests={pendingRequests.length}
+            jamiahName={jamiah?.name}
+            onMembersClick={() => navigate('members')}
+          />
         </Grid>
       </Grid>
 
