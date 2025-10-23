@@ -1,5 +1,8 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -9,6 +12,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   LinearProgress,
   List,
   ListItem,
@@ -17,11 +21,13 @@ import {
   Paper,
   Skeleton,
   Snackbar,
+  Stack,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
 import EuroIcon from '@mui/icons-material/Euro';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { API_BASE_URL } from '../../constants/api';
@@ -161,6 +167,260 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({ amount, clientSec
   );
 };
 
+interface PaymentStatusHeaderProps {
+  round: Round | null;
+  currentUserPayment: Payment | null;
+  rateAmount: number;
+  wallet?: WalletDto | null;
+}
+
+const paymentStatusLabels: Record<PaymentStatus, { label: string; color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' }> = {
+  UNPAID: { label: 'Offen', color: 'warning' },
+  INITIATED: { label: 'In Bearbeitung', color: 'info' },
+  PAID_SELF_CONFIRMED: { label: 'Bezahlt', color: 'success' },
+  RECEIPT_CONFIRMED: { label: 'Empfang bestätigt', color: 'success' },
+};
+
+const PaymentStatusHeader: React.FC<PaymentStatusHeaderProps> = ({ round, currentUserPayment, rateAmount, wallet }) => {
+  if (!round || !currentUserPayment) return null;
+
+  const amount = currentUserPayment.amount ?? round.expectedAmount ?? rateAmount;
+  const dueDate = round.startDate ? new Date(round.startDate).toLocaleDateString() : undefined;
+  const statusMeta = paymentStatusLabels[currentUserPayment.status] || paymentStatusLabels.UNPAID;
+
+  return (
+    <Paper sx={{ mb: 3, p: 2 }}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        flexDirection={{ xs: 'column', sm: 'row' }}
+        gap={2}
+      >
+        <Box>
+          <Typography variant="subtitle2" color="text.secondary">
+            Dein Zahlungsstatus
+          </Typography>
+          <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+            <Chip label={statusMeta.label} color={statusMeta.color} size="small" />
+            <Typography variant="body2">
+              Betrag: {amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+            </Typography>
+          </Box>
+          {dueDate && (
+            <Typography variant="body2" color="text.secondary">
+              Nächste Fälligkeit: {dueDate}
+            </Typography>
+          )}
+        </Box>
+        {wallet && (
+          <Box textAlign={{ xs: 'left', sm: 'right' }}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Wallet-Stand
+            </Typography>
+            <Typography variant="body1" fontWeight="bold">
+              {wallet.balance.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+            </Typography>
+            {wallet.lastUpdated && (
+              <Typography variant="caption" color="text.secondary">
+                Aktualisiert am {new Date(wallet.lastUpdated).toLocaleDateString()}
+              </Typography>
+            )}
+          </Box>
+        )}
+      </Box>
+    </Paper>
+  );
+};
+
+interface OwnerPaymentsPanelProps {
+  summary: CycleSummary[];
+  wallets: WalletDto[];
+  getMemberName: (uid?: string) => string;
+  onSelectCycle: (cycleId: number) => void;
+  loadingWallets: boolean;
+}
+
+const OwnerPaymentsPanel: React.FC<OwnerPaymentsPanelProps> = ({ summary, wallets, getMemberName, onSelectCycle, loadingWallets }) => (
+  <Accordion defaultExpanded sx={{ mb: 3 }}>
+    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+      <Typography fontWeight="bold">Owner-Bereich</Typography>
+    </AccordionSummary>
+    <AccordionDetails>
+      <Stack spacing={3}>
+        <Box>
+          <Typography variant="subtitle1" gutterBottom>Runden-Übersicht</Typography>
+          {summary.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              Noch keine Rundenübersicht verfügbar.
+            </Typography>
+          ) : (
+            summary.map(s => {
+              const name = getMemberName(s.recipientUid);
+              const status = s.completed
+                ? 'abgeschlossen'
+                : s.receiptCount === s.totalPayers
+                  ? 'Empfang bestätigt'
+                  : s.paidCount === s.totalPayers
+                    ? 'vollständig bezahlt'
+                    : 'offen';
+              const chipColor: 'success' | 'warning' | 'default' = s.completed
+                ? 'success'
+                : s.receiptCount === s.totalPayers || s.paidCount === s.totalPayers
+                  ? 'warning'
+                  : 'default';
+              const paidPct = s.totalPayers ? (s.paidCount / s.totalPayers) * 100 : 0;
+              const receiptPct = s.totalPayers ? (s.receiptCount / s.totalPayers) * 100 : 0;
+              return (
+                <Box key={s.id} mb={2} sx={{ cursor: 'pointer' }} onClick={() => onSelectCycle(s.id)}>
+                  <Typography variant="body2">Runde {s.cycleNumber} – Empfänger: {name}</Typography>
+                  <Box display="flex" alignItems="center" gap={1} mt={1}>
+                    <LinearProgress variant="determinate" value={paidPct} sx={{ flex: 1 }} />
+                    <LinearProgress variant="determinate" value={receiptPct} color="secondary" sx={{ flex: 1 }} />
+                    <Chip label={status} size="small" color={chipColor} />
+                  </Box>
+                  <Typography variant="caption">Bezahlt {s.paidCount}/{s.totalPayers} – Empfang bestätigt {s.receiptCount}/{s.totalPayers}</Typography>
+                </Box>
+              );
+            })
+          )}
+        </Box>
+        <Divider />
+        <Box>
+          <Typography variant="subtitle1" gutterBottom>Wallet-Stände</Typography>
+          {loadingWallets ? (
+            <Skeleton variant="rectangular" height={80} />
+          ) : wallets.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              Keine Wallet-Daten verfügbar.
+            </Typography>
+          ) : (
+            wallets.map(wallet => (
+              <Box key={wallet.memberId} display="flex" justifyContent="space-between" mb={1}>
+                <Typography variant="body2">{getMemberName(wallet.memberId)}</Typography>
+                <Typography variant="body2">{wallet.balance.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</Typography>
+              </Box>
+            ))
+          )}
+        </Box>
+      </Stack>
+    </AccordionDetails>
+  </Accordion>
+);
+
+interface MemberPaymentListProps {
+  round: Round;
+  totalPayers: number;
+  paidCount: number;
+  receiptCount: number;
+  roundStatus: string;
+  canPay: boolean;
+  currentUid?: string;
+  currentUserPayment: Payment | null;
+  onInitiatePayment: (payment: Payment) => void;
+  getMemberName: (uid?: string) => string;
+  renderStatusLabel: (payment: Payment) => string;
+  loadingRound: boolean;
+  rateAmount: number;
+}
+
+const MemberPaymentList: React.FC<MemberPaymentListProps> = ({
+  round,
+  totalPayers,
+  paidCount,
+  receiptCount,
+  roundStatus,
+  canPay,
+  currentUid,
+  currentUserPayment,
+  onInitiatePayment,
+  getMemberName,
+  renderStatusLabel,
+  loadingRound,
+  rateAmount,
+}) => {
+  const amountPerPayment = round.expectedAmount ?? rateAmount;
+
+  return (
+    <Box>
+      <Box display="flex" justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} flexDirection={{ xs: 'column', sm: 'row' }} gap={2} mb={2}>
+        <Box>
+          <Typography variant="body2">Empfänger: {getMemberName(round.recipient?.uid)}</Typography>
+          <Typography variant="body2">Bezahlt: {paidCount}/{totalPayers}</Typography>
+          <Typography variant="body2">Empfang bestätigt: {receiptCount}/{totalPayers}</Typography>
+          <Typography variant="body2">Rundenstatus: {roundStatus}</Typography>
+        </Box>
+        <Box textAlign={{ xs: 'left', sm: 'right' }}>
+          <Typography variant="body2">Beitrag je Zahlung: {amountPerPayment.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</Typography>
+          <Typography variant="body2">Startdatum: {new Date(round.startDate).toLocaleDateString()}</Typography>
+        </Box>
+      </Box>
+      <Box mb={2} display="flex" flexWrap="wrap" gap={2} alignItems="center">
+        <Tooltip title={canPay ? '' : 'Du kannst nur in deiner Runde zahlen, solange du nicht Empfänger bist.'} disableHoverListener={canPay}>
+          <span>
+            <Button
+              variant="contained"
+              startIcon={<EuroIcon />}
+              disabled={!canPay || !currentUserPayment}
+              onClick={() => currentUserPayment && onInitiatePayment(currentUserPayment)}
+            >
+              Beitrag bezahlen
+            </Button>
+          </span>
+        </Tooltip>
+      </Box>
+      {loadingRound ? (
+        <Skeleton variant="rectangular" height={120} />
+      ) : (
+        <List>
+          {round.payments.map(payment => {
+            const name = getMemberName(payment.user?.uid);
+            const isCurrent = payment.user?.uid === currentUid;
+            return (
+              <ListItem key={payment.id} secondaryAction={
+                isCurrent && (payment.status === 'UNPAID' || payment.status === 'INITIATED') ? (
+                  <Button size="small" variant="outlined" onClick={() => onInitiatePayment(payment)}>
+                    Jetzt zahlen
+                  </Button>
+                ) : (
+                  <Typography variant="body2">{renderStatusLabel(payment)}</Typography>
+                )
+              }>
+                <ListItemText primary={name} secondary={isCurrent ? 'Das bist du' : undefined} />
+              </ListItem>
+            );
+          })}
+        </List>
+      )}
+    </Box>
+  );
+};
+
+interface RecipientConfirmationProps {
+  round: Round | null;
+  isRecipient: boolean;
+  onConfirm: () => void;
+}
+
+const RecipientConfirmation: React.FC<RecipientConfirmationProps> = ({ round, isRecipient, onConfirm }) => {
+  if (!round || !isRecipient) {
+    return null;
+  }
+
+  const canConfirm = round.allPaid && !round.receiptConfirmed;
+
+  return (
+    <Box mt={2} display="flex" flexWrap="wrap" gap={2} justifyContent="space-between" alignItems="center">
+      <Typography variant="body2">
+        Sobald alle Beiträge eingegangen sind, kannst du den Empfang bestätigen.
+      </Typography>
+      <Button variant="outlined" onClick={onConfirm} disabled={!canConfirm}>
+        Empfang quittieren
+      </Button>
+    </Box>
+  );
+};
+
 export const Payments: React.FC = () => {
   const { user } = useAuth();
   const currentUid = user?.uid;
@@ -184,7 +444,7 @@ export const Payments: React.FC = () => {
   const [paymentClientSecret, setPaymentClientSecret] = useState<string | null>(null);
   const [activePayment, setActivePayment] = useState<Payment | null>(null);
 
-  const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
+  const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'error' | 'info' | 'warning' } | null>(null);
 
   const closePaymentDialog = () => {
     setPaymentDialogOpen(false);
@@ -445,6 +705,62 @@ export const Payments: React.FC = () => {
     }
   };
 
+  const memberWallet = !isOwner && wallets.length > 0 ? wallets[0] : null;
+
+  const statusAlerts: React.ReactNode[] = [];
+
+  if (round && currentUserPayment) {
+    if (currentUserPayment.status === 'UNPAID') {
+      statusAlerts.push(
+        <Alert key="payment-unpaid" severity="warning">
+          Deine Zahlung ist noch offen. Bitte begleiche den fälligen Beitrag, damit die Runde weitergehen kann.
+        </Alert>,
+      );
+    }
+    if (currentUserPayment.status === 'INITIATED') {
+      statusAlerts.push(
+        <Alert key="payment-initiated" severity="info">
+          Deine Kartenzahlung wird verarbeitet. Du erhältst eine Bestätigung, sobald sie abgeschlossen ist.
+        </Alert>,
+      );
+    }
+    if (currentUserPayment.status === 'PAID_SELF_CONFIRMED') {
+      statusAlerts.push(
+        <Alert key="payment-paid" severity="success">
+          Danke! Dein Beitrag ist eingegangen und wartet auf die Bestätigung des Empfängers.
+        </Alert>,
+      );
+    }
+  }
+
+  if (round?.completed) {
+    statusAlerts.push(
+      <Alert key="round-completed" severity="success">
+        Diese Runde wurde abgeschlossen. Du kannst die Historie im Owner-Bereich einsehen.
+      </Alert>,
+    );
+  } else if (round?.allPaid && round?.receiptConfirmed) {
+    statusAlerts.push(
+      <Alert key="round-receipt" severity="success">
+        Alle Beiträge wurden bestätigt. Die nächste Runde startet in Kürze.
+      </Alert>,
+    );
+  }
+
+  if (round && isRecipient && round.allPaid && !round.receiptConfirmed) {
+    statusAlerts.push(
+      <Alert key="receipt-pending" severity="info">
+        Alle Zahlungen sind eingegangen. Bestätige jetzt den Empfang, um die nächste Runde zu starten.
+      </Alert>,
+    );
+  }
+
+  const showBankDetailsCTA = Boolean(currentUserPayment && currentUserPayment.status === 'UNPAID');
+
+  const handleBankDetailsClick = () => {
+    setSnackbar({ message: 'Bitte hinterlege deine Bankdaten im Profilbereich.', severity: 'info' });
+  };
+
   if (!groupId) {
     return (
       <Box p={4}>
@@ -481,119 +797,84 @@ export const Payments: React.FC = () => {
           )}
         </Box>
 
-        {isOwner && summary.length > 0 && (
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="h6" mb={2}>Runden-Übersicht</Typography>
-            {summary.map(s => {
-              const name = getMemberName(s.recipientUid);
-              const status = s.completed
-                ? 'abgeschlossen'
-                : s.receiptCount === s.totalPayers
-                  ? 'Empfang bestätigt'
-                  : s.paidCount === s.totalPayers
-                    ? 'vollständig bezahlt'
-                    : 'offen';
-              const chipColor: 'success' | 'warning' | 'default' = s.completed
-                ? 'success'
-                : s.receiptCount === s.totalPayers || s.paidCount === s.totalPayers
-                  ? 'warning'
-                  : 'default';
-              const paidPct = s.totalPayers ? (s.paidCount / s.totalPayers) * 100 : 0;
-              const receiptPct = s.totalPayers ? (s.receiptCount / s.totalPayers) * 100 : 0;
-              return (
-                <Box key={s.id} mb={2} sx={{ cursor: 'pointer' }} onClick={() => setSelectedCycle(s.id)}>
-                  <Typography variant="body2">Runde {s.cycleNumber} – Empfänger: {name}</Typography>
-                  <Box display="flex" alignItems="center" gap={1} mt={1}>
-                    <LinearProgress variant="determinate" value={paidPct} sx={{ flex: 1 }} />
-                    <LinearProgress variant="determinate" value={receiptPct} color="secondary" sx={{ flex: 1 }} />
-                    <Chip label={status} size="small" color={chipColor} />
-                  </Box>
-                  <Typography variant="caption">Bezahlt {s.paidCount}/{s.totalPayers} – Empfang bestätigt {s.receiptCount}/{s.totalPayers}</Typography>
-                </Box>
-              );
-            })}
+        {currentUserPayment && (
+          <PaymentStatusHeader
+            round={round}
+            currentUserPayment={currentUserPayment}
+            rateAmount={rateAmount}
+            wallet={memberWallet}
+          />
+        )}
+
+        {showBankDetailsCTA && (
+          <Paper sx={{ p: 2, mb: 3, border: '1px solid', borderColor: 'warning.light', backgroundColor: 'rgba(255, 193, 7, 0.08)' }}>
+            <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+              <Box>
+                <Typography variant="subtitle1">Bankdaten hinterlegen</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Hinterlege jetzt dein Konto, um Zahlungen schneller abzuwickeln.
+                </Typography>
+              </Box>
+              <Button variant="outlined" color="warning" onClick={handleBankDetailsClick}>
+                Bankdaten hinterlegen
+              </Button>
+            </Box>
           </Paper>
         )}
 
-        {!round && (
+        {statusAlerts.length > 0 && (
+          <Stack spacing={1.5} sx={{ mb: 3 }}>
+            {statusAlerts}
+          </Stack>
+        )}
+
+        {!round ? (
           <Alert severity="info" sx={{ mb: 3 }}>
             {isOwner ? 'Noch keine Runden – Jamiah starten' : 'Keine aktive Runde – bitte vom Admin starten lassen.'}
           </Alert>
+        ) : (
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <MemberPaymentList
+              round={round}
+              totalPayers={totalPayers}
+              paidCount={paidCount}
+              receiptCount={receiptCount}
+              roundStatus={roundStatus}
+              canPay={canPay}
+              currentUid={currentUid}
+              currentUserPayment={currentUserPayment}
+              onInitiatePayment={handleInitiatePayment}
+              getMemberName={getMemberName}
+              renderStatusLabel={renderStatusLabel}
+              loadingRound={loadingRound}
+              rateAmount={rateAmount}
+            />
+            <RecipientConfirmation round={round} isRecipient={isRecipient} onConfirm={handleReceiptConfirm} />
+          </Paper>
         )}
 
-        {round && (
+        {!isOwner && memberWallet && (
           <Paper sx={{ p: 2, mb: 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Box>
-                <Typography variant="body2">Empfänger: {getMemberName(round.recipient?.uid)}</Typography>
-                <Typography variant="body2">Bezahlt: {paidCount}/{totalPayers}</Typography>
-                <Typography variant="body2">Empfang bestätigt: {receiptCount}/{totalPayers}</Typography>
-                <Typography variant="body2">Rundenstatus: {roundStatus}</Typography>
-              </Box>
-              <Box textAlign="right">
-                <Typography variant="body2">Beitrag je Zahlung: {(round.expectedAmount ?? rateAmount).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</Typography>
-                <Typography variant="body2">Startdatum: {new Date(round.startDate).toLocaleDateString()}</Typography>
-              </Box>
-            </Box>
-            <Box mb={2}>
-              <Tooltip title={canPay ? '' : 'Du kannst nur in deiner Runde zahlen, solange du nicht Empfänger bist.'} disableHoverListener={canPay}>
-                <span>
-                  <Button
-                    variant="contained"
-                    startIcon={<EuroIcon />}
-                    disabled={!canPay}
-                    onClick={() => currentUserPayment && handleInitiatePayment(currentUserPayment)}
-                  >
-                    Beitrag bezahlen
-                  </Button>
-                </span>
-              </Tooltip>
-              {isRecipient && round.allPaid && !round.receiptConfirmed && (
-                <Button sx={{ ml: 2 }} variant="outlined" onClick={handleReceiptConfirm}>
-                  Empfang quittieren
-                </Button>
-              )}
-            </Box>
-            {loadingRound ? (
-              <Skeleton variant="rectangular" height={120} />
-            ) : (
-              <List>
-                {round.payments.map(payment => {
-                  const name = getMemberName(payment.user?.uid);
-                  const isCurrent = payment.user?.uid === currentUid;
-                  return (
-                    <ListItem key={payment.id} secondaryAction={
-                      isCurrent && (payment.status === 'UNPAID' || payment.status === 'INITIATED') ? (
-                        <Button size="small" variant="outlined" onClick={() => handleInitiatePayment(payment)}>
-                          Jetzt zahlen
-                        </Button>
-                      ) : (
-                        <Typography variant="body2">{renderStatusLabel(payment)}</Typography>
-                      )
-                    }>
-                      <ListItemText primary={name} secondary={isCurrent ? 'Das bist du' : undefined} />
-                    </ListItem>
-                  );
-                })}
-              </List>
+            <Typography variant="subtitle1" gutterBottom>Dein Wallet</Typography>
+            <Typography variant="body1" fontWeight="bold">
+              {memberWallet.balance.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+            </Typography>
+            {memberWallet.lastUpdated && (
+              <Typography variant="caption" color="text.secondary">
+                Aktualisiert am {new Date(memberWallet.lastUpdated).toLocaleDateString()}
+              </Typography>
             )}
           </Paper>
         )}
 
-        {wallets.length > 0 && (
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="h6" mb={2}>{isOwner ? 'Wallet-Stände aller Mitglieder' : 'Dein Wallet'}</Typography>
-            {loadingWallets ? (
-              <Skeleton variant="rectangular" height={80} />
-            ) : (
-              wallets.map(wallet => (
-                <Box key={wallet.memberId} display="flex" justifyContent="space-between" mb={1}>
-                  <Typography variant="body2">{getMemberName(wallet.memberId)}</Typography>
-                  <Typography variant="body2">{wallet.balance.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</Typography>
-                </Box>
-              ))
-            )}
-          </Paper>
+        {isOwner && (
+          <OwnerPaymentsPanel
+            summary={summary}
+            wallets={wallets}
+            getMemberName={getMemberName}
+            onSelectCycle={cycleId => setSelectedCycle(cycleId)}
+            loadingWallets={loadingWallets}
+          />
         )}
       </Box>
 
