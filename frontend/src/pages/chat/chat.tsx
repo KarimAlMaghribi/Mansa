@@ -5,14 +5,17 @@ import {ChatSidebar} from "../../components/chat/chat-sidebar";
 import Box from "@mui/material/Box";
 import {ChatHeader} from "../../components/chat/chat-header";
 import {ChatMessages} from "../../components/chat/chat-messages";
-import {chatsUnsubscribe, subscribeToMyChats} from "../../store/slices/my-bids";
+import {chatsUnsubscribe, selectActiveChatId, setActiveChat, subscribeToMyChats} from "../../store/slices/my-bids";
 import {AppDispatch} from "../../store/store";
-import {useDispatch} from "react-redux";
+import {useDispatch, useSelector} from "react-redux";
 import {ChatSender} from "../../components/chat/chat-sender";
+import {useParams} from "react-router-dom";
 
 
 export const Chat = () => {
     const dispatch: AppDispatch = useDispatch();
+    const activeChatId = useSelector(selectActiveChatId);
+    const { chatId } = useParams<{ chatId?: string }>();
 
     useEffect(() => {
         dispatch(subscribeToMyChats());
@@ -23,6 +26,12 @@ export const Chat = () => {
             }
         };
     }, [dispatch])
+
+    useEffect(() => {
+        if (chatId && chatId !== activeChatId) {
+            dispatch(setActiveChat(chatId));
+        }
+    }, [chatId, dispatch, activeChatId]);
 
     return (
         <Container maxWidth={false}>

@@ -69,6 +69,7 @@ function App() {
                 <Route path={`/${ROUTES.DOCUMENTS}`} element={<PrivateRoute><Documents /></PrivateRoute>} />
                 <Route path={`/${ROUTES.REPORTS}`} element={<PrivateRoute><Reports /></PrivateRoute>} />
                 <Route path={`/${ROUTES.CHAT}`} element={<PrivateRoute><Chat /></PrivateRoute>} />
+                <Route path={`/${ROUTES.CHAT}/:chatId`} element={<PrivateRoute><Chat /></PrivateRoute>} />
                 <Route path={`/${ROUTES.PROFILE}`} element={<PrivateRoute><Profile /></PrivateRoute>} />
                 <Route path={`/${ROUTES.ACCOUNT}`} element={<PrivateRoute><Account /></PrivateRoute>} />
                 <Route path={`/${ROUTES.SETTINGS}`} element={<PrivateRoute><Settings /></PrivateRoute>} />
