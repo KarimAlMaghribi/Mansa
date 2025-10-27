@@ -39,10 +39,11 @@ export interface JamiahCycle {
 }
 
 export interface JamiahPayment {
-  id: string;
+  id?: string | number;
   status?: string;
   createdAt?: string;
-  amount?: number;
+  paidAt?: string;
+  amount?: number | string;
   user?: {
     uid?: string;
     username?: string;

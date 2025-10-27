@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -8,6 +8,7 @@ import {
   Grid,
   List,
   ListItem,
+  ListItemText,
   Paper,
   Stack,
   Tooltip,
@@ -26,6 +27,45 @@ import {
   JamiahCycle,
   useJamiahContext,
 } from '../../context/JamiahContext';
+import dayjs from 'dayjs';
+import { API_BASE_URL } from '../../constants/api';
+
+interface VotePreview {
+  id: number;
+  title: string;
+  closed?: boolean;
+  result?: string;
+  expiresAt?: string;
+  createdAt?: string;
+}
+
+interface CommunityPreviewItem {
+  primary: string;
+  secondary?: string;
+}
+
+interface CommunityPreviewBlock {
+  title: string;
+  description: string;
+  items: CommunityPreviewItem[];
+  actionLabel: string;
+  actionTarget: string;
+}
+
+const formatDate = (value?: string) => {
+  if (!value) return undefined;
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.format('DD.MM.YYYY') : undefined;
+};
+
+const formatCurrency = (amount?: number) => {
+  if (typeof amount !== 'number') return undefined;
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
 
 const getDisplayName = (
   person?: Pick<JamiahMember, 'firstName' | 'lastName' | 'username' | 'uid'> & { userUid?: string }
@@ -204,6 +244,44 @@ export const Dashboard = () => {
   const userName = useSelector(selectName);
   const { jamiah, cycle, members, payments, pendingRequests, roles, status, currentUid } = useJamiahContext();
 
+  const [votes, setVotes] = useState<VotePreview[]>([]);
+  const [votesLoading, setVotesLoading] = useState(false);
+  const [votesError, setVotesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadVotes = async () => {
+      setVotesLoading(true);
+      setVotesError(null);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/votes`);
+        if (!response.ok) {
+          throw new Error('failed to load votes');
+        }
+        const data: VotePreview[] = await response.json();
+        if (isMounted) {
+          setVotes(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('[dashboard] Failed to load votes', error);
+        if (isMounted) {
+          setVotes([]);
+          setVotesError('Abstimmungen konnten nicht geladen werden.');
+        }
+      } finally {
+        if (isMounted) {
+          setVotesLoading(false);
+        }
+      }
+    };
+
+    void loadVotes();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const stats = useMemo(
     () => [
       {
@@ -239,20 +317,124 @@ export const Dashboard = () => {
   const showNotificationBar =
     (roles.isOwner && pendingRequests.length > 0) || status.needsSetup || roles.hasOpenPayment;
 
-  const recentVotes = [
-    { title: 'Neuer Vorstand ab Juli', status: 'Läuft' },
-    { title: 'Ramadan-Spendenaktion', status: 'Abgeschlossen' },
-  ];
+  const voteItems = useMemo(() => {
+    const toStatus = (vote: VotePreview) => {
+      if (vote.closed) {
+        return vote.result ? `Ergebnis: ${vote.result}` : 'Abgeschlossen';
+      }
+      const dateLabel = formatDate(vote.expiresAt);
+      return dateLabel ? `Läuft bis ${dateLabel}` : 'Läuft';
+    };
 
-  const recentPayments = [
-    { month: 'April 2025', amount: '50€', status: 'Bezahlt' },
-    { month: 'Mai 2025', amount: '50€', status: 'Ausstehend' },
-  ];
+    return votes
+      .slice()
+      .sort((a, b) => {
+        const dateB = dayjs(b.expiresAt ?? b.createdAt ?? 0);
+        const dateA = dayjs(a.expiresAt ?? a.createdAt ?? 0);
+        return dateB.valueOf() - dateA.valueOf();
+      })
+      .slice(0, 3)
+      .map((vote) => ({
+        id: vote.id,
+        title: vote.title,
+        status: toStatus(vote),
+      }));
+  }, [votes]);
 
-  const personalDocs = [
-    { name: 'Mitgliedsbestätigung.pdf' },
-    { name: 'Beitragsquittung_April.pdf' },
-  ];
+  const paymentHistory = useMemo(() => {
+    const statusLabel = (status?: string) => {
+      switch (status) {
+        case 'PAID_SELF_CONFIRMED':
+          return 'Selbst bestätigt';
+        case 'RECEIPT_CONFIRMED':
+          return 'Empfang bestätigt';
+        case 'INITIATED':
+          return 'Initiiert';
+        case 'UNPAID':
+          return 'Offen';
+        default:
+          return status ?? 'Unbekannt';
+      }
+    };
+
+    return payments
+      .slice()
+      .sort((a, b) => {
+        const dateB = dayjs(b.paidAt ?? b.createdAt ?? 0);
+        const dateA = dayjs(a.paidAt ?? a.createdAt ?? 0);
+        return dateB.valueOf() - dateA.valueOf();
+      })
+      .slice(0, 5)
+      .map((payment) => {
+        const amountValue =
+          typeof payment.amount === 'number'
+            ? payment.amount
+            : Number.isFinite(Number(payment.amount))
+            ? Number(payment.amount)
+            : undefined;
+        const dateLabel = formatDate(payment.paidAt ?? payment.createdAt);
+        const payerName = getDisplayName({
+          firstName: payment.user?.firstName,
+          lastName: payment.user?.lastName,
+          username: payment.user?.username,
+          uid: payment.user?.uid,
+        });
+
+        const id =
+          payment.id ??
+          `${payment.user?.uid ?? 'payment'}-${payment.paidAt ?? payment.createdAt ?? payment.status ?? 'unknown'}`;
+
+        return {
+          id,
+          payerName,
+          dateLabel,
+          amount: formatCurrency(amountValue),
+          status: statusLabel(payment.status),
+          isCurrentUser: payment.user?.uid === currentUid,
+        };
+      });
+  }, [payments, currentUid]);
+
+  const communityPreview: CommunityPreviewBlock = useMemo(() => {
+    if (roles.isOwner && pendingRequests.length > 0) {
+      return {
+        title: 'Offene Beitrittsanfragen',
+        description: 'Triff Entscheidungen für neue Mitglieder.',
+        items: pendingRequests.slice(0, 4).map((request) => ({
+          primary:
+            getDisplayName({
+              firstName: request.firstName,
+              lastName: request.lastName,
+              username: request.username,
+              uid: request.userUid,
+              userUid: request.userUid,
+            }) ?? request.userUid,
+          secondary: request.motivation ? `Motivation: ${request.motivation}` : 'Wartet auf Entscheidung',
+        })),
+        actionLabel: 'Anfragen verwalten',
+        actionTarget: 'members',
+      };
+    }
+
+    return {
+      title: 'Mitgliederübersicht',
+      description:
+        members.length > 0
+          ? 'Ein Blick auf einige aktive Mitglieder deiner Jamiah.'
+          : 'Noch keine Mitglieder hinzugefügt.',
+      items: members.slice(0, 5).map((member) => ({
+        primary: getDisplayName(member) ?? member.uid ?? String(member.id),
+        secondary:
+          member.uid === currentUid
+            ? 'Das bist du'
+            : member.uid === jamiah?.ownerId
+            ? 'Leitung'
+            : undefined,
+      })),
+      actionLabel: 'Mitgliederliste öffnen',
+      actionTarget: 'members',
+    };
+  }, [roles.isOwner, pendingRequests, members, currentUid, jamiah?.ownerId]);
 
   const showPaymentWidget = roles.isPayer || roles.isRecipient;
   const paymentCols = roles.isOwner ? 6 : 8;
@@ -359,41 +541,72 @@ export const Dashboard = () => {
       </Grid>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Letzte Abstimmungen
-            </Typography>
+        <Grid item xs={12} md={6} lg={4}>
+          <Paper sx={{ p: 3, height: '100%' }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+              <Typography variant="h6">Aktuelle Abstimmungen</Typography>
+              <Chip size="small" label={votes.length} color="default" />
+            </Stack>
             <Stack spacing={1}>
-              {recentVotes.map((vote, index) => (
-                <Box key={vote.title}>
-                  <Typography>
-                    {vote.title} – <i>{vote.status}</i>
-                  </Typography>
-                  {index < recentVotes.length - 1 && <Divider sx={{ my: 1 }} />}
-                </Box>
-              ))}
+              {votesLoading && <Typography color="text.secondary">Lade Abstimmungen...</Typography>}
+              {!votesLoading && votesError && (
+                <Typography color="error" variant="body2">
+                  {votesError}
+                </Typography>
+              )}
+              {!votesLoading && !votesError && voteItems.length === 0 && (
+                <Typography color="text.secondary">Es liegen keine Abstimmungen vor.</Typography>
+              )}
+              {!votesLoading && !votesError &&
+                voteItems.map((vote, index) => (
+                  <Box key={vote.id}>
+                    <Typography fontWeight={600}>{vote.title}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {vote.status}
+                    </Typography>
+                    {index < voteItems.length - 1 && <Divider sx={{ my: 1 }} />}
+                  </Box>
+                ))}
             </Stack>
             <Button size="small" sx={{ mt: 2 }} onClick={() => navigate('votes')}>
-              Zu den Abstimmungen
+              Abstimmungen öffnen
             </Button>
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
+        <Grid item xs={12} md={6} lg={4}>
+          <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
-              Meine Zahlungen
+              Zahlungsverlauf
             </Typography>
             <List>
-              {recentPayments.map((payment) => (
-                <ListItem key={payment.month} disableGutters>
+              {paymentHistory.length === 0 && (
+                <ListItem disableGutters>
+                  <ListItemText
+                    primary="Noch keine Zahlungen erfasst."
+                    primaryTypographyProps={{ color: 'text.secondary' }}
+                  />
+                </ListItem>
+              )}
+              {paymentHistory.map((payment) => (
+                <ListItem key={payment.id} disableGutters sx={{ alignItems: 'flex-start' }}>
                   <Box flexGrow={1}>
-                    <Typography>{`${payment.month} – ${payment.amount}`}</Typography>
+                    <Typography fontWeight={payment.isCurrentUser ? 600 : 500}>
+                      {payment.payerName ?? 'Unbekanntes Mitglied'}
+                      {payment.isCurrentUser ? ' (Du)' : ''}
+                    </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {payment.status}
+                      {payment.dateLabel ?? 'Datum unbekannt'}
                     </Typography>
                   </Box>
+                  <Stack spacing={1} alignItems="flex-end">
+                    {payment.amount && (
+                      <Typography variant="body2" fontWeight={600}>
+                        {payment.amount}
+                      </Typography>
+                    )}
+                    <Chip label={payment.status} size="small" variant="outlined" />
+                  </Stack>
                 </ListItem>
               ))}
             </List>
@@ -403,20 +616,38 @@ export const Dashboard = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
+        <Grid item xs={12} md={6} lg={4}>
+          <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
-              Meine Dokumente
+              {communityPreview.title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              {communityPreview.description}
             </Typography>
             <List>
-              {personalDocs.map((doc) => (
-                <ListItem key={doc.name} disableGutters>
-                  <Typography>{doc.name}</Typography>
+              {communityPreview.items.length === 0 && (
+                <ListItem disableGutters>
+                  <ListItemText
+                    primary="Keine Einträge vorhanden."
+                    primaryTypographyProps={{ color: 'text.secondary' }}
+                  />
                 </ListItem>
+              )}
+              {communityPreview.items.map((item, index) => (
+                <React.Fragment key={`${item.primary}-${index}`}>
+                  <ListItem disableGutters>
+                    <ListItemText
+                      primary={item.primary}
+                      secondary={item.secondary}
+                      primaryTypographyProps={{ fontWeight: 500 }}
+                    />
+                  </ListItem>
+                  {index < communityPreview.items.length - 1 && <Divider />}
+                </React.Fragment>
               ))}
             </List>
-            <Button size="small" onClick={() => navigate('documents')}>
-              Alle Dokumente anzeigen
+            <Button size="small" onClick={() => navigate(communityPreview.actionTarget)}>
+              {communityPreview.actionLabel}
             </Button>
           </Paper>
         </Grid>
