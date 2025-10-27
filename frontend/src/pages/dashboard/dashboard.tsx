@@ -18,7 +18,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import PaymentsIcon from '@mui/icons-material/Payments';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { selectName } from '../../store/slices/user-profile';
 import {
@@ -29,6 +29,9 @@ import {
 } from '../../context/JamiahContext';
 import dayjs from 'dayjs';
 import { API_BASE_URL } from '../../constants/api';
+import { AppDispatch, RootState } from '../../store/store';
+import { setActiveChat } from '../../store/slices/my-bids';
+import { formatLastActivity } from '../../components/chat/utils';
 
 interface VotePreview {
   id: number;
@@ -240,14 +243,47 @@ const PersonalNotesWidget: React.FC<{
 };
 
 export const Dashboard = () => {
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const { groupId } = useParams<{ groupId: string }>();
   const userName = useSelector(selectName);
   const { jamiah, cycle, members, payments, pendingRequests, roles, status, currentUid } = useJamiahContext();
+  const groupChatContextId = jamiah?.id ?? groupId ?? null;
+  const groupChat = useSelector((state: RootState) => {
+    if (!groupChatContextId) {
+      return undefined;
+    }
+
+    return state.myBids.allChats.find(
+      (chat) => chat.context === 'jamiah_group' && chat.contextId === groupChatContextId
+    );
+  });
+  const groupChatId = groupChat?.id;
+  const groupChatParticipantCount = groupChat?.participants?.length ?? 0;
+  const groupChatLastMessage = useMemo(() => {
+    if (typeof groupChat?.lastMessage !== 'string') {
+      return 'Noch keine Nachrichten';
+    }
+
+    const trimmed = groupChat.lastMessage.trim();
+    return trimmed.length > 0 ? trimmed : 'Noch keine Nachrichten';
+  }, [groupChat?.lastMessage]);
+  const groupChatActivityText = groupChat?.lastActivity
+    ? `Letzte Aktivität: ${formatLastActivity(groupChat.lastActivity)}`
+    : 'Noch keine Aktivität';
 
   const [votes, setVotes] = useState<VotePreview[]>([]);
   const [votesLoading, setVotesLoading] = useState(false);
   const [votesError, setVotesError] = useState<string | null>(null);
+
+  const openGroupChat = useCallback(() => {
+    if (!groupChatId) {
+      return;
+    }
+
+    dispatch(setActiveChat(groupChatId));
+    navigate(`/chat/${groupChatId}`);
+  }, [dispatch, navigate, groupChatId]);
 
   const navigateWithinJamiah = useCallback(
     (path: string) => {
@@ -550,7 +586,7 @@ export const Dashboard = () => {
       </Grid>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={6} lg={4}>
+        <Grid item xs={12} md={6} lg={3}>
           <Paper sx={{ p: 3, height: '100%' }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
               <Typography variant="h6">Aktuelle Abstimmungen</Typography>
@@ -583,7 +619,7 @@ export const Dashboard = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6} lg={4}>
+        <Grid item xs={12} md={6} lg={3}>
           <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
               Zahlungsverlauf
@@ -625,7 +661,55 @@ export const Dashboard = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6} lg={4}>
+        <Grid item xs={12} md={6} lg={3}>
+          <Paper sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
+              <Typography variant="h6">Gruppenchat</Typography>
+              {groupChatParticipantCount > 0 && (
+                <Chip size="small" label={`${groupChatParticipantCount} Teilnehmende`} color="default" />
+              )}
+            </Stack>
+            <Box flexGrow={1}>
+              {groupChat ? (
+                <Stack spacing={1.5}>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Letzte Nachricht
+                    </Typography>
+                    <Typography
+                      variant="body1"
+                      fontWeight={500}
+                      noWrap
+                      title={groupChatLastMessage}
+                    >
+                      {groupChatLastMessage}
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {groupChatActivityText}
+                  </Typography>
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  Es wurde noch kein Gruppenchat gestartet. Öffne die Mitgliederübersicht, um einen Chat zu
+                  erstellen.
+                </Typography>
+              )}
+            </Box>
+            <Stack direction="row" spacing={1} mt={2}>
+              <Button size="small" variant="contained" onClick={openGroupChat} disabled={!groupChatId}>
+                Zum Gruppenchat
+              </Button>
+              {!groupChat && (
+                <Button size="small" onClick={() => navigateWithinJamiah('members')}>
+                  Mitglieder öffnen
+                </Button>
+              )}
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={6} lg={3}>
           <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
               {communityPreview.title}
