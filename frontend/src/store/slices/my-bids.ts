@@ -4,7 +4,6 @@ import {FetchStatusEnum} from "../../enums/FetchStatus.enum";
 import {FetchStatus} from "../../types/FetchStatus";
 import {
     Timestamp,
-    Unsubscribe,
     collection,
     doc,
     getDocs,
@@ -31,7 +30,7 @@ export interface ChatMessage {
     read: boolean;
 }
 
-export type ChatContext = "risk" | "jamiah_request" | "jamiah_member";
+export type ChatContext = "risk" | "jamiah_request" | "jamiah_member" | "jamiah_group";
 
 export interface ChatParticipant {
     name?: string;
@@ -53,6 +52,7 @@ export interface Chat {
     status?: ChatStatus;
     participants?: string[];
     participantsKey?: string;
+    kind?: "direct" | "group";
 }
 
 export interface MyBidsState {
@@ -173,9 +173,14 @@ export const createChat = createAsyncThunk<Chat, Omit<Chat, "id">, { rejectValue
 
             const participantsKey = participants.join("__");
 
+            const isGroupChat =
+                chatData.kind === "group" ||
+                chatData.context === "jamiah_group" ||
+                participants.length > 2;
+
             const constraints = [];
 
-            if (participantsKey) {
+            if (!isGroupChat && participantsKey) {
                 constraints.push(where("participantsKey", "==", participantsKey));
             }
 
@@ -206,13 +211,14 @@ export const createChat = createAsyncThunk<Chat, Omit<Chat, "id">, { rejectValue
                 created: createdAt,
                 lastActivity,
                 participants,
-                participantsKey: participantsKey || undefined,
+                participantsKey: !isGroupChat && participantsKey ? participantsKey : undefined,
+                kind: isGroupChat ? "group" : "direct",
             };
 
             await setDoc(chatRef, {
                 ...newChat,
                 participants,
-                participantsKey: participantsKey || undefined,
+                participantsKey: !isGroupChat && participantsKey ? participantsKey : undefined,
                 updatedAt: serverTimestamp(),
             });
 
@@ -239,12 +245,18 @@ export const subscribeToMyChats = createAsyncThunk<void, void, { rejectValue: st
             const chatsRef = collection(db, FirestoreCollectionEnum.CHATS);
             const providerQuery = query(chatsRef, where("riskProvider.uid", "==", userUid));
             const takerQuery = query(chatsRef, where("riskTaker.uid", "==", userUid));
+            const groupQuery = query(
+                chatsRef,
+                where("participants", "array-contains", userUid),
+                where("kind", "==", "group")
+            );
 
             let providerChats: Chat[] = [];
             let takerChats: Chat[] = [];
+            let groupChats: Chat[] = [];
 
             const emit = () => {
-                dispatch(setChats(combineChats(providerChats, takerChats)));
+                dispatch(setChats(combineChats(providerChats, takerChats, groupChats)));
             };
 
             const providerUnsub = onSnapshot(providerQuery, (snapshot) => {
@@ -263,9 +275,18 @@ export const subscribeToMyChats = createAsyncThunk<void, void, { rejectValue: st
                 emit();
             });
 
+            const groupUnsub = onSnapshot(groupQuery, (snapshot) => {
+                groupChats = snapshot.docs.map((doc) => ({
+                    id: doc.id,
+                    ...doc.data(),
+                })) as Chat[];
+                emit();
+            });
+
             chatsUnsubscribe = () => {
                 providerUnsub();
                 takerUnsub();
+                groupUnsub();
                 chatsUnsubscribe = null;
             };
         } catch (error) {
