@@ -233,10 +233,19 @@ export const createChat = createAsyncThunk<Chat, Omit<Chat, "id">, { rejectValue
 export const subscribeToMyChats = createAsyncThunk<void, void, { rejectValue: string }>(
     "myBids/subscribeToMyChats",
     async (_, {rejectWithValue, dispatch}) => {
-        try {
-            const userUid = auth.currentUser?.uid;
-            if (!userUid) throw new Error("User not authenticated");
+        const userUid = auth.currentUser?.uid;
 
+        if (!userUid) {
+            if (chatsUnsubscribe) {
+                chatsUnsubscribe();
+                chatsUnsubscribe = null;
+            }
+
+            dispatch(setChats([]));
+            return;
+        }
+
+        try {
             if (chatsUnsubscribe) {
                 chatsUnsubscribe();
                 chatsUnsubscribe = null;
@@ -302,11 +311,14 @@ export const fetchProviderChats = createAsyncThunk<
     { rejectValue: string }
 >(
     "myBids/fetchChats",
-    async (_, {rejectWithValue, getState}) => {
-        try {
-            const userUid = auth.currentUser?.uid;
-            if (!userUid) throw new Error("User not authenticated");
+    async (_, {rejectWithValue}) => {
+        const userUid = auth.currentUser?.uid;
 
+        if (!userUid) {
+            return [];
+        }
+
+        try {
             const chatsRef = collection(db, "chats");
 
             const q = query(chatsRef, where("riskTaker.uid", "==", userUid));
@@ -328,10 +340,13 @@ export const fetchProviderChats = createAsyncThunk<
 export const fetchMyChats = createAsyncThunk<Chat[], void, { rejectValue: string }>(
     "myBids/fetchMyChats",
     async (_, {rejectWithValue}) => {
-        try {
-            const userUid = auth.currentUser?.uid;
-            if (!userUid) throw new Error("User not authenticated");
+        const userUid = auth.currentUser?.uid;
 
+        if (!userUid) {
+            return [];
+        }
+
+        try {
             const chatsRef = collection(db, "chats");
 
             const providerQuery = query(chatsRef, where("riskProvider.uid", "==", userUid));
