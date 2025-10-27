@@ -14,29 +14,22 @@ import {
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
-import { useParams } from 'react-router-dom';
-import { API_BASE_URL } from '../../constants/api';
 import { useAuth } from '../../context/AuthContext';
+import { useJamiahContext } from '../../context/JamiahContext';
 
 export const Documents = () => {
-  const [isAdmin, setIsAdmin] = React.useState(false);
-  const { groupId } = useParams();
   const { user } = useAuth();
-  const userUid = user?.uid;
-
-  React.useEffect(() => {
-    if (!groupId || !userUid) {
-      setIsAdmin(false);
-      return;
+  const { jamiah, members, roles, currentUid } = useJamiahContext();
+  const isAdmin = React.useMemo(() => {
+    if (roles.isOwner) {
+      return true;
     }
-
-    fetch(`${API_BASE_URL}/api/jamiahs/${groupId}`)
-      .then((res) => res.json())
-      .then((jamiah) => {
-        setIsAdmin(jamiah.ownerId === userUid);
-      })
-      .catch(() => setIsAdmin(false));
-  }, [groupId, userUid]);
+    if (!jamiah?.ownerId) {
+      return false;
+    }
+    const uidToCheck = currentUid ?? user?.uid;
+    return Boolean(uidToCheck && jamiah.ownerId === uidToCheck);
+  }, [roles.isOwner, jamiah?.ownerId, currentUid, user?.uid]);
 
   const allDocuments = [
     { name: 'Satzung Jamiah Berlin.pdf', owner: 'Admin', date: '01.01.2025' },
@@ -44,11 +37,28 @@ export const Documents = () => {
     { name: 'Protokoll März.pdf', owner: 'Admin', date: '15.03.2025' },
   ];
 
-  const memberName = user?.displayName || user?.email || 'Amina Yusuf';
+  const currentMemberName = React.useMemo(() => {
+    const uidToMatch = currentUid ?? user?.uid;
+    if (!uidToMatch) {
+      return user?.displayName || user?.email || 'Amina Yusuf';
+    }
+
+    const member = members.find((m) => m.uid === uidToMatch);
+    if (!member) {
+      return user?.displayName || user?.email || 'Amina Yusuf';
+    }
+
+    const fullName = `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim();
+    if (fullName) {
+      return fullName;
+    }
+
+    return member.username || member.uid || user?.displayName || user?.email || 'Amina Yusuf';
+  }, [currentUid, members, user?.displayName, user?.email, user?.uid]);
 
   const visibleDocs = isAdmin
       ? allDocuments
-      : allDocuments.filter(doc => doc.owner === 'Admin' || doc.owner === memberName);
+      : allDocuments.filter((doc) => doc.owner === 'Admin' || doc.owner === currentMemberName);
 
   return (
       <Box p={4}>

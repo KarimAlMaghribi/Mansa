@@ -148,9 +148,10 @@ export const JamiahProvider: React.FC<JamiahProviderProps> = ({ groupId, childre
     if (!groupId) return;
     setLoading(true);
     try {
+      let jamiahData: Jamiah | null = null;
       const jamiahResponse = await fetch(`${API_BASE_URL}/api/jamiahs/${groupId}`);
       if (jamiahResponse.ok) {
-        const jamiahData = await jamiahResponse.json();
+        jamiahData = await jamiahResponse.json();
         setJamiah(jamiahData);
         if (currentUid && jamiahData.ownerId === currentUid) {
           await fetchJoinRequests(currentUid, groupId);
@@ -163,12 +164,71 @@ export const JamiahProvider: React.FC<JamiahProviderProps> = ({ groupId, childre
       }
 
       const membersResponse = await fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/members`);
+      let membersData: JamiahMember[] = [];
       if (membersResponse.ok) {
         const data = await membersResponse.json();
-        setMembers(Array.isArray(data) ? data : []);
-      } else {
-        setMembers([]);
+        membersData = Array.isArray(data) ? data : [];
       }
+
+      if (jamiahData?.ownerId) {
+        const ownerPresent = membersData.some((member) => member.uid === jamiahData?.ownerId);
+        if (!ownerPresent) {
+          try {
+            const ownerResponse = await fetch(
+              `${API_BASE_URL}/api/userProfiles/uid/${encodeURIComponent(jamiahData.ownerId)}`
+            );
+            if (ownerResponse.ok) {
+              const ownerProfile = await ownerResponse.json();
+              membersData = [
+                ...membersData,
+                {
+                  id: ownerProfile.id,
+                  uid: ownerProfile.uid ?? jamiahData.ownerId,
+                  username: ownerProfile.username,
+                  firstName: ownerProfile.firstName,
+                  lastName: ownerProfile.lastName,
+                },
+              ];
+            } else {
+              membersData = [
+                ...membersData,
+                {
+                  id: Number.MIN_SAFE_INTEGER,
+                  uid: jamiahData.ownerId,
+                  username: jamiahData.ownerId,
+                },
+              ];
+            }
+          } catch (error) {
+            console.warn('[jamiah-context] Konnte Owner-Profil nicht laden', error);
+            membersData = [
+              ...membersData,
+              {
+                id: Number.MIN_SAFE_INTEGER,
+                uid: jamiahData.ownerId,
+                username: jamiahData.ownerId,
+              },
+            ];
+          }
+        }
+      }
+
+      if (membersData.length > 0) {
+        const seen = new Set<string>();
+        membersData = membersData.filter((member) => {
+          const key = member.uid ?? String(member.id ?? member.username ?? '');
+          if (!key) {
+            return true;
+          }
+          if (seen.has(key)) {
+            return false;
+          }
+          seen.add(key);
+          return true;
+        });
+      }
+
+      setMembers(membersData);
 
       const cyclesResponse = await fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/cycles`);
       if (cyclesResponse.ok) {
@@ -234,9 +294,19 @@ export const JamiahProvider: React.FC<JamiahProviderProps> = ({ groupId, childre
     [groupId, currentUid, refresh]
   );
 
+  const memberUids = useMemo(() => {
+    if (cycle?.memberOrder && cycle.memberOrder.length > 0) {
+      return cycle.memberOrder;
+    }
+    const uids = members.map((member) => member.uid).filter(Boolean) as string[];
+    if (jamiah?.ownerId && !uids.includes(jamiah.ownerId)) {
+      uids.push(jamiah.ownerId);
+    }
+    return uids;
+  }, [cycle?.memberOrder, members, jamiah?.ownerId]);
+
   const roles: JamiahRoles = useMemo(() => {
     const isOwner = Boolean(jamiah && currentUid && jamiah.ownerId === currentUid);
-    const memberUids = cycle?.memberOrder ?? members.map((m) => m.uid).filter(Boolean) as string[];
     const isMember = Boolean(currentUid && memberUids?.includes(currentUid));
     const isRecipient = Boolean(currentUid && cycle?.recipient?.uid === currentUid);
     const hasPaid = Boolean(currentUid && payments.some((p) => p.user?.uid === currentUid));
@@ -248,7 +318,7 @@ export const JamiahProvider: React.FC<JamiahProviderProps> = ({ groupId, childre
       isRecipient,
       hasOpenPayment,
     };
-  }, [jamiah, currentUid, cycle, members, payments]);
+  }, [jamiah, currentUid, cycle, memberUids, payments]);
 
   const pendingRequests = useMemo(
     () => joinRequests.filter((request) => request.status === 'PENDING'),
