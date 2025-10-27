@@ -39,6 +39,7 @@ import {
   selectChats,
   sendMessage,
   setActiveChat,
+  setChats,
 } from "../../store/slices/my-bids";
 import { ChatStatusEnum } from "../../enums/ChatStatus.enum";
 import { MessageTypeEnum } from "../../enums/MessageTypeEnum";
@@ -79,8 +80,12 @@ export const Members = () => {
   const [groupChatLoading, setGroupChatLoading] = useState(false);
 
   useEffect(() => {
-    dispatch(fetchMyChats());
-  }, [dispatch]);
+    if (user?.uid) {
+      dispatch(fetchMyChats());
+    } else {
+      dispatch(setChats([]));
+    }
+  }, [dispatch, user?.uid]);
 
   const handleDecision = async (request: JamiahJoinRequest, accept: boolean) => {
     const decisionSuccessful = await respondToJoinRequest(request.id, accept);
