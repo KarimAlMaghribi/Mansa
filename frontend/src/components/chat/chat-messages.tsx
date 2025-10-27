@@ -13,8 +13,27 @@ import {useDispatch, useSelector} from "react-redux";
 import {auth} from "../../firebase_config";
 import {AppDispatch, RootState} from "../../store/store";
 import {MessageTypeEnum} from "../../enums/MessageTypeEnum";
-import {CHATBOT_UID} from "../../constants/chatbot";
-import Logo from "../../assests/imgs/jamiah_logo.png";
+import {Timestamp} from "firebase/firestore";
+
+const toIsoString = (value?: string | Timestamp): string | undefined => {
+    if (!value) {
+        return undefined;
+    }
+
+    if (typeof value === "string") {
+        return value;
+    }
+
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    try {
+        return value.toDate().toISOString();
+    } catch (error) {
+        return undefined;
+    }
+};
 
 export const ChatMessages = () => {
     const dispatch: AppDispatch = useDispatch();
@@ -37,106 +56,127 @@ export const ChatMessages = () => {
     }, [activeChatId, dispatch]);
 
     useEffect(() => {
-        console.log(scrollRef.current);
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [messages]);
 
+    const hasMessages = messages.length > 0;
+    const sortedMessages = hasMessages ? [...messages].reverse() : [];
+
     return (
         <>
-            {
-                messages ?
-                    <Box width="100%">
-                        <Box sx={{height: '650px', overflow: 'auto', maxHeight: '800px'}} ref={scrollRef}>
-                            <Box p={3}>
-                                {messages && [...messages].reverse().map((message) => {
+            {hasMessages ? (
+                <Box width="100%">
+                    <Box sx={{height: '650px', overflow: 'auto', maxHeight: '800px'}} ref={scrollRef}>
+                        <Box p={3}>
+                            {sortedMessages.map((message) => {
+                                const createdIso = toIsoString(message.created);
+                                const createdLabel = createdIso ? formatLastActivity(createdIso) : undefined;
+                                const key = `${message.id}_${createdIso ?? ''}`;
+                                const isSystemMessage = message.type === MessageTypeEnum.SYSTEM;
+                                const textContent = typeof message.content === 'string' ? message.content : '';
+                                const imageSrc = typeof message.content === 'string' ? message.content : undefined;
+
+                                if (isSystemMessage) {
                                     return (
-                                        <Box key={message.id + "_" + message.created}>
-                                            {message.uid !== uid ? (
-                                                <>
-                                                    <Box display="flex">
-                                                        <ListItemAvatar>
-                                                            <Avatar
-                                                                alt={otherChatMemberName}
-                                                                src={message.uid === CHATBOT_UID ? Logo : ''}
-                                                                sx={{width: 40, height: 40}}
-                                                            />
-                                                        </ListItemAvatar>
-                                                        <Box>
-                                                            {message.created ? (
-                                                                <Typography variant="body2" color="grey.400" mb={1}>
-                                                                    {message.uid === CHATBOT_UID ? "Mansa-Chatbot" : otherChatMemberName},{' '}
-                                                                    {formatLastActivity(message.created)}
-                                                                </Typography>
-                                                            ) : null}
-                                                            {message.type === MessageTypeEnum.TEXT ? (
-                                                                <Box
-                                                                    mb={2}
-                                                                    sx={{
-                                                                        borderRadius: "5px",
-                                                                        p: 1,
-                                                                        backgroundColor: message.uid === CHATBOT_UID ? 'primary.light' : 'grey.100',
-                                                                        mr: 'auto',
-                                                                        maxWidth: '320px',
-                                                                        fontFamily: 'Roboto'
-                                                                    }}>
-                                                                    {message.content}
-                                                                </Box>
-                                                            ) : null}
-                                                            {message.type === MessageTypeEnum.IMAGE ? (
-                                                                <Box mb={1} sx={{overflow: 'hidden', lineHeight: '0px'}}>
-                                                                    <img src={message.content} alt="attach" width="150"/>
-                                                                </Box>
-                                                            ) : null}
-                                                        </Box>
-                                                    </Box>
-                                                </>
-                                            ) : (
-                                                <Box
-                                                    mb={1}
-                                                    display="flex"
-                                                    alignItems="flex-end"
-                                                    flexDirection="row-reverse">
-                                                    <Box alignItems="flex-end" display="flex" flexDirection={'column'}>
-                                                        {message.created ? (
-                                                            <Typography variant="body2" color="grey.400" mb={1}>
-                                                                Du, {formatLastActivity(message.created)}
-                                                            </Typography>
-                                                        ) : null}
-                                                        {message.type === MessageTypeEnum.TEXT ? (
-                                                            <Box
-                                                                mb={1}
-                                                                key={message.id}
-                                                                sx={{
-                                                                    borderRadius: "5px",
-                                                                    p: 1,
-                                                                    backgroundColor: 'grey.200',
-                                                                    ml: 'auto',
-                                                                    maxWidth: '320px',
-                                                                    fontFamily: 'Roboto'
-                                                                }}>
-                                                                {message.content}
-                                                            </Box>
-                                                        ) : null}
-                                                        {message.type === MessageTypeEnum.IMAGE ? (
-                                                            <Box mb={1} sx={{overflow: 'hidden', lineHeight: '0px'}}>
-                                                                <img src={message.content} alt="attach" width="250"/>
-                                                            </Box>
-                                                        ) : null}
-                                                    </Box>
-                                                </Box>
-                                            )}
+                                        <Box key={key} display="flex" justifyContent="center" my={2}>
+                                            <Typography variant="body2" color="text.secondary" textAlign="center">
+                                                {textContent}
+                                                {createdLabel ? ` · ${createdLabel}` : ''}
+                                            </Typography>
                                         </Box>
                                     );
-                                })}
-                            </Box>
+                                }
+
+                                const isOwnMessage = message.uid === uid;
+
+                                if (!isOwnMessage) {
+                                    return (
+                                        <Box key={key}>
+                                            <Box display="flex">
+                                                <ListItemAvatar>
+                                                    <Avatar
+                                                        alt={otherChatMemberName}
+                                                        sx={{width: 40, height: 40}}
+                                                    >
+                                                        {otherChatMemberName?.[0] || ''}
+                                                    </Avatar>
+                                                </ListItemAvatar>
+                                                <Box>
+                                                    {createdLabel ? (
+                                                        <Typography variant="body2" color="grey.400" mb={1}>
+                                                            {otherChatMemberName}, {createdLabel}
+                                                        </Typography>
+                                                    ) : null}
+                                                    {message.type === MessageTypeEnum.TEXT ? (
+                                                        <Box
+                                                            mb={2}
+                                                            sx={{
+                                                                borderRadius: "5px",
+                                                                p: 1,
+                                                                backgroundColor: 'grey.100',
+                                                                mr: 'auto',
+                                                                maxWidth: '320px',
+                                                                fontFamily: 'Roboto'
+                                                            }}>
+                                                            {textContent}
+                                                        </Box>
+                                                    ) : null}
+                                                    {message.type === MessageTypeEnum.IMAGE ? (
+                                                        <Box mb={1} sx={{overflow: 'hidden', lineHeight: '0px'}}>
+                                                            {imageSrc ? <img src={imageSrc} alt="attach" width="150"/> : null}
+                                                        </Box>
+                                                    ) : null}
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                    );
+                                }
+
+                                return (
+                                    <Box key={key}
+                                         mb={1}
+                                         display="flex"
+                                         alignItems="flex-end"
+                                         flexDirection="row-reverse">
+                                        <Box alignItems="flex-end" display="flex" flexDirection={'column'}>
+                                            {createdLabel ? (
+                                                <Typography variant="body2" color="grey.400" mb={1}>
+                                                    Du, {createdLabel}
+                                                </Typography>
+                                            ) : null}
+                                            {message.type === MessageTypeEnum.TEXT ? (
+                                                <Box
+                                                    mb={1}
+                                                    sx={{
+                                                        borderRadius: "5px",
+                                                        p: 1,
+                                                        backgroundColor: 'grey.200',
+                                                        ml: 'auto',
+                                                        maxWidth: '320px',
+                                                        fontFamily: 'Roboto'
+                                                    }}>
+                                                    {textContent}
+                                                </Box>
+                                            ) : null}
+                                            {message.type === MessageTypeEnum.IMAGE ? (
+                                                <Box mb={1} sx={{overflow: 'hidden', lineHeight: '0px'}}>
+                                                    {imageSrc ? <img src={imageSrc} alt="attach" width="250"/> : null}
+                                                </Box>
+                                            ) : null}
+                                        </Box>
+                                    </Box>
+                                );
+                            })}
                         </Box>
-                    </Box> :
-                    <Box display="flex" alignItems="center" p={2} pb={1} pt={1}>
-                        <Typography variant="h4">Wähle einen Chat</Typography>
                     </Box>
-            }
+                </Box>
+            ) : (
+                <Box display="flex" alignItems="center" p={2} pb={1} pt={1}>
+                    <Typography variant="h4">Wähle einen Chat</Typography>
+                </Box>
+            )}
         </>
-    )
+    );
 }

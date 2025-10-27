@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -34,13 +34,16 @@ import { AppDispatch } from "../../store/store";
 import {
   Chat,
   createChat,
+  fetchMyChats,
   selectChats,
+  sendMessage,
   setActiveChat,
 } from "../../store/slices/my-bids";
 import { ChatStatusEnum } from "../../enums/ChatStatus.enum";
+import { MessageTypeEnum } from "../../enums/MessageTypeEnum";
 import { auth } from "../../firebase_config";
 import { useAuth } from "../../context/AuthContext";
-import { JamiahMember, useJamiahContext } from "../../context/JamiahContext";
+import { JamiahJoinRequest, JamiahMember, useJamiahContext } from "../../context/JamiahContext";
 import useJoinStatus from "../../hooks/useJoinStatus";
 
 export const Members = () => {
@@ -73,8 +76,75 @@ export const Members = () => {
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
 
-  const handleDecision = (requestId: number, accept: boolean) => {
-    void respondToJoinRequest(requestId, accept);
+  useEffect(() => {
+    dispatch(fetchMyChats());
+  }, [dispatch]);
+
+  const handleDecision = async (request: JamiahJoinRequest, accept: boolean) => {
+    const decisionSuccessful = await respondToJoinRequest(request.id, accept);
+    if (!decisionSuccessful) return;
+
+    const currentUser = auth.currentUser;
+    if (!currentUser?.uid || !jamiah?.id || !request.userUid) return;
+
+    const applicantName = `${request.firstName ?? ""} ${request.lastName ?? ""}`.trim() || request.username || request.userUid;
+    const ownerMember = members.find((member) => member.uid === jamiah.ownerId);
+    const ownerName = ownerMember ? getMemberName(ownerMember) : currentUser.displayName || currentUser.email || currentUser.uid;
+
+    let targetChat = chats.find(
+      (chat) =>
+        chat.context === "jamiah_request" &&
+        chat.contextId === jamiah.id &&
+        chat.participants?.includes(request.userUid)
+    );
+
+    if (!targetChat) {
+      try {
+        const createdChat = await dispatch(
+          createChat({
+            context: "jamiah_request",
+            contextId: jamiah.id,
+            created: new Date().toISOString(),
+            lastActivity: new Date().toISOString(),
+            topic: jamiah.name ?? applicantName,
+            status: ChatStatusEnum.ONLINE,
+            participants: [currentUser.uid, request.userUid],
+            riskProvider: {
+              name: ownerName,
+              uid: jamiah.ownerId ?? currentUser.uid,
+            },
+            riskTaker: {
+              name: applicantName,
+              uid: request.userUid,
+            },
+          })
+        ).unwrap();
+        targetChat = createdChat;
+      } catch (error) {
+        console.error("[members] Konnte Chat für Beitrittsanfrage nicht anlegen", error);
+        return;
+      }
+    }
+
+    if (!targetChat) {
+      return;
+    }
+
+    const message = accept
+      ? `Deine Bewerbung für ${jamiah?.name ?? "die Jamiah"} wurde akzeptiert. Willkommen!`
+      : `Deine Bewerbung für ${jamiah?.name ?? "die Jamiah"} wurde abgelehnt.`;
+
+    void dispatch(
+      sendMessage({
+        chatId: targetChat.id,
+        message: {
+          type: MessageTypeEnum.SYSTEM,
+          uid: currentUser.uid,
+          content: message,
+          read: false,
+        },
+      })
+    );
   };
 
   const startChat = (member: JamiahMember) => {
@@ -96,12 +166,15 @@ export const Members = () => {
 
     const targetName = getMemberName(member);
 
+    const now = new Date().toISOString();
     const newChat: Omit<Chat, "id"> = {
-      riskId: (groupId as string) || "jamiah",
-      created: new Date().toISOString(),
-      lastActivity: new Date().toISOString(),
+      context: "jamiah_member",
+      contextId: jamiah?.id || (groupId as string) || "jamiah",
+      created: now,
+      lastActivity: now,
       topic: targetName,
       status: ChatStatusEnum.ONLINE,
+      participants: [currentUser.uid, member.uid],
       riskProvider: {
         name: targetName,
         uid: member.uid,
@@ -112,8 +185,15 @@ export const Members = () => {
       },
     };
 
-    dispatch(createChat(newChat));
-    navigate(`/chat`);
+    dispatch(createChat(newChat))
+      .unwrap()
+      .then((chat) => {
+        dispatch(setActiveChat(chat.id));
+        navigate(`/chat`);
+      })
+      .catch((error) => {
+        console.error("[members] Konnte Chat nicht starten", error);
+      });
   };
 
   const getMemberName = (member: JamiahMember) =>
@@ -256,10 +336,10 @@ export const Members = () => {
                           )}
                         </Box>
                         <Stack direction="row" spacing={1}>
-                          <Button size="small" color="success" onClick={() => handleDecision(request.id, true)}>
+                          <Button size="small" color="success" onClick={() => { void handleDecision(request, true); }}>
                             Annehmen
                           </Button>
-                          <Button size="small" color="error" onClick={() => handleDecision(request.id, false)}>
+                          <Button size="small" color="error" onClick={() => { void handleDecision(request, false); }}>
                             Ablehnen
                           </Button>
                         </Stack>

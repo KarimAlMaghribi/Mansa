@@ -1,5 +1,32 @@
-export function formatLastActivity(lastActivity: string): string {
-    const activityDate = new Date(lastActivity);
+import {Timestamp} from "firebase/firestore";
+
+const toDate = (value?: string | Timestamp): Date | null => {
+    if (!value) {
+        return null;
+    }
+
+    if (typeof value === "string") {
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    if (value instanceof Date) {
+        return value;
+    }
+
+    try {
+        return value.toDate();
+    } catch (error) {
+        return null;
+    }
+};
+
+export function formatLastActivity(lastActivity?: string | Timestamp): string {
+    const activityDate = toDate(lastActivity);
+
+    if (!activityDate) {
+        return "";
+    }
     const now = new Date();
     const diffInSeconds = (now.getTime() - activityDate.getTime()) / 1000;
 

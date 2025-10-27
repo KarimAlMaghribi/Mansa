@@ -19,11 +19,16 @@ import {
 } from '@mui/material';
 import KeyIcon from '@mui/icons-material/VpnKey';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { ROUTES } from '../../routing/routes';
 import { Jamiah } from '../../models/Jamiah';
 import { API_BASE_URL } from '../../constants/api';
 import { useAuth } from '../../context/AuthContext';
 import { fetchJoinStatus, JoinRequestStatus } from '../../api/jamiah-status';
+import { AppDispatch } from '../../store/store';
+import { createChat, sendMessage } from '../../store/slices/my-bids';
+import { ChatStatusEnum } from '../../enums/ChatStatus.enum';
+import { MessageTypeEnum } from '../../enums/MessageTypeEnum';
 
 export const SearchPage = () => {
   const [publicGroups, setPublicGroups] = useState<Jamiah[]>([]);
@@ -39,6 +44,7 @@ export const SearchPage = () => {
   const { user, loading } = useAuth();
   const uid = user?.uid;
   const navigate = useNavigate();
+  const dispatch: AppDispatch = useDispatch();
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/jamiahs/public`)
@@ -115,6 +121,52 @@ export const SearchPage = () => {
         if (res.ok) {
           if (selectedGroup.id) {
             setStatusMap((current) => ({ ...current, [selectedGroup.id as string]: 'pending' }));
+          }
+          const ownerUid = selectedGroup.ownerId;
+          if (ownerUid) {
+            const now = new Date().toISOString();
+            const applicantName = user?.displayName || user?.email || uid;
+            const ownerLabel = selectedGroup.name ? `${selectedGroup.name}-Owner` : 'Jamiah Owner';
+            const trimmedMotivation = motivation.trim();
+            dispatch(
+              createChat({
+                context: 'jamiah_request',
+                contextId: selectedGroup.id || 'jamiah',
+                created: now,
+                lastActivity: now,
+                topic: selectedGroup.name,
+                status: ChatStatusEnum.ONLINE,
+                participants: [ownerUid, uid],
+                riskProvider: {
+                  name: ownerLabel,
+                  uid: ownerUid,
+                },
+                riskTaker: {
+                  name: applicantName || uid,
+                  uid,
+                },
+              })
+            )
+              .unwrap()
+              .then((chat) => {
+                const content = trimmedMotivation
+                  ? trimmedMotivation
+                  : `Ich möchte der Jamiah "${selectedGroup.name}" beitreten.`;
+                void dispatch(
+                  sendMessage({
+                    chatId: chat.id,
+                    message: {
+                      type: MessageTypeEnum.TEXT,
+                      uid,
+                      content,
+                      read: false,
+                    },
+                  })
+                );
+              })
+              .catch((error) => {
+                console.error('[search] Konnte Chat für Beitrittsanfrage nicht initialisieren', error);
+              });
           }
           setSnackbarMessage('Bewerbung gesendet');
           setSnackbarError(false);

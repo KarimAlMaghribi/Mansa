@@ -7,7 +7,7 @@ import Avatar from "@mui/material/Avatar";
 import SearchIcon from '@mui/icons-material/Search';
 import {useDispatch, useSelector} from "react-redux";
 import {AppDispatch} from "../../store/store";
-import {searchChats} from "../../store/slices/my-bids";
+import {setChatSearch} from "../../store/slices/my-bids";
 import {selectMail, selectName} from "../../store/slices/user-profile";
 import {auth} from "../../firebase_config";
 import {fetchProfileImage} from "../../firebase/firebase-service";
@@ -78,7 +78,7 @@ export const ChatSidebar = () => {
                         ),
                     }}
                     fullWidth
-                    onChange={(e) => dispatch(searchChats(e.target.value))}
+                    onChange={(e) => dispatch(setChatSearch(e.target.value))}
                 />
             </Box>
             <ChatsList/>
