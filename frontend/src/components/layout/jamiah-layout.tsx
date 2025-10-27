@@ -56,6 +56,7 @@ const JamiahLayoutShell: React.FC = () => {
   const theme = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  const { groupId } = useParams();
   const { jamiah, roles, status } = useJamiahContext();
 
   const drawerWidth = open ? 260 : 72;
@@ -148,7 +149,17 @@ const JamiahLayoutShell: React.FC = () => {
   const activeSegment = segments[2];
 
   const handleNavigate = (path: string) => {
-    navigate(path);
+    if (path.startsWith('/')) {
+      navigate(path);
+      return;
+    }
+
+    if (!groupId) {
+      navigate(path);
+      return;
+    }
+
+    navigate(`/jamiah/${groupId}/${path}`);
   };
 
   return (
