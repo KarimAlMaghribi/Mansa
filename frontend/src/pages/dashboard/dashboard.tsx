@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -19,7 +19,7 @@ import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { selectName } from '../../store/slices/user-profile';
 import {
   JamiahMember,
@@ -241,12 +241,21 @@ const PersonalNotesWidget: React.FC<{
 
 export const Dashboard = () => {
   const navigate = useNavigate();
+  const { groupId } = useParams<{ groupId: string }>();
   const userName = useSelector(selectName);
   const { jamiah, cycle, members, payments, pendingRequests, roles, status, currentUid } = useJamiahContext();
 
   const [votes, setVotes] = useState<VotePreview[]>([]);
   const [votesLoading, setVotesLoading] = useState(false);
   const [votesError, setVotesError] = useState<string | null>(null);
+
+  const navigateWithinJamiah = useCallback(
+    (path: string) => {
+      if (!groupId) return;
+      navigate(`/jamiah/${groupId}/${path}`);
+    },
+    [groupId, navigate]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -288,13 +297,13 @@ export const Dashboard = () => {
         label: 'Mitglieder',
         value: members.length,
         tooltip: 'Alle aktiven Mitglieder dieser Jamiah anzeigen.',
-        action: () => navigate('members'),
+        action: () => navigateWithinJamiah('members'),
       },
       {
         label: 'Bestätigte Zahlungen',
         value: payments.length,
         tooltip: 'Anzahl der bestätigten Zahlungen im aktuellen Zyklus.',
-        action: () => navigate('payments'),
+        action: () => navigateWithinJamiah('payments'),
       },
       {
         label: 'Dein Beitragsstatus',
@@ -302,16 +311,16 @@ export const Dashboard = () => {
         tooltip: roles.hasOpenPayment
           ? 'Begleiche deinen ausstehenden Beitrag.'
           : 'Es liegen keine offenen Zahlungen vor.',
-        action: () => navigate('payments'),
+        action: () => navigateWithinJamiah('payments'),
       },
       {
         label: 'Offene Anfragen',
         value: pendingRequests.length,
         tooltip: 'Noch zu prüfende Beitrittsanfragen.',
-        action: () => navigate('members'),
+        action: () => navigateWithinJamiah('members'),
       },
     ],
-    [members.length, navigate, payments.length, pendingRequests.length, roles.hasOpenPayment]
+    [members.length, navigateWithinJamiah, payments.length, pendingRequests.length, roles.hasOpenPayment]
   );
 
   const showNotificationBar =
@@ -459,7 +468,7 @@ export const Dashboard = () => {
               icon={<GroupAddIcon />}
               color="secondary"
               label={`${pendingRequests.length} offene Bewerbungen`}
-              onClick={() => navigate('members')}
+              onClick={() => navigateWithinJamiah('members')}
               sx={{ cursor: 'pointer' }}
             />
           )}
@@ -468,7 +477,7 @@ export const Dashboard = () => {
               icon={<SettingsSuggestIcon />}
               color="warning"
               label="Setup erforderlich"
-              onClick={() => navigate('setup')}
+              onClick={() => navigateWithinJamiah('setup')}
               sx={{ cursor: 'pointer' }}
             />
           )}
@@ -477,7 +486,7 @@ export const Dashboard = () => {
               icon={<PaymentsIcon />}
               color="error"
               label="Zahlung offen"
-              onClick={() => navigate('payments')}
+              onClick={() => navigateWithinJamiah('payments')}
               sx={{ cursor: 'pointer' }}
             />
           )}
@@ -520,7 +529,7 @@ export const Dashboard = () => {
               cycle={cycle}
               members={members}
               statusNeedsSetup={status.needsSetup}
-              onSetup={() => navigate('setup')}
+              onSetup={() => navigateWithinJamiah('setup')}
             />
           </Grid>
         )}
@@ -535,7 +544,7 @@ export const Dashboard = () => {
             statusNeedsSetup={status.needsSetup}
             pendingJoinRequests={pendingRequests.length}
             jamiahName={jamiah?.name}
-            onMembersClick={() => navigate('members')}
+            onMembersClick={() => navigateWithinJamiah('members')}
           />
         </Grid>
       </Grid>
@@ -568,7 +577,7 @@ export const Dashboard = () => {
                   </Box>
                 ))}
             </Stack>
-            <Button size="small" sx={{ mt: 2 }} onClick={() => navigate('votes')}>
+            <Button size="small" sx={{ mt: 2 }} onClick={() => navigateWithinJamiah('votes')}>
               Abstimmungen öffnen
             </Button>
           </Paper>
@@ -610,7 +619,7 @@ export const Dashboard = () => {
                 </ListItem>
               ))}
             </List>
-            <Button size="small" onClick={() => navigate('payments')}>
+            <Button size="small" onClick={() => navigateWithinJamiah('payments')}>
               Zahlungen verwalten
             </Button>
           </Paper>
@@ -646,7 +655,7 @@ export const Dashboard = () => {
                 </React.Fragment>
               ))}
             </List>
-            <Button size="small" onClick={() => navigate(communityPreview.actionTarget)}>
+            <Button size="small" onClick={() => navigateWithinJamiah(communityPreview.actionTarget)}>
               {communityPreview.actionLabel}
             </Button>
           </Paper>
