@@ -154,7 +154,7 @@ export const JamiahProvider: React.FC<JamiahProviderProps> = ({ groupId, childre
       if (jamiahResponse.ok) {
         jamiahData = await jamiahResponse.json();
         setJamiah(jamiahData);
-        if (currentUid && jamiahData.ownerId === currentUid) {
+        if (currentUid && jamiahData?.ownerId === currentUid) {
           await fetchJoinRequests(currentUid, groupId);
         } else {
           setJoinRequests([]);
