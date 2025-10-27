@@ -5,7 +5,7 @@ import {ChatSidebar} from "../../components/chat/chat-sidebar";
 import Box from "@mui/material/Box";
 import {ChatHeader} from "../../components/chat/chat-header";
 import {ChatMessages} from "../../components/chat/chat-messages";
-import {chatsUnsubscribe, selectActiveChatId, setActiveChat, setChats, subscribeToMyChats} from "../../store/slices/my-bids";
+import {clearChatsSubscription, selectActiveChatId, setActiveChat, setChats, subscribeToMyChats} from "../../store/slices/my-bids";
 import {AppDispatch} from "../../store/store";
 import {useDispatch, useSelector} from "react-redux";
 import {ChatSender} from "../../components/chat/chat-sender";
@@ -21,10 +21,7 @@ export const Chat = () => {
 
     useEffect(() => {
         if (!user?.uid) {
-            if (chatsUnsubscribe) {
-                chatsUnsubscribe();
-                chatsUnsubscribe = null;
-            }
+            clearChatsSubscription();
             dispatch(setChats([]));
             return;
         }
@@ -32,9 +29,7 @@ export const Chat = () => {
         dispatch(subscribeToMyChats());
 
         return () => {
-            if (chatsUnsubscribe) {
-                chatsUnsubscribe();
-            }
+            clearChatsSubscription();
         };
     }, [dispatch, user?.uid])
 
