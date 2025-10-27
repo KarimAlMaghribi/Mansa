@@ -185,6 +185,8 @@ export const createChat = createAsyncThunk<Chat, Omit<Chat, "id">, { rejectValue
                 chatData.context === "jamiah_group" ||
                 participants.length > 2;
 
+            const participantsKeyData = !isGroupChat && participantsKey ? { participantsKey } : {};
+
             const constraints = [];
 
             if (!isGroupChat && participantsKey) {
@@ -214,18 +216,17 @@ export const createChat = createAsyncThunk<Chat, Omit<Chat, "id">, { rejectValue
 
             const newChat: Chat = {
                 ...chatData,
+                ...participantsKeyData,
                 id: chatRef.id,
                 created: createdAt,
                 lastActivity,
                 participants,
-                participantsKey: !isGroupChat && participantsKey ? participantsKey : undefined,
                 kind: isGroupChat ? "group" : "direct",
             };
 
             await setDoc(chatRef, {
                 ...newChat,
-                participants,
-                participantsKey: !isGroupChat && participantsKey ? participantsKey : undefined,
+                ...participantsKeyData,
                 updatedAt: serverTimestamp(),
             });
 
