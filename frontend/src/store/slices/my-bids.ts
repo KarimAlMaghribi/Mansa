@@ -519,6 +519,7 @@ const myBidsSlice = createSlice({
     }
 );
 
+export const selectAllChats = (state: { myBids: MyBidsState }) => state.myBids.allChats;
 export const selectChats = (state: { myBids: MyBidsState }) => state.myBids.chats;
 export const selectActiveChat = (state: { myBids: MyBidsState }) => {
     const activeId = state.myBids.activeChatId;
