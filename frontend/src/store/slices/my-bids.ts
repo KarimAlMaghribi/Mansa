@@ -78,6 +78,13 @@ export let messagesUnsubscribe: (() => void) | null = null;
 
 export let chatsUnsubscribe: (() => void) | null = null;
 
+export const clearChatsSubscription = () => {
+    if (chatsUnsubscribe) {
+        chatsUnsubscribe();
+        chatsUnsubscribe = null;
+    }
+};
+
 const activityToMillis = (value?: string | Timestamp): number => {
     if (!value) {
         return 0;
@@ -236,20 +243,13 @@ export const subscribeToMyChats = createAsyncThunk<void, void, { rejectValue: st
         const userUid = auth.currentUser?.uid;
 
         if (!userUid) {
-            if (chatsUnsubscribe) {
-                chatsUnsubscribe();
-                chatsUnsubscribe = null;
-            }
-
+            clearChatsSubscription();
             dispatch(setChats([]));
             return;
         }
 
         try {
-            if (chatsUnsubscribe) {
-                chatsUnsubscribe();
-                chatsUnsubscribe = null;
-            }
+            clearChatsSubscription();
 
             const chatsRef = collection(db, FirestoreCollectionEnum.CHATS);
             const providerQuery = query(chatsRef, where("riskProvider.uid", "==", userUid));
