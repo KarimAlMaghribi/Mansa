@@ -34,6 +34,15 @@ FIREBASE_TOKEN=YOUR_TOKEN_HERE
 
 The token must not be committed to the repository.
 
+## Firestore indexes and rules
+
+Chats subscribe to group conversations by querying `participants` with `array-contains`. Ensure that Firestore security rules allow reads on the `chats` collection for authorized users and create the required composite index:
+
+* Collection: `chats`
+* Fields: `participants` (Array contains) + `kind` (Ascending)
+
+Create the index in the Firebase console or add it to the shared infrastructure configuration so that local and CI environments stay in sync.
+
 ## Backend (Spring Boot)
 
 A simple Spring Boot backend lives in the `backend` directory. It exposes a demo endpoint at `/api/hello` returning a greeting string.
