@@ -69,10 +69,16 @@ export const RiskOverviewElement = (props: RiskOverviewElementProps) => {
 
         const newChat: Omit<Chat, "id"> = {
             riskId: selectedRisk.id,
+            context: "risk",
+            contextId: selectedRisk.id,
             created: new Date().toISOString(),
             lastActivity: new Date().toISOString(),
             topic: selectedRisk.name,
             status: ChatStatusEnum.ONLINE,
+            participants: [
+                selectedRisk.publisher?.uid || "",
+                user?.uid || "",
+            ].filter(Boolean) as string[],
             riskProvider: {
                 name: selectedRisk.publisher?.name || "Unknown Provider",
                 uid: selectedRisk.publisher?.uid || "unknown_provider_uid",
