@@ -28,6 +28,7 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/PersonRemove";
 import ChatIcon from "@mui/icons-material/Chat";
+import GroupsIcon from "@mui/icons-material/Groups";
 import type { SelectChangeEvent } from "@mui/material/Select";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch } from "../../store/store";
@@ -75,6 +76,7 @@ export const Members = () => {
     message: string;
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
+  const [groupChatLoading, setGroupChatLoading] = useState(false);
 
   useEffect(() => {
     dispatch(fetchMyChats());
@@ -160,7 +162,7 @@ export const Members = () => {
 
     if (existing) {
       dispatch(setActiveChat(existing.id));
-      navigate(`/chat`);
+      navigate(`/chat/${existing.id}`);
       return;
     }
 
@@ -189,11 +191,80 @@ export const Members = () => {
       .unwrap()
       .then((chat) => {
         dispatch(setActiveChat(chat.id));
-        navigate(`/chat`);
+        navigate(`/chat/${chat.id}`);
       })
       .catch((error) => {
         console.error("[members] Konnte Chat nicht starten", error);
       });
+  };
+
+  const openGroupChat = async () => {
+    const currentUser = auth.currentUser;
+    const contextId = jamiah?.id ?? (groupId as string) ?? undefined;
+
+    if (!currentUser?.uid || !contextId) {
+      return;
+    }
+
+    const existingGroupChat = chats.find(
+      (chat) => chat.context === "jamiah_group" && chat.contextId === contextId,
+    );
+
+    if (existingGroupChat) {
+      dispatch(setActiveChat(existingGroupChat.id));
+      navigate(`/chat/${existingGroupChat.id}`);
+      return;
+    }
+
+    const participantUids = Array.from(
+      new Set(
+        members
+          .map((member) => member.uid)
+          .filter((uid): uid is string => Boolean(uid)),
+      ),
+    );
+
+    if (!participantUids.includes(currentUser.uid)) {
+      participantUids.push(currentUser.uid);
+    }
+
+    if (participantUids.length === 0) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const topic = jamiah?.name ? `${jamiah.name} – Gruppenchat` : "Gruppenchat";
+
+    setGroupChatLoading(true);
+    try {
+      const groupChat = await dispatch(
+        createChat({
+          context: "jamiah_group",
+          contextId,
+          created: now,
+          lastActivity: now,
+          topic,
+          status: ChatStatusEnum.ONLINE,
+          participants: participantUids,
+          riskProvider: {
+            name: jamiah?.name ?? "Jamiah",
+            uid: jamiah?.ownerId ?? currentUser.uid,
+          },
+          riskTaker: {
+            name: "Mitglieder",
+            uid: currentUser.uid,
+          },
+          kind: "group",
+        }),
+      ).unwrap();
+
+      dispatch(setActiveChat(groupChat.id));
+      navigate(`/chat/${groupChat.id}`);
+    } catch (error) {
+      console.error("[members] Konnte Gruppenchat nicht öffnen", error);
+    } finally {
+      setGroupChatLoading(false);
+    }
   };
 
   const getMemberName = (member: JamiahMember) =>
@@ -268,7 +339,20 @@ export const Members = () => {
             {jamiah?.name ? `${jamiah.name}` : "Jamiah"} – {roles.isOwner ? "Owner-Ansicht" : "Mitgliedsansicht"}
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          {(roles.isOwner || joinStatus === "accepted") && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<GroupsIcon />}
+              onClick={() => {
+                void openGroupChat();
+              }}
+              disabled={groupChatLoading}
+            >
+              Gruppenchat öffnen
+            </Button>
+          )}
           {statusChip}
           {!roles.isOwner && (
             <Chip
