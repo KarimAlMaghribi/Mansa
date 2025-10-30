@@ -87,6 +87,11 @@ public class StripePaymentProvider {
         return sandboxId;
     }
 
+    public boolean isConfigured() {
+        String apiKey = requestOptions.getApiKey();
+        return apiKey != null && !apiKey.isBlank();
+    }
+
     static final class SandboxAwareAuthenticator implements Authenticator {
         private final BearerTokenAuthenticator delegate;
         private final String sandboxId;

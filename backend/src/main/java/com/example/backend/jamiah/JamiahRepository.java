@@ -56,4 +56,6 @@ public interface JamiahRepository extends JpaRepository<Jamiah, Long> {
      */
     @Query("SELECT j FROM Jamiah j JOIN j.members m WHERE m.uid = :uid")
     java.util.List<Jamiah> findByMemberUid(@Param("uid") String uid);
+
+    java.util.List<Jamiah> findByStripeAccountIdIsNotNull();
 }
