@@ -29,6 +29,7 @@ export const ROUTES = {
     SEARCH: 'search',
 
     JOIN_JAMIAH: 'join-jamiah',
+    INVITE_JOIN: 'invite',
 
     GROUP_DETAILS: 'group-details',
 

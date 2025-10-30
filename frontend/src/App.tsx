@@ -34,6 +34,7 @@ import JamiahLayout from "./components/layout/jamiah-layout";
 import {Onboarding} from "./pages/onboarding/onboarding";
 import SearchPage from "./pages/search/search";
 import { JoinJamiahPage } from "./pages/join-jamiah/join-jamiah";
+import { InviteJoinPage } from "./pages/join-jamiah/invite-join";
 import { GroupDetails } from "./pages/group-details/group-details";
 import {VerifyEmail} from "./pages/authentication/verifyEmail";
 import {HelloBackend} from "./pages/hello-backend/hello-backend";
@@ -78,6 +79,7 @@ function App() {
                 <Route path={`/${ROUTES.MY_BIDS}`} element={<PrivateRoute><MyBids /></PrivateRoute>} />
                 <Route path={`/${ROUTES.ONBOARDING}`} element={<PrivateRoute><Onboarding /></PrivateRoute>} />
                 <Route path={`/${ROUTES.JOIN_JAMIAH}`} element={<PrivateRoute><JoinJamiahPage /></PrivateRoute>} />
+                <Route path={`/${ROUTES.INVITE_JOIN}/:code`} element={<PrivateRoute><InviteJoinPage /></PrivateRoute>} />
                 <Route path={`/${ROUTES.GROUP_DETAILS}/:id`} element={<PrivateRoute><GroupDetails /></PrivateRoute>} />
 
 
