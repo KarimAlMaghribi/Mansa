@@ -105,13 +105,12 @@ interface PaymentConfirmationResponse {
 
 interface StripePaymentFormProps {
   amount: number;
-  clientSecret: string;
   onCancel: () => void;
-  onSuccess: () => Promise<void>;
+  onConfirm: (paymentMethodId: string) => Promise<void>;
   onError: (message: string) => void;
 }
 
-const StripePaymentForm: React.FC<StripePaymentFormProps> = ({ amount, clientSecret, onCancel, onSuccess, onError }) => {
+const StripePaymentForm: React.FC<StripePaymentFormProps> = ({ amount, onCancel, onConfirm, onError }) => {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -127,26 +126,22 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({ amount, clientSec
       return;
     }
     setSubmitting(true);
-    const result = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: {
+    try {
+      const result = await stripe.createPaymentMethod({
+        type: 'card',
         card,
-      },
-    });
-    if (result.error) {
-      onError(result.error.message || 'Stripe-Zahlung fehlgeschlagen.');
-      setSubmitting(false);
-      return;
-    }
-    if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
-      try {
-        await onSuccess();
-      } finally {
-        setSubmitting(false);
+      });
+      if (result.error || !result.paymentMethod?.id) {
+        onError(result.error?.message || 'Stripe-Zahlung fehlgeschlagen.');
+        return;
       }
-      return;
+      await onConfirm(result.paymentMethod.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Stripe-Zahlung fehlgeschlagen.';
+      onError(message);
+    } finally {
+      setSubmitting(false);
     }
-    onError('Zahlung konnte nicht abgeschlossen werden.');
-    setSubmitting(false);
   };
 
   return (
@@ -609,9 +604,10 @@ export const Payments: React.FC = () => {
       .catch(err => setSnackbar({ message: err.message, severity: 'error' }));
   };
 
-  const finalizePayment = async () => {
+  const finalizePayment = async (paymentMethodId: string) => {
     if (!activePayment || !currentUid) return;
-    const response = await fetch(`${API_BASE_URL}/api/payments/${activePayment.id}/confirm?uid=${encodeURIComponent(currentUid)}`, {
+    const params = new URLSearchParams({ uid: currentUid, payment_method: paymentMethodId });
+    const response = await fetch(`${API_BASE_URL}/api/payments/${activePayment.id}/confirm?${params.toString()}`, {
       method: 'POST',
     });
     if (!response.ok) {
@@ -889,10 +885,9 @@ export const Payments: React.FC = () => {
             <Elements stripe={stripePromise} options={{ clientSecret: paymentClientSecret }}>
               <StripePaymentForm
                 amount={dialogAmount}
-                clientSecret={paymentClientSecret}
                 onCancel={closePaymentDialog}
                 onError={message => setSnackbar({ message, severity: 'error' })}
-                onSuccess={finalizePayment}
+                onConfirm={finalizePayment}
               />
             </Elements>
           )}
