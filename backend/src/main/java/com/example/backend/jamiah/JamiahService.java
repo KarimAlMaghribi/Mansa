@@ -1,5 +1,6 @@
 package com.example.backend.jamiah;
 
+import com.example.backend.jamiah.dto.InvitationPreviewDto;
 import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.dto.JoinRequestDto;
 import com.example.backend.jamiah.util.InviteCodeGenerator;
@@ -157,6 +158,21 @@ public class JamiahService {
 
     public JamiahDto createOrRefreshInvitation(String publicId) {
         return createOrRefreshInvitation(publicId, null);
+    }
+
+    public InvitationPreviewDto getInvitationPreview(String code) {
+        Jamiah entity = repository.findWithMembersByInvitationCode(code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (entity.getInvitationExpiry() != null && entity.getInvitationExpiry().isBefore(LocalDate.now())) {
+            throw new ResponseStatusException(HttpStatus.GONE);
+        }
+        InvitationPreviewDto dto = new InvitationPreviewDto();
+        dto.setName(entity.getName());
+        if (entity.getPublicId() != null) {
+            dto.setPublicId(entity.getPublicId().toString());
+        }
+        dto.setInvitationExpiry(entity.getInvitationExpiry());
+        return dto;
     }
 
     public JamiahDto findByPublicId(String publicId) {
