@@ -5,8 +5,8 @@ import com.example.backend.UserProfileRepository;
 import com.example.backend.jamiah.dto.PaymentConfirmationDto;
 import com.example.backend.jamiah.dto.PaymentDto;
 import com.example.backend.payment.StripePaymentProvider;
-import com.example.backend.wallet.Wallet;
-import com.example.backend.wallet.WalletRepository;
+import com.example.backend.wallet.JamiahWallet;
+import com.example.backend.wallet.JamiahWalletRepository;
 import com.stripe.model.PaymentIntent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +27,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.*;
 
@@ -44,7 +45,7 @@ class PaymentServiceUnitTest {
     @Mock
     private StripePaymentProvider stripePaymentProvider;
     @Mock
-    private WalletRepository walletRepository;
+    private JamiahWalletRepository walletRepository;
 
     @InjectMocks
     private PaymentService paymentService;
@@ -113,7 +114,7 @@ class PaymentServiceUnitTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         assertEquals("Payer profile incomplete", exception.getReason());
-        verify(walletRepository, never()).findById(any());
+        verify(walletRepository, never()).findByJamiah_IdAndMember_Id(anyLong(), anyLong());
     }
 
     @Test
@@ -163,20 +164,22 @@ class PaymentServiceUnitTest {
         setUserProfileId(payerProfile, 77L);
         when(userRepository.findByUid(callerUid)).thenReturn(Optional.of(payerProfile));
 
-        when(walletRepository.findById(77L)).thenReturn(Optional.empty());
-        when(walletRepository.save(any(Wallet.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(walletRepository.findByJamiah_IdAndMember_Id(21L, 77L)).thenReturn(Optional.empty());
+        when(walletRepository.save(any(JamiahWallet.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         PaymentConfirmationDto confirmation = paymentService.confirmPayment(paymentId, callerUid);
 
-        ArgumentCaptor<Wallet> walletCaptor = ArgumentCaptor.forClass(Wallet.class);
+        ArgumentCaptor<JamiahWallet> walletCaptor = ArgumentCaptor.forClass(JamiahWallet.class);
         verify(walletRepository).save(walletCaptor.capture());
-        Wallet savedWallet = walletCaptor.getValue();
+        JamiahWallet savedWallet = walletCaptor.getValue();
 
+        assertEquals(21L, savedWallet.getJamiahId());
         assertEquals(77L, savedWallet.getMemberId());
         assertEquals(payerProfile, savedWallet.getMember());
         assertEquals(new BigDecimal("10"), savedWallet.getBalance());
         assertEquals(new BigDecimal("10"), confirmation.getWallet().getBalance());
         assertEquals(callerUid, confirmation.getWallet().getMemberId());
+        assertEquals(21L, confirmation.getWallet().getJamiahId());
     }
 
     @Test
@@ -353,13 +356,14 @@ class PaymentServiceUnitTest {
         setUserProfileId(payerProfile, 99L);
         when(userRepository.findByUid(callerUid)).thenReturn(Optional.of(payerProfile));
 
-        when(walletRepository.findById(99L)).thenReturn(Optional.empty());
-        when(walletRepository.save(any(Wallet.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(walletRepository.findByJamiah_IdAndMember_Id(12L, 99L)).thenReturn(Optional.empty());
+        when(walletRepository.save(any(JamiahWallet.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         PaymentConfirmationDto confirmation = paymentService.confirmPayment(paymentId, callerUid);
 
         assertEquals(PaymentDto.PaymentStatus.PAID_SELF_CONFIRMED, confirmation.getPayment().getStatus());
         assertEquals(new BigDecimal("10"), confirmation.getWallet().getBalance());
+        assertEquals(12L, confirmation.getWallet().getJamiahId());
     }
 
     private void setUserProfileId(UserProfile profile, Long id) throws Exception {

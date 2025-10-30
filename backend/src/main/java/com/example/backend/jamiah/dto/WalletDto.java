@@ -7,6 +7,7 @@ import java.time.Instant;
 
 @Data
 public class WalletDto {
+    private Long jamiahId;
     private String memberId;
     private String username;
     private BigDecimal balance;
