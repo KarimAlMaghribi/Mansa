@@ -4,6 +4,7 @@ import com.example.backend.jamiah.dto.InvitationPreviewDto;
 import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.JamiahCycle;
 import com.example.backend.jamiah.PaymentService;
+import com.example.backend.jamiah.dto.PaymentDto;
 import com.example.backend.jamiah.dto.RoundDto;
 import com.example.backend.jamiah.dto.WalletDto;
 import jakarta.validation.Valid;
@@ -113,6 +114,13 @@ public class JamiahController {
                           @PathVariable Long cycleId,
                           @RequestParam String uid) {
         return paymentService.getRound(id, cycleId, uid);
+    }
+
+    @GetMapping("/{id}/cycles/{cycleId}/payments")
+    public java.util.List<PaymentDto> payments(@PathVariable String id,
+                                               @PathVariable Long cycleId,
+                                               @RequestParam String uid) {
+        return paymentService.getPayments(id, cycleId, uid);
     }
 
     @GetMapping("/{id}/wallets")
