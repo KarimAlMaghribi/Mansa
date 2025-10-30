@@ -9,7 +9,7 @@ import com.example.backend.jamiah.dto.WalletDto;
 import com.example.backend.jamiah.dto.CycleSummaryDto;
 import com.example.backend.jamiah.JamiahPayment;
 import com.example.backend.jamiah.JamiahCycle;
-import com.example.backend.wallet.WalletRepository;
+import com.example.backend.wallet.JamiahWalletRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,7 +37,7 @@ public class PaymentServiceTest {
     @Autowired
     UserProfileRepository userRepository;
     @Autowired
-    WalletRepository walletRepository;
+    JamiahWalletRepository walletRepository;
 
     private JamiahDto createJamiah(String ownerUid) {
         JamiahDto dto = new JamiahDto();
@@ -87,6 +87,7 @@ public class PaymentServiceTest {
 
         JamiahDto created = createJamiah("u1");
         Jamiah jamiah = jamiahRepository.findAll().get(0);
+        Long jamiahId = jamiah.getId();
         jamiah.getMembers().add(member);
         member.getJamiahs().add(jamiah);
         jamiahRepository.save(jamiah);
@@ -126,6 +127,7 @@ public class PaymentServiceTest {
 
         JamiahDto created = createJamiah("u1");
         Jamiah jamiah = jamiahRepository.findAll().get(0);
+        Long jamiahId = jamiah.getId();
         jamiah.getMembers().add(recipient);
         recipient.getJamiahs().add(jamiah);
         jamiah.getMembers().add(payerOne);
@@ -142,9 +144,9 @@ public class PaymentServiceTest {
 
         RoundDto round = paymentService.confirmReceipt(created.getId().toString(), cycle.getId(), "u2");
 
-        assertEquals(new BigDecimal("0.00"), walletRepository.findById(payerOne.getId()).orElseThrow().getBalance());
-        assertEquals(new BigDecimal("0.00"), walletRepository.findById(payerTwo.getId()).orElseThrow().getBalance());
-        assertEquals(new BigDecimal("10.00"), walletRepository.findById(recipient.getId()).orElseThrow().getBalance());
+        assertEquals(new BigDecimal("0.00"), walletRepository.findByJamiah_IdAndMember_Id(jamiahId, payerOne.getId()).orElseThrow().getBalance());
+        assertEquals(new BigDecimal("0.00"), walletRepository.findByJamiah_IdAndMember_Id(jamiahId, payerTwo.getId()).orElseThrow().getBalance());
+        assertEquals(new BigDecimal("10.00"), walletRepository.findByJamiah_IdAndMember_Id(jamiahId, recipient.getId()).orElseThrow().getBalance());
 
         assertNotNull(round.getWallets());
         assertEquals(3, round.getWallets().size());
@@ -172,6 +174,7 @@ public class PaymentServiceTest {
 
         JamiahDto created = createJamiah("u1");
         Jamiah jamiah = jamiahRepository.findAll().get(0);
+        Long jamiahId = jamiah.getId();
         jamiah.getMembers().add(recipient);
         recipient.getJamiahs().add(jamiah);
         jamiah.getMembers().add(payer);
@@ -185,13 +188,13 @@ public class PaymentServiceTest {
 
         paymentService.confirmReceipt(created.getId().toString(), cycle.getId(), "u2");
 
-        BigDecimal recipientBalanceAfterFirst = walletRepository.findById(recipient.getId()).orElseThrow().getBalance();
-        BigDecimal payerBalanceAfterFirst = walletRepository.findById(payer.getId()).orElseThrow().getBalance();
+        BigDecimal recipientBalanceAfterFirst = walletRepository.findByJamiah_IdAndMember_Id(jamiahId, recipient.getId()).orElseThrow().getBalance();
+        BigDecimal payerBalanceAfterFirst = walletRepository.findByJamiah_IdAndMember_Id(jamiahId, payer.getId()).orElseThrow().getBalance();
 
         paymentService.confirmReceipt(created.getId().toString(), cycle.getId(), "u2");
 
-        BigDecimal recipientBalanceAfterSecond = walletRepository.findById(recipient.getId()).orElseThrow().getBalance();
-        BigDecimal payerBalanceAfterSecond = walletRepository.findById(payer.getId()).orElseThrow().getBalance();
+        BigDecimal recipientBalanceAfterSecond = walletRepository.findByJamiah_IdAndMember_Id(jamiahId, recipient.getId()).orElseThrow().getBalance();
+        BigDecimal payerBalanceAfterSecond = walletRepository.findByJamiah_IdAndMember_Id(jamiahId, payer.getId()).orElseThrow().getBalance();
 
         assertEquals(recipientBalanceAfterFirst, recipientBalanceAfterSecond);
         assertEquals(payerBalanceAfterFirst, payerBalanceAfterSecond);
@@ -322,6 +325,7 @@ public class PaymentServiceTest {
 
         JamiahDto created = createJamiah("u1");
         Jamiah jamiah = jamiahRepository.findAll().get(0);
+        Long jamiahId = jamiah.getId();
         jamiah.getMembers().add(recipient);
         recipient.getJamiahs().add(jamiah);
         jamiah.getMembers().add(member);
