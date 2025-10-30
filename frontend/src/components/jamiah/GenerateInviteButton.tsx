@@ -11,7 +11,9 @@ interface GenerateInviteButtonProps {
 
 export const GenerateInviteButton: React.FC<GenerateInviteButtonProps> = ({ jamiahId }) => {
   const [open, setOpen] = useState(false);
-  const [invite, setInvite] = useState<{ invitationCode: string; invitationExpiry: string } | null>(null);
+  const [invite, setInvite] = useState<{ invitationCode: string; invitationExpiry: string; invitationLink: string } | null>(
+    null
+  );
 
   const handleClick = () => {
     const uid = auth.currentUser?.uid || '';
@@ -20,10 +22,17 @@ export const GenerateInviteButton: React.FC<GenerateInviteButtonProps> = ({ jami
       .then(async res => {
         if (!res.ok) throw new Error();
         const data = await res.json();
-        setInvite({ invitationCode: data.invitationCode, invitationExpiry: data.invitationExpiry });
+        const invitationCode: string = data.invitationCode;
+        const invitationExpiry: string = data.invitationExpiry;
+        const invitationLink = `${window.location.origin}/invite/${invitationCode}`;
+        setInvite({ invitationCode, invitationExpiry, invitationLink });
       })
       .catch(() =>
-        setInvite({ invitationCode: 'Fehler', invitationExpiry: new Date().toISOString() })
+        setInvite({
+          invitationCode: 'Fehler',
+          invitationExpiry: new Date().toISOString(),
+          invitationLink: '',
+        })
       )
       .finally(() => setOpen(true));
   };
@@ -31,12 +40,13 @@ export const GenerateInviteButton: React.FC<GenerateInviteButtonProps> = ({ jami
   return (
     <>
       <Button size="small" variant="outlined" fullWidth startIcon={<KeyIcon />} onClick={handleClick}>
-        Einladungscode
+        Einladungslink
       </Button>
       <InviteCodeDialog
         open={open}
         code={invite?.invitationCode ?? null}
         expiry={invite?.invitationExpiry ?? null}
+        link={invite?.invitationLink ?? null}
         onClose={() => setOpen(false)}
       />
     </>

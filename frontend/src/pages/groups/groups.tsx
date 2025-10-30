@@ -263,7 +263,8 @@ export const Groups = () => {
           </Grid>
         ) : filteredGroups.length === 0 ? (
           <Typography variant="body1" color="textSecondary">
-            Du bist noch keiner Jamiah beigetreten. Verwende einen Einladungscode oder gründe deine eigene Jamiah.
+            Du bist noch keiner Jamiah beigetreten. Verwende einen Einladungslink oder -code oder gründe deine eigene
+            Jamiah.
           </Typography>
         ) : isMobile ? (
           <List>
