@@ -6,7 +6,7 @@ import com.example.backend.jamiah.dto.PaymentConfirmationDto;
 import com.example.backend.jamiah.dto.PaymentDto;
 import com.example.backend.payment.StripePaymentProvider;
 import com.example.backend.wallet.JamiahWallet;
-import com.example.backend.wallet.JamiahWalletRepository;
+import com.example.backend.wallet.WalletService;
 import com.stripe.model.PaymentIntent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,7 +45,7 @@ class PaymentServiceUnitTest {
     @Mock
     private StripePaymentProvider stripePaymentProvider;
     @Mock
-    private JamiahWalletRepository walletRepository;
+    private WalletService walletService;
 
     @InjectMocks
     private PaymentService paymentService;
@@ -58,7 +58,7 @@ class PaymentServiceUnitTest {
                 jamiahRepository,
                 userRepository,
                 stripePaymentProvider,
-                walletRepository,
+                walletService,
                 "pk_test"
         );
     }
@@ -76,7 +76,7 @@ class PaymentServiceUnitTest {
         payment.setStripePaymentIntentId("pi_test");
 
         when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
-        when(paymentRepository.save(any(JamiahPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(paymentRepository.save(any(JamiahPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Jamiah jamiah = new Jamiah();
         jamiah.setId(11L);
@@ -114,7 +114,8 @@ class PaymentServiceUnitTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         assertEquals("Payer profile incomplete", exception.getReason());
-        verify(walletRepository, never()).findByJamiah_IdAndMember_Id(anyLong(), anyLong());
+        verify(walletService, never()).getOrCreateWallet(any(), any());
+        verify(walletService, never()).credit(any(), any(), any(BigDecimal.class), anyBoolean());
     }
 
     @Test
@@ -164,19 +165,26 @@ class PaymentServiceUnitTest {
         setUserProfileId(payerProfile, 77L);
         when(userRepository.findByUid(callerUid)).thenReturn(Optional.of(payerProfile));
 
-        when(walletRepository.findByJamiah_IdAndMember_Id(21L, 77L)).thenReturn(Optional.empty());
-        when(walletRepository.save(any(JamiahWallet.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        JamiahWallet existingWallet = new JamiahWallet();
+        existingWallet.setJamiah(jamiahWithMembers);
+        existingWallet.setMember(payerProfile);
+        existingWallet.setBalance(BigDecimal.ZERO);
+        existingWallet.setReservedBalance(BigDecimal.ZERO);
+
+        JamiahWallet creditedWallet = new JamiahWallet();
+        creditedWallet.setJamiah(jamiahWithMembers);
+        creditedWallet.setMember(payerProfile);
+        creditedWallet.setBalance(new BigDecimal("10"));
+        creditedWallet.setReservedBalance(new BigDecimal("10"));
+
+        when(walletService.getOrCreateWallet(jamiahWithMembers, payerProfile)).thenReturn(existingWallet);
+        when(walletService.credit(eq(jamiahWithMembers), eq(payerProfile), eq(new BigDecimal("10")), eq(true)))
+                .thenReturn(creditedWallet);
 
         PaymentConfirmationDto confirmation = paymentService.confirmPayment(paymentId, callerUid);
 
-        ArgumentCaptor<JamiahWallet> walletCaptor = ArgumentCaptor.forClass(JamiahWallet.class);
-        verify(walletRepository).save(walletCaptor.capture());
-        JamiahWallet savedWallet = walletCaptor.getValue();
-
-        assertEquals(21L, savedWallet.getJamiahId());
-        assertEquals(77L, savedWallet.getMemberId());
-        assertEquals(payerProfile, savedWallet.getMember());
-        assertEquals(new BigDecimal("10"), savedWallet.getBalance());
+        verify(walletService).getOrCreateWallet(jamiahWithMembers, payerProfile);
+        verify(walletService).credit(jamiahWithMembers, payerProfile, new BigDecimal("10"), true);
         assertEquals(new BigDecimal("10"), confirmation.getWallet().getBalance());
         assertEquals(callerUid, confirmation.getWallet().getMemberId());
         assertEquals(21L, confirmation.getWallet().getJamiahId());
@@ -356,8 +364,21 @@ class PaymentServiceUnitTest {
         setUserProfileId(payerProfile, 99L);
         when(userRepository.findByUid(callerUid)).thenReturn(Optional.of(payerProfile));
 
-        when(walletRepository.findByJamiah_IdAndMember_Id(12L, 99L)).thenReturn(Optional.empty());
-        when(walletRepository.save(any(JamiahWallet.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        JamiahWallet existingWallet = new JamiahWallet();
+        existingWallet.setJamiah(jamiahWithMembers);
+        existingWallet.setMember(payerProfile);
+        existingWallet.setBalance(BigDecimal.ZERO);
+        existingWallet.setReservedBalance(BigDecimal.ZERO);
+
+        JamiahWallet creditedWallet = new JamiahWallet();
+        creditedWallet.setJamiah(jamiahWithMembers);
+        creditedWallet.setMember(payerProfile);
+        creditedWallet.setBalance(new BigDecimal("10"));
+        creditedWallet.setReservedBalance(new BigDecimal("10"));
+
+        when(walletService.getOrCreateWallet(jamiahWithMembers, payerProfile)).thenReturn(existingWallet);
+        when(walletService.credit(eq(jamiahWithMembers), eq(payerProfile), eq(new BigDecimal("10")), eq(true)))
+                .thenReturn(creditedWallet);
 
         PaymentConfirmationDto confirmation = paymentService.confirmPayment(paymentId, callerUid);
 

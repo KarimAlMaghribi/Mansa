@@ -27,6 +27,15 @@ public class JamiahWallet {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal balance = BigDecimal.ZERO;
 
+    @Column(name = "reserved_balance", nullable = false, precision = 19, scale = 2)
+    private BigDecimal reservedBalance = BigDecimal.ZERO;
+
+    @Column(name = "locked_for_payments", nullable = false)
+    private Boolean lockedForPayments = false;
+
+    @Column(name = "locked_for_payouts", nullable = false)
+    private Boolean lockedForPayouts = false;
+
     @Column(name = "stripe_account_id")
     private String stripeAccountId;
 
@@ -46,11 +55,35 @@ public class JamiahWallet {
             createdAt = now;
         }
         updatedAt = now;
+        if (balance == null) {
+            balance = BigDecimal.ZERO;
+        }
+        if (reservedBalance == null) {
+            reservedBalance = BigDecimal.ZERO;
+        }
+        if (lockedForPayments == null) {
+            lockedForPayments = false;
+        }
+        if (lockedForPayouts == null) {
+            lockedForPayouts = false;
+        }
     }
 
     @PreUpdate
     void preUpdate() {
         updatedAt = Instant.now();
+        if (balance == null) {
+            balance = BigDecimal.ZERO;
+        }
+        if (reservedBalance == null) {
+            reservedBalance = BigDecimal.ZERO;
+        }
+        if (lockedForPayments == null) {
+            lockedForPayments = false;
+        }
+        if (lockedForPayouts == null) {
+            lockedForPayouts = false;
+        }
     }
 
     public JamiahWalletId getId() {
@@ -95,6 +128,30 @@ public class JamiahWallet {
 
     public void setBalance(BigDecimal balance) {
         this.balance = balance;
+    }
+
+    public BigDecimal getReservedBalance() {
+        return reservedBalance;
+    }
+
+    public void setReservedBalance(BigDecimal reservedBalance) {
+        this.reservedBalance = reservedBalance;
+    }
+
+    public Boolean getLockedForPayments() {
+        return lockedForPayments;
+    }
+
+    public void setLockedForPayments(Boolean lockedForPayments) {
+        this.lockedForPayments = lockedForPayments;
+    }
+
+    public Boolean getLockedForPayouts() {
+        return lockedForPayouts;
+    }
+
+    public void setLockedForPayouts(Boolean lockedForPayouts) {
+        this.lockedForPayouts = lockedForPayouts;
     }
 
     public String getStripeAccountId() {

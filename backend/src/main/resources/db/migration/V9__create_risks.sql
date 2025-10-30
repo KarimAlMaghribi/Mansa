@@ -2,7 +2,7 @@ CREATE TABLE risks (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255),
     description VARCHAR(2048),
-    value DECIMAL(19,2),
+    `value` DECIMAL(19,2),
     publisher_id BIGINT,
     declination_date DATE,
     created_at DATETIME,

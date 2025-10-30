@@ -1,6 +1,5 @@
-ALTER TABLE jamiah_cycles
-    ADD COLUMN recipient_id BIGINT,
-    ADD COLUMN recipient_confirmed BIT;
+ALTER TABLE jamiah_cycles ADD COLUMN recipient_id BIGINT;
+ALTER TABLE jamiah_cycles ADD COLUMN recipient_confirmed BIT;
 
 ALTER TABLE jamiah_cycles
     ADD CONSTRAINT fk_cycle_recipient FOREIGN KEY (recipient_id) REFERENCES user_profiles(id);

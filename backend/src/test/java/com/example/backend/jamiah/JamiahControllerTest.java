@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import com.example.backend.jamiah.JamiahRepository;
 import com.example.backend.jamiah.Jamiah;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -37,6 +38,23 @@ class JamiahControllerTest {
 
     @Autowired
     UserProfileRepository userRepository;
+
+    private String newUid() {
+        return "u-" + java.util.UUID.randomUUID();
+    }
+
+    private UserProfile createUser(String uid) {
+        return createUser(uid, uid);
+    }
+
+    private UserProfile createUser(String uid, String username) {
+        return userRepository.findByUid(uid).orElseGet(() -> {
+            UserProfile user = new UserProfile();
+            user.setUid(uid);
+            user.setUsername(username + "-" + uid);
+            return userRepository.save(user);
+        });
+    }
 
     @Test
     void createJamiahSuccess() throws Exception {
@@ -93,12 +111,10 @@ class JamiahControllerTest {
                 .andReturn().getResponse().getContentAsString();
         JamiahDto invite = objectMapper.readValue(inviteResp, JamiahDto.class);
 
-        UserProfile user = new UserProfile();
-        user.setUsername("user1");
-        user.setUid("u1");
-        userRepository.save(user);
+        String userUid = newUid();
+        createUser(userUid, "user1");
 
-        mockMvc.perform(post("/api/jamiahs/join?code=" + invite.getInvitationCode() + "&uid=u1"))
+        mockMvc.perform(post("/api/jamiahs/join?code=" + invite.getInvitationCode() + "&uid=" + userUid))
                 .andExpect(status().isOk());
     }
 
@@ -153,7 +169,7 @@ class JamiahControllerTest {
                 .andReturn().getResponse().getContentAsString();
         JamiahDto invite = objectMapper.readValue(inviteResp, JamiahDto.class);
 
-        Jamiah entity = repository.findByInvitationCode(invite.getInvitationCode()).get();
+        Jamiah entity = repository.findWithMembersByInvitationCode(invite.getInvitationCode()).orElseThrow();
         entity.setInvitationExpiry(LocalDate.now().minusDays(1));
         repository.save(entity);
 
@@ -183,12 +199,10 @@ class JamiahControllerTest {
                 .andReturn().getResponse().getContentAsString();
         JamiahDto invite = objectMapper.readValue(inviteResp, JamiahDto.class);
 
-        UserProfile user = new UserProfile();
-        user.setUsername("invitee");
-        user.setUid("invitee-uid");
-        userRepository.save(user);
+        String inviteeUid = newUid();
+        createUser(inviteeUid, "invitee");
 
-        mockMvc.perform(post("/api/jamiahs/invite/" + invite.getInvitationCode() + "/accept?uid=" + user.getUid()))
+        mockMvc.perform(post("/api/jamiahs/invite/" + invite.getInvitationCode() + "/accept?uid=" + inviteeUid))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(created.getId().toString()));
     }
@@ -215,23 +229,19 @@ class JamiahControllerTest {
                 .andReturn().getResponse().getContentAsString();
         JamiahDto invite = objectMapper.readValue(inviteResp, JamiahDto.class);
 
-        UserProfile existing = new UserProfile();
-        existing.setUsername("existing");
-        existing.setUid("existing-uid");
-        userRepository.save(existing);
+        String existingUid = newUid();
+        UserProfile existing = createUser(existingUid, "existing");
 
-        Jamiah entity = repository.findByInvitationCode(invite.getInvitationCode()).get();
+        Jamiah entity = repository.findWithMembersByInvitationCode(invite.getInvitationCode()).orElseThrow();
         entity.getMembers().add(existing);
         existing.getJamiahs().add(entity);
         repository.save(entity);
         userRepository.save(existing);
 
-        UserProfile user = new UserProfile();
-        user.setUsername("blocked");
-        user.setUid("blocked-uid");
-        userRepository.save(user);
+        String blockedUid = newUid();
+        createUser(blockedUid, "blocked");
 
-        mockMvc.perform(post("/api/jamiahs/invite/" + invite.getInvitationCode() + "/accept?uid=" + user.getUid()))
+        mockMvc.perform(post("/api/jamiahs/invite/" + invite.getInvitationCode() + "/accept?uid=" + blockedUid))
                 .andExpect(status().isBadRequest());
     }
 
@@ -260,12 +270,10 @@ class JamiahControllerTest {
         entity.setInvitationExpiry(LocalDate.now().minusDays(1));
         repository.save(entity);
 
-        UserProfile user = new UserProfile();
-        user.setUsername("user1");
-        user.setUid("u1");
-        userRepository.save(user);
+        String expiredUid = newUid();
+        createUser(expiredUid, "user1");
 
-        mockMvc.perform(post("/api/jamiahs/join?code=" + invite.getInvitationCode() + "&uid=u1"))
+        mockMvc.perform(post("/api/jamiahs/join?code=" + invite.getInvitationCode() + "&uid=" + expiredUid))
                 .andExpect(status().isGone());
     }
 
@@ -326,10 +334,8 @@ class JamiahControllerTest {
 
     @Test
     void deleteJamiahForbiddenForNonOwner() throws Exception {
-        UserProfile user = new UserProfile();
-        user.setUsername("owner");
-        user.setUid("uidA");
-        userRepository.save(user);
+        String ownerUid = newUid();
+        createUser(ownerUid, "owner");
 
         JamiahDto dto = new JamiahDto();
         dto.setName("Protected");
@@ -340,7 +346,7 @@ class JamiahControllerTest {
         dto.setRateInterval(RateInterval.MONTHLY);
         dto.setStartDate(LocalDate.now());
 
-        String response = mockMvc.perform(post("/api/jamiahs?uid=uidA")
+        String response = mockMvc.perform(post("/api/jamiahs?uid=" + ownerUid)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andReturn().getResponse().getContentAsString();
@@ -369,7 +375,7 @@ class JamiahControllerTest {
 
         mockMvc.perform(get("/api/jamiahs/public"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Public"));
+                .andExpect(jsonPath("$[*].name", hasItem("Public")));
     }
 
     @Test
@@ -389,14 +395,12 @@ class JamiahControllerTest {
                 .andReturn().getResponse().getContentAsString();
         JamiahDto created = objectMapper.readValue(response, JamiahDto.class);
 
-        UserProfile user = new UserProfile();
-        user.setUsername("joiner");
-        user.setUid("uid1");
-        userRepository.save(user);
+        String joinerUid = newUid();
+        createUser(joinerUid, "joiner");
 
         mockMvc.perform(post("/api/jamiahs/" + created.getId() + "/join-public")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"uid\":\"uid1\"}"))
+                        .content("{\"uid\":\"" + joinerUid + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(created.getId().toString()));
     }
