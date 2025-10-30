@@ -69,6 +69,24 @@ public class Jamiah {
 
     private LocalDate invitationExpiry;
 
+    @Column(name = "stripe_account_id")
+    private String stripeAccountId;
+
+    @Column(name = "stripe_account_kyc_status")
+    private String stripeAccountKycStatus;
+
+    @Column(name = "stripe_account_charges_enabled")
+    private Boolean stripeAccountChargesEnabled;
+
+    @Column(name = "stripe_account_payouts_enabled")
+    private Boolean stripeAccountPayoutsEnabled;
+
+    @Column(name = "stripe_account_payouts_locked")
+    private Boolean stripeAccountPayoutsLocked;
+
+    @Column(name = "stripe_account_disabled_reason")
+    private String stripeAccountDisabledReason;
+
     @ManyToMany
     @JoinTable(name = "jamiah_members",
             joinColumns = @JoinColumn(name = "jamiah_id"),

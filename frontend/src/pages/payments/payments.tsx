@@ -101,6 +101,9 @@ interface WalletStatus {
   stripeSandboxId?: string;
   lockedForPayments?: boolean;
   lockedForPayouts?: boolean;
+  stripeChargesEnabled?: boolean;
+  stripePayoutsEnabled?: boolean;
+  stripeDisabledReason?: string;
 }
 
 interface WalletHistoryEntry {
@@ -682,6 +685,9 @@ export const Payments: React.FC = () => {
     stripeSandboxId: data.stripeSandboxId || undefined,
     lockedForPayments: data.lockedForPayments != null ? Boolean(data.lockedForPayments) : undefined,
     lockedForPayouts: data.lockedForPayouts != null ? Boolean(data.lockedForPayouts) : undefined,
+    stripeChargesEnabled: typeof data.stripeChargesEnabled === 'boolean' ? data.stripeChargesEnabled : undefined,
+    stripePayoutsEnabled: typeof data.stripePayoutsEnabled === 'boolean' ? data.stripePayoutsEnabled : undefined,
+    stripeDisabledReason: typeof data.stripeDisabledReason === 'string' ? data.stripeDisabledReason : undefined,
   }), []);
 
   useEffect(() => {

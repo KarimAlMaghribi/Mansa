@@ -19,6 +19,9 @@ public class WalletStatusResponse {
     private String stripeSandboxId;
     private boolean lockedForPayments;
     private boolean lockedForPayouts;
+    private Boolean stripeChargesEnabled;
+    private Boolean stripePayoutsEnabled;
+    private String stripeDisabledReason;
 
     public Long getJamiahId() {
         return jamiahId;
@@ -138,5 +141,29 @@ public class WalletStatusResponse {
 
     public void setLockedForPayouts(boolean lockedForPayouts) {
         this.lockedForPayouts = lockedForPayouts;
+    }
+
+    public Boolean getStripeChargesEnabled() {
+        return stripeChargesEnabled;
+    }
+
+    public void setStripeChargesEnabled(Boolean stripeChargesEnabled) {
+        this.stripeChargesEnabled = stripeChargesEnabled;
+    }
+
+    public Boolean getStripePayoutsEnabled() {
+        return stripePayoutsEnabled;
+    }
+
+    public void setStripePayoutsEnabled(Boolean stripePayoutsEnabled) {
+        this.stripePayoutsEnabled = stripePayoutsEnabled;
+    }
+
+    public String getStripeDisabledReason() {
+        return stripeDisabledReason;
+    }
+
+    public void setStripeDisabledReason(String stripeDisabledReason) {
+        this.stripeDisabledReason = stripeDisabledReason;
     }
 }

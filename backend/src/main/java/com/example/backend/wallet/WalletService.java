@@ -12,6 +12,7 @@ import com.stripe.model.AccountSession;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +26,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -40,6 +40,9 @@ public class WalletService {
     private final JamiahWalletRepository walletRepository;
     private final UserProfileRepository userRepository;
     private final StripePaymentProvider stripePaymentProvider;
+    private final StripeAccountStatusUpdater stripeAccountStatusUpdater;
+    private final String defaultAccountReturnUrl;
+    private final String defaultAccountRefreshUrl;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -47,11 +50,17 @@ public class WalletService {
     public WalletService(JamiahRepository jamiahRepository,
                          JamiahWalletRepository walletRepository,
                          UserProfileRepository userRepository,
-                         StripePaymentProvider stripePaymentProvider) {
+                         StripePaymentProvider stripePaymentProvider,
+                         StripeAccountStatusUpdater stripeAccountStatusUpdater,
+                         @Value("${stripe.connect.account-return-url:}") String defaultAccountReturnUrl,
+                         @Value("${stripe.connect.account-refresh-url:}") String defaultAccountRefreshUrl) {
         this.jamiahRepository = jamiahRepository;
         this.walletRepository = walletRepository;
         this.userRepository = userRepository;
         this.stripePaymentProvider = stripePaymentProvider;
+        this.stripeAccountStatusUpdater = stripeAccountStatusUpdater;
+        this.defaultAccountReturnUrl = normalizeUrl(defaultAccountReturnUrl);
+        this.defaultAccountRefreshUrl = normalizeUrl(defaultAccountRefreshUrl);
     }
 
     public WalletStatusResponse createWallet(String jamiahPublicId,
@@ -257,7 +266,8 @@ public class WalletService {
         if (available.compareTo(amount) < 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient available balance");
         }
-        if (wallet.getStripeAccountId() == null || wallet.getStripeAccountId().isBlank()) {
+        if (stripePaymentProvider.isConfigured()
+                && (wallet.getStripeAccountId() == null || wallet.getStripeAccountId().isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Wallet is not connected to Stripe");
         }
         Map<String, Object> transferParams = new HashMap<>();
@@ -372,9 +382,22 @@ public class WalletService {
     }
 
     private Account ensureStripeAccount(JamiahWallet wallet, Jamiah jamiah, UserProfile member) {
-        if (wallet.getStripeAccountId() != null && !wallet.getStripeAccountId().isBlank()) {
+        String walletAccountId = normalize(wallet.getStripeAccountId());
+        String jamiahAccountId = normalize(jamiah.getStripeAccountId());
+        if (!stripePaymentProvider.isConfigured()) {
+            if (jamiahAccountId != null && !jamiahAccountId.equals(walletAccountId)) {
+                wallet.setStripeAccountId(jamiahAccountId);
+            }
+            return null;
+        }
+        if (jamiahAccountId != null) {
+            if (!jamiahAccountId.equals(walletAccountId)) {
+                wallet.setStripeAccountId(jamiahAccountId);
+            }
             try {
-                return stripePaymentProvider.retrieveAccount(wallet.getStripeAccountId());
+                Account account = stripePaymentProvider.retrieveAccount(jamiahAccountId);
+                stripeAccountStatusUpdater.applyAccountState(jamiah, account, List.of(wallet));
+                return account;
             } catch (StripeException ex) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
             }
@@ -388,16 +411,27 @@ public class WalletService {
         params.put("capabilities", capabilities);
         Map<String, String> metadata = new HashMap<>();
         metadata.put("jamiahId", jamiah.getId().toString());
+        if (jamiah.getPublicId() != null) {
+            metadata.put("jamiahPublicId", jamiah.getPublicId().toString());
+        }
         metadata.put("memberId", member.getId().toString());
+        metadata.put("memberUid", member.getUid());
         params.put("metadata", metadata);
-        if (member.getUsername() != null) {
-            params.put("business_profile", Map.of("name", member.getUsername()));
+        Map<String, Object> businessProfile = new HashMap<>();
+        if (jamiah.getName() != null && !jamiah.getName().isBlank()) {
+            businessProfile.put("name", jamiah.getName());
+        } else if (member.getUsername() != null && !member.getUsername().isBlank()) {
+            businessProfile.put("name", member.getUsername());
+        }
+        if (!businessProfile.isEmpty()) {
+            params.put("business_profile", businessProfile);
         }
         try {
             Account account = stripePaymentProvider.createAccount(params);
-            wallet.setStripeAccountId(account.getId());
-            wallet.setKycStatus(Boolean.TRUE.equals(account.getDetailsSubmitted()) ? "verified" : "pending");
-            walletRepository.save(wallet);
+            String accountId = account.getId();
+            jamiah.setStripeAccountId(accountId);
+            wallet.setStripeAccountId(accountId);
+            stripeAccountStatusUpdater.applyAccountState(jamiah, account, List.of(wallet));
             return account;
         } catch (StripeException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
@@ -419,36 +453,55 @@ public class WalletService {
         response.setBalance(Optional.ofNullable(wallet.getBalance()).orElse(ZERO));
         response.setReservedBalance(Optional.ofNullable(wallet.getReservedBalance()).orElse(ZERO));
         response.setUpdatedAt(wallet.getUpdatedAt());
-        response.setStripeAccountId(wallet.getStripeAccountId());
+
+        String effectiveReturnUrl = resolveReturnUrl(returnUrl);
+        String effectiveRefreshUrl = resolveRefreshUrl(refreshUrl);
+
+        String accountId = normalize(wallet.getStripeAccountId());
+        if (accountId == null) {
+            accountId = normalize(jamiah.getStripeAccountId());
+            if (accountId != null) {
+                wallet.setStripeAccountId(accountId);
+            }
+        }
+        response.setStripeAccountId(accountId);
         response.setKycStatus(wallet.getKycStatus());
         response.setStripeSandboxId(stripePaymentProvider.getSandboxId());
-        response.setLockedForPayments(Boolean.TRUE.equals(wallet.getLockedForPayments()));
-        response.setLockedForPayouts(Boolean.TRUE.equals(wallet.getLockedForPayouts()));
+        boolean manualPaymentsLock = Boolean.TRUE.equals(wallet.getLockedForPayments());
+        boolean manualPayoutsLock = Boolean.TRUE.equals(wallet.getLockedForPayouts());
+        boolean stripePayoutsLock = Boolean.TRUE.equals(jamiah.getStripeAccountPayoutsLocked());
+        response.setLockedForPayments(manualPaymentsLock);
+        response.setLockedForPayouts(manualPayoutsLock || stripePayoutsLock);
+        response.setStripeChargesEnabled(jamiah.getStripeAccountChargesEnabled());
+        response.setStripePayoutsEnabled(jamiah.getStripeAccountPayoutsEnabled());
+        response.setStripeDisabledReason(jamiah.getStripeAccountDisabledReason());
 
         Account effectiveAccount = account;
-        if (effectiveAccount == null && wallet.getStripeAccountId() != null) {
+        if (effectiveAccount == null && accountId != null && stripePaymentProvider.isConfigured()) {
             try {
-                effectiveAccount = stripePaymentProvider.retrieveAccount(wallet.getStripeAccountId());
+                effectiveAccount = stripePaymentProvider.retrieveAccount(accountId);
+                stripeAccountStatusUpdater.applyAccountState(jamiah, effectiveAccount, List.of(wallet));
+                response.setKycStatus(wallet.getKycStatus());
+                response.setLockedForPayments(Boolean.TRUE.equals(wallet.getLockedForPayments()));
+                response.setLockedForPayouts(Boolean.TRUE.equals(wallet.getLockedForPayouts())
+                        || Boolean.TRUE.equals(jamiah.getStripeAccountPayoutsLocked()));
+                response.setStripeChargesEnabled(jamiah.getStripeAccountChargesEnabled());
+                response.setStripePayoutsEnabled(jamiah.getStripeAccountPayoutsEnabled());
+                response.setStripeDisabledReason(jamiah.getStripeAccountDisabledReason());
             } catch (StripeException ex) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
             }
         }
 
-        boolean requiresOnboarding = false;
+        boolean requiresOnboarding = accountId == null;
         if (effectiveAccount != null) {
             boolean detailsSubmitted = Boolean.TRUE.equals(effectiveAccount.getDetailsSubmitted());
             requiresOnboarding = !detailsSubmitted;
-            String status = detailsSubmitted ? "verified" : "pending";
-            if (!Objects.equals(status, wallet.getKycStatus())) {
-                wallet.setKycStatus(status);
-                walletRepository.save(wallet);
-                response.setKycStatus(status);
-            }
-            if (requiresOnboarding && refreshUrl != null && returnUrl != null) {
+            if (requiresOnboarding && effectiveRefreshUrl != null && effectiveReturnUrl != null) {
                 Map<String, Object> params = new HashMap<>();
                 params.put("account", effectiveAccount.getId());
-                params.put("refresh_url", refreshUrl);
-                params.put("return_url", returnUrl);
+                params.put("refresh_url", effectiveRefreshUrl);
+                params.put("return_url", effectiveReturnUrl);
                 params.put("type", "account_onboarding");
                 try {
                     AccountLink link = stripePaymentProvider.createAccountLink(params);
@@ -471,11 +524,31 @@ public class WalletService {
                     throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
                 }
             }
-        } else {
-            requiresOnboarding = true;
         }
         response.setRequiresOnboarding(requiresOnboarding);
         return response;
+    }
+
+    private String resolveReturnUrl(String override) {
+        String normalized = normalizeUrl(override);
+        return normalized != null ? normalized : defaultAccountReturnUrl;
+    }
+
+    private String resolveRefreshUrl(String override) {
+        String normalized = normalizeUrl(override);
+        return normalized != null ? normalized : defaultAccountRefreshUrl;
+    }
+
+    private String normalizeUrl(String url) {
+        return normalize(url);
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private long toStripeAmount(BigDecimal amount) {
