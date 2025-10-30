@@ -1,5 +1,6 @@
 package com.example.backend.jamiah;
 
+import com.example.backend.jamiah.dto.InvitationPreviewDto;
 import com.example.backend.jamiah.dto.JamiahDto;
 import com.example.backend.jamiah.JamiahCycle;
 import com.example.backend.jamiah.PaymentService;
@@ -9,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 
 @RestController
@@ -64,6 +66,25 @@ public class JamiahController {
     public JamiahDto invite(@PathVariable String id,
                             @RequestParam(required = false) String uid) {
         return service.createOrRefreshInvitation(id, uid);
+    }
+
+    @GetMapping("/invite/{code}")
+    public InvitationPreviewDto invitationPreview(@PathVariable String code) {
+        return service.getInvitationPreview(code);
+    }
+
+    @PostMapping("/invite/{code}/accept")
+    public JamiahDto acceptInvitation(@PathVariable String code,
+                                      @RequestParam(required = false) String uid,
+                                      @RequestBody(required = false) JoinByInvitationRequest request) {
+        String requestUid = uid;
+        if (requestUid == null && request != null) {
+            requestUid = request.getUid();
+        }
+        if (requestUid == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "uid is required");
+        }
+        return service.joinByInvitation(code, requestUid);
     }
 
     @PostMapping("/{id}/start")
@@ -188,6 +209,18 @@ public class JamiahController {
 
         public void setMotivation(String motivation) {
             this.motivation = motivation;
+        }
+    }
+
+    static class JoinByInvitationRequest {
+        private String uid;
+
+        public String getUid() {
+            return uid;
+        }
+
+        public void setUid(String uid) {
+            this.uid = uid;
         }
     }
 }

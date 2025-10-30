@@ -103,6 +103,139 @@ class JamiahControllerTest {
     }
 
     @Test
+    void invitationPreviewSuccess() throws Exception {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("Previewable");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setMaxMembers(5);
+        dto.setCycleCount(2);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        String response = mockMvc.perform(post("/api/jamiahs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andReturn().getResponse().getContentAsString();
+        JamiahDto created = objectMapper.readValue(response, JamiahDto.class);
+
+        String inviteResp = mockMvc.perform(post("/api/jamiahs/" + created.getId() + "/invite"))
+                .andReturn().getResponse().getContentAsString();
+        JamiahDto invite = objectMapper.readValue(inviteResp, JamiahDto.class);
+
+        mockMvc.perform(get("/api/jamiahs/invite/" + invite.getInvitationCode()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Previewable"))
+                .andExpect(jsonPath("$.publicId").value(created.getId().toString()))
+                .andExpect(jsonPath("$.invitationExpiry").isNotEmpty());
+    }
+
+    @Test
+    void invitationPreviewExpired() throws Exception {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("ExpiredPreview");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setMaxMembers(5);
+        dto.setCycleCount(2);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        String response = mockMvc.perform(post("/api/jamiahs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andReturn().getResponse().getContentAsString();
+        JamiahDto created = objectMapper.readValue(response, JamiahDto.class);
+
+        String inviteResp = mockMvc.perform(post("/api/jamiahs/" + created.getId() + "/invite"))
+                .andReturn().getResponse().getContentAsString();
+        JamiahDto invite = objectMapper.readValue(inviteResp, JamiahDto.class);
+
+        Jamiah entity = repository.findByInvitationCode(invite.getInvitationCode()).get();
+        entity.setInvitationExpiry(LocalDate.now().minusDays(1));
+        repository.save(entity);
+
+        mockMvc.perform(get("/api/jamiahs/invite/" + invite.getInvitationCode()))
+                .andExpect(status().isGone());
+    }
+
+    @Test
+    void acceptInvitationSuccess() throws Exception {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("Acceptable");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setMaxMembers(5);
+        dto.setCycleCount(2);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        String response = mockMvc.perform(post("/api/jamiahs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andReturn().getResponse().getContentAsString();
+        JamiahDto created = objectMapper.readValue(response, JamiahDto.class);
+
+        String inviteResp = mockMvc.perform(post("/api/jamiahs/" + created.getId() + "/invite"))
+                .andReturn().getResponse().getContentAsString();
+        JamiahDto invite = objectMapper.readValue(inviteResp, JamiahDto.class);
+
+        UserProfile user = new UserProfile();
+        user.setUsername("invitee");
+        user.setUid("invitee-uid");
+        userRepository.save(user);
+
+        mockMvc.perform(post("/api/jamiahs/invite/" + invite.getInvitationCode() + "/accept?uid=" + user.getUid()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(created.getId().toString()));
+    }
+
+    @Test
+    void acceptInvitationMemberLimitReached() throws Exception {
+        JamiahDto dto = new JamiahDto();
+        dto.setName("FullGroup");
+        dto.setIsPublic(true);
+        dto.setMaxGroupSize(3);
+        dto.setMaxMembers(1);
+        dto.setCycleCount(2);
+        dto.setRateAmount(new BigDecimal("5"));
+        dto.setRateInterval(RateInterval.MONTHLY);
+        dto.setStartDate(LocalDate.now());
+
+        String response = mockMvc.perform(post("/api/jamiahs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andReturn().getResponse().getContentAsString();
+        JamiahDto created = objectMapper.readValue(response, JamiahDto.class);
+
+        String inviteResp = mockMvc.perform(post("/api/jamiahs/" + created.getId() + "/invite"))
+                .andReturn().getResponse().getContentAsString();
+        JamiahDto invite = objectMapper.readValue(inviteResp, JamiahDto.class);
+
+        UserProfile existing = new UserProfile();
+        existing.setUsername("existing");
+        existing.setUid("existing-uid");
+        userRepository.save(existing);
+
+        Jamiah entity = repository.findByInvitationCode(invite.getInvitationCode()).get();
+        entity.getMembers().add(existing);
+        existing.getJamiahs().add(entity);
+        repository.save(entity);
+        userRepository.save(existing);
+
+        UserProfile user = new UserProfile();
+        user.setUsername("blocked");
+        user.setUid("blocked-uid");
+        userRepository.save(user);
+
+        mockMvc.perform(post("/api/jamiahs/invite/" + invite.getInvitationCode() + "/accept?uid=" + user.getUid()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void joinJamiahExpired() throws Exception {
         JamiahDto dto = new JamiahDto();
         dto.setName("Expired");
