@@ -261,6 +261,9 @@ public class PaymentService {
         }
         UserProfile payer = userRepository.findByUid(callerUid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (payer.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payer profile incomplete");
+        }
         Wallet wallet = walletRepository.findById(payer.getId()).orElseGet(() -> {
             Wallet w = new Wallet();
             w.setMemberId(payer.getId());
@@ -268,6 +271,7 @@ public class PaymentService {
             w.setBalance(BigDecimal.ZERO);
             return w;
         });
+        wallet.setMemberId(payer.getId());
         wallet.setMember(payer);
         BigDecimal current = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
         wallet.setBalance(current.add(expectedAmount));
