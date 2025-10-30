@@ -73,11 +73,64 @@ interface Round {
 }
 
 interface WalletDto {
+  jamiahId?: number;
   memberId: string;
   username?: string;
   balance: number;
+  reserved?: number;
   lastUpdated?: string;
+  kycStatus?: string | null;
+  requiresOnboarding?: boolean;
+  lockedForPayments?: boolean;
+  lockedForPayouts?: boolean;
 }
+
+interface WalletStatus {
+  jamiahId?: number;
+  jamiahPublicId?: string;
+  memberId?: number;
+  memberUid?: string;
+  balance: number;
+  reservedBalance: number;
+  updatedAt?: string;
+  stripeAccountId?: string;
+  kycStatus?: string | null;
+  requiresOnboarding?: boolean;
+  onboardingUrl?: string;
+  accountSessionClientSecret?: string;
+  stripeSandboxId?: string;
+  lockedForPayments?: boolean;
+  lockedForPayouts?: boolean;
+}
+
+interface WalletHistoryEntry {
+  recordedAt: string;
+  balance: number;
+  reservedBalance: number;
+  updatedAt?: string;
+  kycStatus?: string | null;
+}
+
+const parseAmountValue = (value: any): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.replace(',', '.');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const buildHistoryEntry = (status: WalletStatus): WalletHistoryEntry => ({
+  recordedAt: new Date().toISOString(),
+  balance: status.balance,
+  reservedBalance: status.reservedBalance,
+  updatedAt: status.updatedAt,
+  kycStatus: status.kycStatus,
+});
 
 interface Cycle {
   id: number;
@@ -227,11 +280,24 @@ const PaymentStatusHeader: React.FC<PaymentStatusHeaderProps> = ({ round, curren
             <Typography variant="body1" fontWeight="bold">
               {wallet.balance.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
             </Typography>
+            {typeof wallet.reserved === 'number' && wallet.reserved > 0 && (
+              <Typography variant="caption" color="text.secondary">
+                Reserviert: {wallet.reserved.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+              </Typography>
+            )}
             {wallet.lastUpdated && (
               <Typography variant="caption" color="text.secondary">
                 Aktualisiert am {new Date(wallet.lastUpdated).toLocaleDateString()}
               </Typography>
             )}
+            <Stack direction="row" spacing={1} justifyContent={{ xs: 'flex-start', sm: 'flex-end' }} mt={1} flexWrap="wrap">
+              {wallet.requiresOnboarding && <Chip label="Onboarding offen" size="small" color="warning" />}
+              {wallet.kycStatus && !wallet.requiresOnboarding && (
+                <Chip label={`KYC: ${wallet.kycStatus}`} size="small" color="success" />
+              )}
+              {wallet.lockedForPayments && <Chip label="Zahlung gesperrt" size="small" color="error" />}
+              {wallet.lockedForPayouts && <Chip label="Payout gesperrt" size="small" color="warning" />}
+            </Stack>
           </Box>
         )}
       </Box>
@@ -245,9 +311,11 @@ interface OwnerPaymentsPanelProps {
   getMemberName: (uid?: string) => string;
   onSelectCycle: (cycleId: number) => void;
   loadingWallets: boolean;
+  walletStatuses: Record<string, WalletStatus>;
+  onRefreshWalletStatus: (uid: string) => void;
 }
 
-const OwnerPaymentsPanel: React.FC<OwnerPaymentsPanelProps> = ({ summary, wallets, getMemberName, onSelectCycle, loadingWallets }) => (
+const OwnerPaymentsPanel: React.FC<OwnerPaymentsPanelProps> = ({ summary, wallets, getMemberName, onSelectCycle, loadingWallets, walletStatuses, onRefreshWalletStatus }) => (
   <Accordion defaultExpanded sx={{ mb: 3 }}>
     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
       <Typography fontWeight="bold">Owner-Bereich</Typography>
@@ -302,9 +370,31 @@ const OwnerPaymentsPanel: React.FC<OwnerPaymentsPanelProps> = ({ summary, wallet
             </Typography>
           ) : (
             wallets.map(wallet => (
-              <Box key={wallet.memberId} display="flex" justifyContent="space-between" mb={1}>
-                <Typography variant="body2">{getMemberName(wallet.memberId)}</Typography>
-                <Typography variant="body2">{wallet.balance.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</Typography>
+              <Box key={wallet.memberId} mb={1}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
+                  <Box>
+                    <Typography variant="body2">{getMemberName(wallet.memberId)}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Stand: {wallet.balance.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                      {wallet.reserved ? ` · Reserviert: ${wallet.reserved.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}` : ''}
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {walletStatuses[wallet.memberId]?.requiresOnboarding && (
+                      <Chip label="KYC offen" size="small" color="warning" />
+                    )}
+                    {walletStatuses[wallet.memberId]?.kycStatus && !walletStatuses[wallet.memberId]?.requiresOnboarding && (
+                      <Chip label={`KYC: ${walletStatuses[wallet.memberId]?.kycStatus}`} size="small" color="success" />
+                    )}
+                    {walletStatuses[wallet.memberId]?.lockedForPayments && (
+                      <Chip label="Zahlung gesperrt" size="small" color="error" />
+                    )}
+                    {walletStatuses[wallet.memberId]?.lockedForPayouts && (
+                      <Chip label="Payout gesperrt" size="small" color="warning" />
+                    )}
+                    <Button size="small" onClick={() => onRefreshWalletStatus(wallet.memberId)}>Aktualisieren</Button>
+                  </Stack>
+                </Stack>
               </Box>
             ))
           )}
@@ -439,6 +529,16 @@ export const Payments: React.FC = () => {
   const [summary, setSummary] = useState<CycleSummary[]>([]);
   const [round, setRound] = useState<Round | null>(null);
   const [wallets, setWallets] = useState<WalletDto[]>([]);
+  const [memberWallet, setMemberWallet] = useState<WalletDto | null>(null);
+  const [walletStatus, setWalletStatus] = useState<WalletStatus | null>(null);
+  const [walletStatusHistory, setWalletStatusHistory] = useState<WalletHistoryEntry[]>([]);
+  const [walletStatusByMember, setWalletStatusByMember] = useState<Record<string, WalletStatus>>({});
+  const [walletStatusLoading, setWalletStatusLoading] = useState(false);
+  const [creatingWallet, setCreatingWallet] = useState(false);
+  const [walletActionState, setWalletActionState] = useState<{ open: boolean; mode: 'top-up' | 'withdraw' } | null>(null);
+  const [walletActionAmount, setWalletActionAmount] = useState('');
+  const [walletActionError, setWalletActionError] = useState<string | null>(null);
+  const [walletActionSubmitting, setWalletActionSubmitting] = useState(false);
   const [rateAmount, setRateAmount] = useState<number>(0);
 
   const [loadingCycles, setLoadingCycles] = useState(false);
@@ -460,6 +560,69 @@ export const Payments: React.FC = () => {
 
   const parseErr = useCallback(async (r: Response) =>
     Promise.reject(new Error((await r.text()) || r.statusText)), []);
+
+  const pushWalletHistory = useCallback((status: WalletStatus) => {
+    setWalletStatusHistory(prev => {
+      const entry = buildHistoryEntry(status);
+      const next = [entry, ...prev];
+      return next.slice(0, 10);
+    });
+  }, []);
+
+  const mergeStatusIntoWallets = useCallback((status: WalletStatus, fallbackUid?: string) => {
+    const uid = status.memberUid
+      || (typeof status.memberId === 'string' ? status.memberId : undefined)
+      || fallbackUid;
+    if (!uid) {
+      return;
+    }
+    setWalletStatusByMember(prev => ({ ...prev, [uid]: status }));
+    setWallets(prev => {
+      if (!prev.length) {
+        return prev;
+      }
+      return prev.map(wallet => (wallet.memberId === uid
+        ? {
+          ...wallet,
+          balance: status.balance,
+          reserved: status.reservedBalance,
+          lastUpdated: status.updatedAt,
+          kycStatus: status.kycStatus ?? wallet.kycStatus,
+          requiresOnboarding: status.requiresOnboarding ?? wallet.requiresOnboarding,
+          lockedForPayments: status.lockedForPayments ?? wallet.lockedForPayments,
+          lockedForPayouts: status.lockedForPayouts ?? wallet.lockedForPayouts,
+        }
+        : wallet));
+    });
+    if (uid === currentUid) {
+      setWalletStatus(status);
+      setMemberWallet(prev => {
+        if (prev) {
+          return {
+            ...prev,
+            balance: status.balance,
+            reserved: status.reservedBalance,
+            lastUpdated: status.updatedAt,
+            kycStatus: status.kycStatus ?? prev.kycStatus,
+            requiresOnboarding: status.requiresOnboarding ?? prev.requiresOnboarding,
+            lockedForPayments: status.lockedForPayments ?? prev.lockedForPayments,
+            lockedForPayouts: status.lockedForPayouts ?? prev.lockedForPayouts,
+          };
+        }
+        return {
+          jamiahId: status.jamiahId,
+          memberId: uid,
+          balance: status.balance,
+          reserved: status.reservedBalance,
+          lastUpdated: status.updatedAt,
+          kycStatus: status.kycStatus,
+          requiresOnboarding: status.requiresOnboarding,
+          lockedForPayments: status.lockedForPayments,
+          lockedForPayouts: status.lockedForPayouts,
+        };
+      });
+    }
+  }, [currentUid]);
 
   const mapPayment = useCallback((data: any): Payment => ({
     id: data.id,
@@ -483,11 +646,42 @@ export const Payments: React.FC = () => {
     payments: Array.isArray(data.payments) ? data.payments.map(mapPayment) : [],
   }), [mapPayment]);
 
-  const mapWallet = useCallback((data: any): WalletDto => ({
-    memberId: data.memberId,
-    username: data.username,
-    balance: typeof data.balance === 'number' ? data.balance : Number(data.balance || 0),
-    lastUpdated: data.lastUpdated || undefined,
+  const mapWallet = useCallback((data: any): WalletDto => {
+    const memberId: string = typeof data.memberId === 'string'
+      ? data.memberId
+      : typeof data.memberUid === 'string'
+        ? data.memberUid
+        : '';
+    return {
+      jamiahId: typeof data.jamiahId === 'number' ? data.jamiahId : undefined,
+      memberId,
+      username: data.username,
+      balance: parseAmountValue(data.balance),
+      reserved: parseAmountValue(data.reserved ?? data.reservedBalance),
+      lastUpdated: data.lastUpdated || data.updatedAt || undefined,
+      kycStatus: data.kycStatus ?? null,
+      requiresOnboarding: Boolean(data.requiresOnboarding),
+      lockedForPayments: Boolean(data.lockedForPayments),
+      lockedForPayouts: Boolean(data.lockedForPayouts),
+    };
+  }, []);
+
+  const mapWalletStatus = useCallback((data: any): WalletStatus => ({
+    jamiahId: typeof data.jamiahId === 'number' ? data.jamiahId : undefined,
+    jamiahPublicId: data.jamiahPublicId || undefined,
+    memberId: typeof data.memberId === 'number' ? data.memberId : undefined,
+    memberUid: typeof data.memberUid === 'string' ? data.memberUid : (typeof data.memberId === 'string' ? data.memberId : undefined),
+    balance: parseAmountValue(data.balance),
+    reservedBalance: parseAmountValue(data.reservedBalance ?? data.reserved ?? 0),
+    updatedAt: data.updatedAt || data.lastUpdated || undefined,
+    stripeAccountId: data.stripeAccountId || undefined,
+    kycStatus: data.kycStatus ?? null,
+    requiresOnboarding: data.requiresOnboarding != null ? Boolean(data.requiresOnboarding) : undefined,
+    onboardingUrl: data.onboardingUrl || undefined,
+    accountSessionClientSecret: data.accountSessionClientSecret || undefined,
+    stripeSandboxId: data.stripeSandboxId || undefined,
+    lockedForPayments: data.lockedForPayments != null ? Boolean(data.lockedForPayments) : undefined,
+    lockedForPayouts: data.lockedForPayouts != null ? Boolean(data.lockedForPayouts) : undefined,
   }), []);
 
   useEffect(() => {
@@ -534,15 +728,90 @@ export const Payments: React.FC = () => {
       .catch(() => setSummary([]));
   }, [groupId, isOwner, currentUid]);
 
-  const fetchWalletData = useCallback(() => {
+  const fetchWalletStatus = useCallback(async (uid: string, options: { recordHistory?: boolean; silent?: boolean; dashboardSession?: boolean } = {}) => {
+    if (!groupId || !uid) {
+      return null;
+    }
+    const isCurrentUser = uid === currentUid;
+    if (isCurrentUser) {
+      setWalletStatusLoading(true);
+    }
+    try {
+      const params = new URLSearchParams({ uid });
+      const currentUrl = typeof window !== 'undefined' ? window.location.href : undefined;
+      if (currentUrl) {
+        params.set('returnUrl', currentUrl);
+        params.set('refreshUrl', currentUrl);
+      }
+      if (options.dashboardSession) {
+        params.set('dashboardSession', 'true');
+      }
+      const response = await fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/wallets/status?${params.toString()}`);
+      if (response.status === 404) {
+        if (isCurrentUser) {
+          setWalletStatus(null);
+        }
+        return null;
+      }
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || response.statusText);
+      }
+      const data = await response.json();
+      const status = mapWalletStatus(data);
+      if (isCurrentUser) {
+        setWalletStatus(status);
+      }
+      mergeStatusIntoWallets(status, uid);
+      if (isCurrentUser && options.recordHistory) {
+        pushWalletHistory(status);
+      }
+      return status;
+    } catch (error) {
+      if (!options.silent) {
+        const message = error instanceof Error ? error.message : 'Wallet-Status konnte nicht geladen werden.';
+        setSnackbar({ message, severity: 'error' });
+      }
+      return null;
+    } finally {
+      if (isCurrentUser) {
+        setWalletStatusLoading(false);
+      }
+    }
+  }, [currentUid, groupId, mapWalletStatus, mergeStatusIntoWallets, pushWalletHistory]);
+
+  const fetchWalletData = useCallback((options: { recordHistory?: boolean } = {}) => {
     if (!groupId || !currentUid) return;
     setLoadingWallets(true);
     fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/wallets?uid=${encodeURIComponent(currentUid)}`)
       .then(r => r.ok ? r.json() : parseErr(r))
-      .then(data => setWallets(Array.isArray(data) ? data.map(mapWallet) : []))
-      .catch(() => setWallets([]))
+      .then(async data => {
+        const mapped = Array.isArray(data) ? data.map(mapWallet) : [];
+        setWallets(mapped);
+        if (!isOwner) {
+          const ownWallet = mapped.find(w => w.memberId === currentUid) || mapped[0] || null;
+          if (ownWallet) {
+            setMemberWallet(ownWallet);
+          } else {
+            setMemberWallet(null);
+          }
+          await fetchWalletStatus(currentUid, { recordHistory: options.recordHistory ?? true, silent: true });
+        } else {
+          const statusPromises = mapped
+            .map(wallet => wallet.memberId)
+            .filter((uid, index, arr) => uid && arr.indexOf(uid) === index)
+            .map(uid => fetchWalletStatus(uid, { silent: true }));
+          await Promise.all(statusPromises);
+        }
+      })
+      .catch(() => {
+        setWallets([]);
+        if (!isOwner) {
+          setMemberWallet(null);
+        }
+      })
       .finally(() => setLoadingWallets(false));
-  }, [groupId, currentUid, mapWallet, parseErr]);
+  }, [currentUid, fetchWalletStatus, groupId, isOwner, mapWallet, parseErr]);
 
   const fetchRound = useCallback((cycleId: number) => {
     if (!groupId || !currentUid) return;
@@ -553,7 +822,11 @@ export const Payments: React.FC = () => {
         const mapped = mapRound(data);
         setRound(mapped);
         if (!isOwner) {
-          setWallets([]);
+          const walletList = Array.isArray(data?.wallets) ? data.wallets.map(mapWallet) : [];
+          if (walletList.length > 0) {
+            const ownWallet = walletList.find((wallet: WalletDto) => wallet.memberId === currentUid) || walletList[0];
+            setMemberWallet(ownWallet ?? null);
+          }
         }
       })
       .catch(err => {
@@ -561,7 +834,7 @@ export const Payments: React.FC = () => {
         setSnackbar({ message: err.message, severity: 'error' });
       })
       .finally(() => setLoadingRound(false));
-  }, [groupId, currentUid, isOwner, mapRound, parseErr]);
+  }, [currentUid, groupId, isOwner, mapRound, mapWallet, parseErr]);
 
   const refreshCycles = useCallback(() => {
     if (!groupId) return;
@@ -585,6 +858,12 @@ export const Payments: React.FC = () => {
     fetchCycleSummary();
     fetchWalletData();
   }, [fetchCycleSummary, fetchWalletData, groupId, currentUid, isOwner]);
+
+  useEffect(() => {
+    if (!groupId || !currentUid) return;
+    if (isOwner) return;
+    fetchWalletData({ recordHistory: true });
+  }, [fetchWalletData, groupId, currentUid, isOwner]);
 
   useEffect(() => {
     if (!groupId || selectedCycle == null || !currentUid) {
@@ -656,6 +935,117 @@ export const Payments: React.FC = () => {
     closePaymentDialog();
   };
 
+  const handleCreateWallet = useCallback(async () => {
+    if (!groupId || !currentUid || creatingWallet) {
+      return;
+    }
+    setCreatingWallet(true);
+    try {
+      const currentUrl = typeof window !== 'undefined' ? window.location.href : undefined;
+      const payload: Record<string, unknown> = { createDashboardSession: true };
+      if (currentUrl) {
+        payload.returnUrl = currentUrl;
+        payload.refreshUrl = currentUrl;
+      }
+      const response = await fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/wallets?uid=${encodeURIComponent(currentUid)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || response.statusText);
+      }
+      const data = await response.json();
+      const status = mapWalletStatus(data);
+      mergeStatusIntoWallets(status, currentUid);
+      pushWalletHistory(status);
+      setSnackbar({ message: 'Wallet erfolgreich erstellt.', severity: 'success' });
+      await fetchWalletData({ recordHistory: false });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Wallet konnte nicht erstellt werden.';
+      setSnackbar({ message, severity: 'error' });
+    } finally {
+      setCreatingWallet(false);
+    }
+  }, [creatingWallet, currentUid, fetchWalletData, groupId, mapWalletStatus, mergeStatusIntoWallets, pushWalletHistory, setSnackbar]);
+
+  const openWalletActionDialog = (mode: 'top-up' | 'withdraw') => {
+    setWalletActionAmount('');
+    setWalletActionError(null);
+    setWalletActionState({ open: true, mode });
+  };
+
+  const closeWalletActionDialog = () => {
+    setWalletActionState(null);
+    setWalletActionError(null);
+    setWalletActionAmount('');
+  };
+
+  const handleWalletActionSubmit = async () => {
+    if (!walletActionState || !groupId || !currentUid) {
+      return;
+    }
+    const amount = parseAmountValue(walletActionAmount);
+    if (!amount || amount <= 0) {
+      setWalletActionError('Bitte einen Betrag größer 0 eingeben.');
+      return;
+    }
+    setWalletActionSubmitting(true);
+    setWalletActionError(null);
+    try {
+      const currentUrl = typeof window !== 'undefined' ? window.location.href : undefined;
+      const payload: Record<string, unknown> = {
+        amount,
+        createDashboardSession: true,
+      };
+      if (currentUrl) {
+        payload.returnUrl = currentUrl;
+        payload.refreshUrl = currentUrl;
+      }
+      const endpoint = walletActionState.mode === 'top-up' ? 'top-up' : 'withdraw';
+      const response = await fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/wallets/${endpoint}?uid=${encodeURIComponent(currentUid)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || response.statusText);
+      }
+      const data = await response.json();
+      const status = mapWalletStatus(data);
+      mergeStatusIntoWallets(status, currentUid);
+      pushWalletHistory(status);
+      setSnackbar({
+        message: walletActionState.mode === 'top-up' ? 'Wallet erfolgreich aufgeladen.' : 'Auszahlung erfolgreich veranlasst.',
+        severity: 'success',
+      });
+      setWalletActionState(null);
+      await fetchWalletData({ recordHistory: false });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Wallet-Aktion fehlgeschlagen.';
+      setWalletActionError(message);
+    } finally {
+      setWalletActionSubmitting(false);
+    }
+  };
+
+  const handleRefreshWalletStatus = useCallback((uid?: string) => {
+    if (!uid) {
+      return;
+    }
+    fetchWalletStatus(uid, { recordHistory: uid === currentUid });
+  }, [currentUid, fetchWalletStatus]);
+
+  const handleStartOnboarding = () => {
+    if (!walletStatus?.onboardingUrl) {
+      setSnackbar({ message: 'Kein Onboarding-Link verfügbar. Bitte versuche es später erneut.', severity: 'error' });
+      return;
+    }
+    window.open(walletStatus.onboardingUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const handleReceiptConfirm = () => {
     if (!groupId || !round || !currentUid) return;
     fetch(`${API_BASE_URL}/api/payments/confirm-receipt`, {
@@ -712,8 +1102,6 @@ export const Payments: React.FC = () => {
     }
   };
 
-  const memberWallet = !isOwner && wallets.length > 0 ? wallets[0] : null;
-
   const statusAlerts: React.ReactNode[] = [];
 
   if (round && currentUserPayment) {
@@ -758,6 +1146,34 @@ export const Payments: React.FC = () => {
     statusAlerts.push(
       <Alert key="receipt-pending" severity="info">
         Alle Zahlungen sind eingegangen. Bestätige jetzt den Empfang, um die nächste Runde zu starten.
+      </Alert>,
+    );
+  }
+
+  if (walletStatus?.requiresOnboarding) {
+    statusAlerts.push(
+      <Alert
+        key="wallet-onboarding"
+        severity="warning"
+        action={<Button color="inherit" size="small" onClick={handleStartOnboarding}>Onboarding starten</Button>}
+      >
+        Bitte schließe das Stripe-Onboarding ab, um Zahlungen empfangen und senden zu können.
+      </Alert>,
+    );
+  }
+
+  if (walletStatus?.lockedForPayments) {
+    statusAlerts.push(
+      <Alert key="wallet-payments-locked" severity="error">
+        Dein Wallet ist für Zahlungen gesperrt. Bitte kontaktiere den Support oder schließe das Onboarding erneut ab.
+      </Alert>,
+    );
+  }
+
+  if (walletStatus?.lockedForPayouts) {
+    statusAlerts.push(
+      <Alert key="wallet-payouts-locked" severity="warning">
+        Auszahlungen sind momentan gesperrt. Prüfe deine Kontodaten oder kontaktiere den Support.
       </Alert>,
     );
   }
@@ -860,17 +1276,110 @@ export const Payments: React.FC = () => {
           </Paper>
         )}
 
-        {!isOwner && memberWallet && (
+        {!isOwner && (
           <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="subtitle1" gutterBottom>Dein Wallet</Typography>
-            <Typography variant="body1" fontWeight="bold">
-              {memberWallet.balance.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-            </Typography>
-            {memberWallet.lastUpdated && (
-              <Typography variant="caption" color="text.secondary">
-                Aktualisiert am {new Date(memberWallet.lastUpdated).toLocaleDateString()}
-              </Typography>
-            )}
+            <Stack spacing={2}>
+              <Box display="flex" justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} flexDirection={{ xs: 'column', sm: 'row' }} gap={1.5}>
+                <Typography variant="subtitle1">Dein Wallet</Typography>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleRefreshWalletStatus(currentUid || '')}
+                    disabled={walletStatusLoading || (!memberWallet && !walletStatus)}
+                  >
+                    {walletStatusLoading ? <CircularProgress size={18} /> : 'Status aktualisieren'}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="secondary"
+                    onClick={() => fetchWalletStatus(currentUid || '', { recordHistory: true })}
+                    disabled={walletStatusLoading || (!memberWallet && !walletStatus)}
+                  >
+                    Verlauf aktualisieren
+                  </Button>
+                </Stack>
+              </Box>
+              {walletStatusLoading ? (
+                <Box display="flex" justifyContent="center" py={2}>
+                  <CircularProgress />
+                </Box>
+              ) : !walletStatus && !memberWallet ? (
+                <Stack spacing={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    Noch kein Wallet vorhanden. Lege jetzt dein Wallet an, um Guthaben zu verwalten.
+                  </Typography>
+                  <Button variant="contained" onClick={handleCreateWallet} disabled={creatingWallet}>
+                    {creatingWallet ? <CircularProgress size={20} color="inherit" /> : 'Wallet erstellen'}
+                  </Button>
+                </Stack>
+              ) : (
+                <>
+                  <Box>
+                    <Typography variant="body1" fontWeight="bold">
+                      {(walletStatus?.balance ?? memberWallet?.balance ?? 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                    </Typography>
+                    {typeof (walletStatus?.reservedBalance ?? memberWallet?.reserved) === 'number' && (walletStatus?.reservedBalance ?? memberWallet?.reserved ?? 0) > 0 && (
+                      <Typography variant="caption" color="text.secondary">
+                        Reserviert: {(walletStatus?.reservedBalance ?? memberWallet?.reserved ?? 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                      </Typography>
+                    )}
+                    {(walletStatus?.updatedAt || memberWallet?.lastUpdated) && (
+                      <Typography variant="caption" color="text.secondary">
+                        Aktualisiert am {new Date(walletStatus?.updatedAt || memberWallet?.lastUpdated || '').toLocaleDateString()}
+                      </Typography>
+                    )}
+                    <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
+                      {walletStatus?.requiresOnboarding && <Chip label="Onboarding offen" size="small" color="warning" />}
+                      {walletStatus?.kycStatus && !walletStatus?.requiresOnboarding && (
+                        <Chip label={`KYC: ${walletStatus.kycStatus}`} size="small" color="success" />
+                      )}
+                      {walletStatus?.lockedForPayments && <Chip label="Zahlung gesperrt" size="small" color="error" />}
+                      {walletStatus?.lockedForPayouts && <Chip label="Payout gesperrt" size="small" color="warning" />}
+                    </Stack>
+                  </Box>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                    <Button
+                      variant="contained"
+                      onClick={() => openWalletActionDialog('top-up')}
+                      disabled={Boolean(walletStatus?.requiresOnboarding || walletStatus?.lockedForPayments)}
+                    >
+                      Aufladen
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={() => openWalletActionDialog('withdraw')}
+                      disabled={Boolean(walletStatus?.requiresOnboarding || walletStatus?.lockedForPayouts || (walletStatus?.balance ?? memberWallet?.balance ?? 0) <= 0)}
+                    >
+                      Auszahlen
+                    </Button>
+                    {walletStatus?.onboardingUrl && (
+                      <Button variant="text" onClick={handleStartOnboarding} color="secondary">
+                        Onboarding öffnen
+                      </Button>
+                    )}
+                  </Stack>
+                  {walletStatusHistory.length > 0 && (
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Saldohistorie
+                      </Typography>
+                      <List dense>
+                        {walletStatusHistory.map((entry, index) => (
+                          <ListItem key={`${entry.recordedAt}-${index}`} disableGutters>
+                            <ListItemText
+                              primary={`Saldo: ${entry.balance.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}`}
+                              secondary={`Reserviert: ${entry.reservedBalance.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} · Stand ${new Date(entry.updatedAt || entry.recordedAt).toLocaleString()}`}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Box>
+                  )}
+                </>
+              )}
+            </Stack>
           </Paper>
         )}
 
@@ -881,9 +1390,41 @@ export const Payments: React.FC = () => {
             getMemberName={getMemberName}
             onSelectCycle={cycleId => setSelectedCycle(cycleId)}
             loadingWallets={loadingWallets}
+            walletStatuses={walletStatusByMember}
+            onRefreshWalletStatus={handleRefreshWalletStatus}
           />
         )}
       </Box>
+
+      <Dialog open={Boolean(walletActionState)} onClose={closeWalletActionDialog} fullWidth maxWidth="xs">
+        <DialogTitle>
+          {walletActionState?.mode === 'withdraw' ? 'Auszahlung anfordern' : 'Wallet aufladen'}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <TextField
+              label="Betrag"
+              type="number"
+              value={walletActionAmount}
+              onChange={event => setWalletActionAmount(event.target.value)}
+              fullWidth
+              inputProps={{ min: 0, step: 0.01 }}
+            />
+            {walletActionError && (
+              <Alert severity="error">{walletActionError}</Alert>
+            )}
+            <Typography variant="body2" color="text.secondary">
+              Der Vorgang startet eine Stripe-Wallet-Transaktion. Du wirst ggf. zu Stripe weitergeleitet, um den Vorgang abzuschließen.
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeWalletActionDialog} disabled={walletActionSubmitting}>Abbrechen</Button>
+          <Button onClick={handleWalletActionSubmit} variant="contained" disabled={walletActionSubmitting}>
+            {walletActionSubmitting ? <CircularProgress size={18} /> : 'Bestätigen'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={paymentDialogOpen} onClose={closePaymentDialog} fullWidth maxWidth="sm">
         <DialogTitle>Kartenzahlung</DialogTitle>
