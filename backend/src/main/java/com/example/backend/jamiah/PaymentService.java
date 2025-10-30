@@ -263,14 +263,20 @@ public class PaymentService {
         if (payer.getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payer profile incomplete");
         }
-        Wallet wallet = walletRepository.findById(payer.getId()).orElseGet(() -> {
+        Long memberId = payer.getId();
+        Wallet wallet = walletRepository.findById(memberId).orElseGet(() -> {
             Wallet w = new Wallet();
-            w.setMemberId(payer.getId());
+            w.setMemberId(memberId);
             w.setMember(payer);
             w.setBalance(BigDecimal.ZERO);
             return w;
         });
-        wallet.setMemberId(payer.getId());
+        if (wallet.getMemberId() == null) {
+            wallet.setMemberId(memberId);
+        }
+        if (wallet.getMemberId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payer profile incomplete");
+        }
         wallet.setMember(payer);
         BigDecimal current = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
         wallet.setBalance(current.add(expectedAmount));
