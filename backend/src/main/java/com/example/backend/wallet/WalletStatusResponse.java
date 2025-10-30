@@ -9,6 +9,7 @@ public class WalletStatusResponse {
     private Long memberId;
     private String memberUid;
     private BigDecimal balance;
+    private BigDecimal reservedBalance;
     private Instant updatedAt;
     private String stripeAccountId;
     private String kycStatus;
@@ -16,6 +17,8 @@ public class WalletStatusResponse {
     private String onboardingUrl;
     private String accountSessionClientSecret;
     private String stripeSandboxId;
+    private boolean lockedForPayments;
+    private boolean lockedForPayouts;
 
     public Long getJamiahId() {
         return jamiahId;
@@ -55,6 +58,14 @@ public class WalletStatusResponse {
 
     public void setBalance(BigDecimal balance) {
         this.balance = balance;
+    }
+
+    public BigDecimal getReservedBalance() {
+        return reservedBalance;
+    }
+
+    public void setReservedBalance(BigDecimal reservedBalance) {
+        this.reservedBalance = reservedBalance;
     }
 
     public Instant getUpdatedAt() {
@@ -111,5 +122,21 @@ public class WalletStatusResponse {
 
     public void setStripeSandboxId(String stripeSandboxId) {
         this.stripeSandboxId = stripeSandboxId;
+    }
+
+    public boolean isLockedForPayments() {
+        return lockedForPayments;
+    }
+
+    public void setLockedForPayments(boolean lockedForPayments) {
+        this.lockedForPayments = lockedForPayments;
+    }
+
+    public boolean isLockedForPayouts() {
+        return lockedForPayouts;
+    }
+
+    public void setLockedForPayouts(boolean lockedForPayouts) {
+        this.lockedForPayouts = lockedForPayouts;
     }
 }

@@ -3,6 +3,7 @@ package com.example.backend.jamiah;
 import com.example.backend.jamiah.dto.JamiahDto;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.web.server.ResponseStatusException;
@@ -19,6 +20,7 @@ import com.example.backend.jamiah.Jamiah;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JamiahService.class, JamiahMapperImpl.class})
 class JamiahServiceTest {
 

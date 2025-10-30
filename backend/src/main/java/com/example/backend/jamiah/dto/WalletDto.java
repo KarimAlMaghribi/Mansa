@@ -11,5 +11,10 @@ public class WalletDto {
     private String memberId;
     private String username;
     private BigDecimal balance;
+    private BigDecimal reserved;
     private Instant lastUpdated;
+    private String kycStatus;
+    private boolean requiresOnboarding;
+    private boolean lockedForPayments;
+    private boolean lockedForPayouts;
 }

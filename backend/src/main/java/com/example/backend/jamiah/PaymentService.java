@@ -9,8 +9,7 @@ import com.example.backend.jamiah.dto.RoundDto;
 import com.example.backend.jamiah.dto.WalletDto;
 import com.example.backend.payment.StripePaymentProvider;
 import com.example.backend.wallet.JamiahWallet;
-import com.example.backend.wallet.JamiahWalletId;
-import com.example.backend.wallet.JamiahWalletRepository;
+import com.example.backend.wallet.WalletService;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,7 +45,7 @@ public class PaymentService {
     private final JamiahRepository jamiahRepository;
     private final UserProfileRepository userRepository;
     private final StripePaymentProvider stripePaymentProvider;
-    private final JamiahWalletRepository walletRepository;
+    private final WalletService walletService;
     private final String publishableKey;
 
     public PaymentService(JamiahPaymentRepository paymentRepository,
@@ -54,14 +53,14 @@ public class PaymentService {
                           JamiahRepository jamiahRepository,
                           UserProfileRepository userRepository,
                           StripePaymentProvider stripePaymentProvider,
-                          JamiahWalletRepository walletRepository,
+                          WalletService walletService,
                           @Value("${stripe.publishable-key:}") String publishableKey) {
         this.paymentRepository = paymentRepository;
         this.cycleRepository = cycleRepository;
         this.jamiahRepository = jamiahRepository;
         this.userRepository = userRepository;
         this.stripePaymentProvider = stripePaymentProvider;
-        this.walletRepository = walletRepository;
+        this.walletService = walletService;
         this.publishableKey = publishableKey;
     }
 
@@ -175,6 +174,12 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount mismatch");
         }
 
+        UserProfile payerProfile = userRepository.findByUid(payerUid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payer not found"));
+        if (payerProfile.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payer profile incomplete");
+        }
+
         List<JamiahPayment> payments = ensurePaymentsForCycle(jamiahWithMembers, cycle);
         JamiahPayment payment = payments.stream()
                 .filter(p -> Objects.equals(payerUid, p.getPayerUid()))
@@ -189,11 +194,13 @@ public class PaymentService {
 
         if (Boolean.TRUE.equals(payment.getConfirmed())) {
             if (payment.getAmount() != null && payment.getAmount().compareTo(expectedAmount) == 0) {
-                UserProfile payer = userRepository.findByUid(payerUid).orElse(null);
-                return toDto(payment, payer, expectedAmount);
+                return toDto(payment, payerProfile, expectedAmount);
             }
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment already confirmed with different amount");
         }
+
+        walletService.ensureBalance(jamiahWithMembers, payerProfile, expectedAmount);
+        walletService.reserve(jamiahWithMembers, payerProfile, expectedAmount);
 
         payment.setJamiahId(jamiahWithMembers.getId());
         payment.setCycleId(cycle.getId());
@@ -205,8 +212,7 @@ public class PaymentService {
         }
         payment = paymentRepository.save(payment);
 
-        UserProfile payer = userRepository.findByUid(payerUid).orElse(null);
-        return toDto(payment, payer, expectedAmount);
+        return toDto(payment, payerProfile, expectedAmount);
     }
 
     public PaymentConfirmationDto confirmPayment(Long paymentId, String callerUid) {
@@ -253,28 +259,23 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported currency");
         }
 
-        if (!Boolean.TRUE.equals(payment.getConfirmed())) {
-            payment.setAmount(expectedAmount);
-            payment.setConfirmed(true);
-            payment.setPaidAt(Instant.now());
-            paymentRepository.save(payment);
-        }
         UserProfile payer = userRepository.findByUid(callerUid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         if (payer.getId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payer profile incomplete");
         }
-        Long memberId = payer.getId();
-        JamiahWallet wallet = walletRepository.findByJamiah_IdAndMember_Id(jamiahWithMembers.getId(), memberId)
-                .orElseGet(() -> createWallet(jamiahWithMembers, payer));
-        if (wallet.getMemberId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payer profile incomplete");
+
+        JamiahWallet wallet = walletService.getOrCreateWallet(jamiahWithMembers, payer);
+        if (!Boolean.TRUE.equals(payment.getConfirmed())) {
+            wallet = walletService.credit(jamiahWithMembers, payer, expectedAmount, true);
+            payment.setAmount(expectedAmount);
+            payment.setConfirmed(true);
+            payment.setPaidAt(Instant.now());
+            paymentRepository.save(payment);
+        } else if (payment.getAmount() == null || payment.getAmount().compareTo(expectedAmount) != 0) {
+            payment.setAmount(expectedAmount);
+            paymentRepository.save(payment);
         }
-        wallet.setJamiah(jamiahWithMembers);
-        wallet.setMember(payer);
-        BigDecimal current = wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance();
-        wallet.setBalance(current.add(expectedAmount));
-        wallet = walletRepository.save(wallet);
 
         PaymentConfirmationDto confirmation = new PaymentConfirmationDto();
         confirmation.setPayment(toDto(payment, payer, expectedAmount));
@@ -351,10 +352,10 @@ public class PaymentService {
                 .collect(Collectors.toList());
 
         if (!newlyConfirmed.isEmpty()) {
-            Map<Long, UserProfile> lockProfiles = new LinkedHashMap<>();
-            if (effectiveRecipient.getId() != null) {
-                lockProfiles.put(effectiveRecipient.getId(), effectiveRecipient);
+            if (effectiveRecipient.getId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipient profile incomplete");
             }
+            Map<UserProfile, BigDecimal> transferRequests = new LinkedHashMap<>();
             for (JamiahPayment payment : newlyConfirmed) {
                 UserProfile payerProfile = users.get(payment.getPayerUid());
                 if (payerProfile == null) {
@@ -365,49 +366,10 @@ public class PaymentService {
                 if (payerProfile.getId() == null) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payer profile incomplete");
                 }
-                UserProfile effectivePayer = payerProfile;
-                lockProfiles.putIfAbsent(effectivePayer.getId(), effectivePayer);
-            }
-            List<Long> memberIds = lockProfiles.keySet().stream()
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-            Map<Long, JamiahWallet> walletMap = memberIds.isEmpty()
-                    ? new HashMap<>()
-                    : walletRepository.findAllByJamiah_IdAndMember_IdInOrderByMember_Id(jamiahWithMembers.getId(), memberIds).stream()
-                    .collect(Collectors.toMap(JamiahWallet::getMemberId, wallet -> wallet));
-            Set<Long> touchedWallets = new HashSet<>();
-            List<JamiahWallet> walletsToSave = new ArrayList<>();
-            BigDecimal totalIncoming = BigDecimal.ZERO;
-            for (JamiahPayment payment : newlyConfirmed) {
-                UserProfile payerProfile = users.get(payment.getPayerUid());
-                UserProfile effectivePayer = payerProfile;
-                JamiahWallet payerWallet = walletMap.computeIfAbsent(effectivePayer.getId(), id -> createWallet(jamiahWithMembers, effectivePayer));
-                payerWallet.setJamiah(jamiahWithMembers);
-                payerWallet.setMember(effectivePayer);
                 BigDecimal transferAmount = payment.getAmount() != null ? payment.getAmount() : expectedAmount;
-                BigDecimal currentBalance = payerWallet.getBalance() == null ? BigDecimal.ZERO : payerWallet.getBalance();
-                BigDecimal newBalance = currentBalance.subtract(transferAmount);
-                if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance");
-                }
-                payerWallet.setBalance(newBalance);
-                if (touchedWallets.add(effectivePayer.getId())) {
-                    walletsToSave.add(payerWallet);
-                }
-                totalIncoming = totalIncoming.add(transferAmount);
+                transferRequests.merge(payerProfile, transferAmount, BigDecimal::add);
             }
-            if (effectiveRecipient.getId() == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipient profile incomplete");
-            }
-            JamiahWallet recipientWallet = walletMap.computeIfAbsent(effectiveRecipient.getId(), id -> createWallet(jamiahWithMembers, effectiveRecipient));
-            recipientWallet.setJamiah(jamiahWithMembers);
-            recipientWallet.setMember(effectiveRecipient);
-            BigDecimal recipientBalance = recipientWallet.getBalance() == null ? BigDecimal.ZERO : recipientWallet.getBalance();
-            recipientWallet.setBalance(recipientBalance.add(totalIncoming));
-            if (touchedWallets.add(effectiveRecipient.getId())) {
-                walletsToSave.add(recipientWallet);
-            }
-            walletRepository.saveAll(walletsToSave);
+            walletService.transfer(jamiahWithMembers, transferRequests, effectiveRecipient);
         }
 
         Instant now = Instant.now();
@@ -486,11 +448,9 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         if (!isOwner) {
-            JamiahWallet wallet = callerProfile.map(member -> walletRepository
-                    .findByJamiah_IdAndMember_Id(jamiahWithMembers.getId(), member.getId())
-                    .orElseGet(() -> createWallet(jamiahWithMembers, member)))
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            WalletDto dto = toWalletDto(wallet, jamiahWithMembers, callerProfile.get());
+            UserProfile member = callerProfile.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+            JamiahWallet wallet = walletService.getOrCreateWallet(jamiahWithMembers, member);
+            WalletDto dto = toWalletDto(wallet, jamiahWithMembers, member);
             return java.util.List.of(dto);
         }
         List<UserProfile> members = new ArrayList<>(jamiahWithMembers.getMembers());
@@ -501,17 +461,12 @@ public class PaymentService {
                 .map(UserProfile::getId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
-        Map<Long, JamiahWallet> wallets = walletRepository
-                .findAllByJamiah_IdAndMember_IdIn(jamiahWithMembers.getId(), memberIds).stream()
-                .collect(Collectors.toMap(JamiahWallet::getMemberId, wallet -> wallet));
+        Map<Long, JamiahWallet> wallets = walletService.findAllByMembers(jamiahWithMembers, memberIds);
         List<WalletDto> dtos = new ArrayList<>();
         for (UserProfile member : members) {
             JamiahWallet wallet = wallets.get(member.getId());
             if (wallet == null) {
-                wallet = createWallet(jamiahWithMembers, member);
-            } else {
-                wallet.setJamiah(jamiahWithMembers);
-                wallet.setMember(member);
+                wallet = walletService.getOrCreateWallet(jamiahWithMembers, member);
             }
             dtos.add(toWalletDto(wallet, jamiahWithMembers, member));
         }
@@ -655,22 +610,14 @@ public class PaymentService {
         dto.setMemberId(member.getUid());
         dto.setUsername(member.getUsername());
         dto.setBalance(wallet.getBalance() == null ? BigDecimal.ZERO : wallet.getBalance());
+        dto.setReserved(wallet.getReservedBalance() == null ? BigDecimal.ZERO : wallet.getReservedBalance());
         dto.setLastUpdated(wallet.getUpdatedAt());
         dto.setJamiahId(jamiah.getId());
+        dto.setKycStatus(wallet.getKycStatus());
+        dto.setRequiresOnboarding(wallet.getKycStatus() == null || !"verified".equalsIgnoreCase(wallet.getKycStatus()));
+        dto.setLockedForPayments(Boolean.TRUE.equals(wallet.getLockedForPayments()));
+        dto.setLockedForPayouts(Boolean.TRUE.equals(wallet.getLockedForPayouts()));
         return dto;
-    }
-
-    private JamiahWallet createWallet(Jamiah jamiah, UserProfile member) {
-        if (jamiah == null || member == null || member.getId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member profile incomplete");
-        }
-        JamiahWallet wallet = new JamiahWallet();
-        JamiahWalletId id = new JamiahWalletId(jamiah.getId(), member.getId());
-        wallet.setId(id);
-        wallet.setJamiah(jamiah);
-        wallet.setMember(member);
-        wallet.setBalance(BigDecimal.ZERO);
-        return wallet;
     }
 
     private List<WalletDto> collectWalletDtos(Jamiah jamiah,
@@ -707,16 +654,12 @@ public class PaymentService {
         List<Long> memberIds = memberProfiles.stream()
                 .map(UserProfile::getId)
                 .collect(Collectors.toList());
-        Map<Long, JamiahWallet> wallets = walletRepository.findAllByJamiah_IdAndMember_IdIn(jamiah.getId(), memberIds).stream()
-                .collect(Collectors.toMap(JamiahWallet::getMemberId, wallet -> wallet));
+        Map<Long, JamiahWallet> wallets = walletService.findAllByMembers(jamiah, memberIds);
         List<WalletDto> walletDtos = new ArrayList<>();
         for (UserProfile profile : memberProfiles) {
             JamiahWallet wallet = wallets.get(profile.getId());
             if (wallet == null) {
-                wallet = createWallet(jamiah, profile);
-            } else {
-                wallet.setJamiah(jamiah);
-                wallet.setMember(profile);
+                wallet = walletService.getOrCreateWallet(jamiah, profile);
             }
             walletDtos.add(toWalletDto(wallet, jamiah, profile));
         }
@@ -812,7 +755,7 @@ public class PaymentService {
             }
             next.setStartDate(nextStart);
             next.setCompleted(false);
-            next.setMemberOrder(order);
+            next.setMemberOrder(order == null ? null : new ArrayList<>(order));
             String nextUid = order.get(idx + 1);
             UserProfile nextUser = userRepository.findByUid(nextUid)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));

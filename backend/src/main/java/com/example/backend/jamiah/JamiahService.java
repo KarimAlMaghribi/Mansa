@@ -469,7 +469,7 @@ public class JamiahService {
         cycle.setCycleNumber(1);
         cycle.setStartDate(jamiah.getStartDate());
         cycle.setCompleted(false);
-        cycle.setMemberOrder(order);
+        cycle.setMemberOrder(order == null ? null : new java.util.ArrayList<>(order));
         String firstUid = order.get(0);
         com.example.backend.UserProfile first = userRepository.findByUid(firstUid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));

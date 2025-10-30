@@ -19,11 +19,16 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -90,6 +95,136 @@ public class WalletService {
         return buildStatus(jamiahWithMembers, member, wallet, account, returnUrl, refreshUrl, createDashboardSession);
     }
 
+    public void ensureBalance(Jamiah jamiah, UserProfile member, BigDecimal amount) {
+        if (amount == null || amount.compareTo(ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Positive amount required");
+        }
+        JamiahWallet wallet = lock(jamiah, member);
+        ensureWalletAvailability(wallet, amount);
+    }
+
+    public JamiahWallet reserve(Jamiah jamiah, UserProfile member, BigDecimal amount) {
+        if (amount == null || amount.compareTo(ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Positive amount required");
+        }
+        JamiahWallet wallet = lock(jamiah, member);
+        if (Boolean.TRUE.equals(wallet.getLockedForPayments())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Wallet is locked for outgoing payments");
+        }
+        ensureWalletAvailability(wallet, amount);
+        BigDecimal reserved = Optional.ofNullable(wallet.getReservedBalance()).orElse(ZERO);
+        wallet.setReservedBalance(reserved.add(amount));
+        return walletRepository.save(wallet);
+    }
+
+    public JamiahWallet credit(Jamiah jamiah, UserProfile member, BigDecimal amount) {
+        return credit(jamiah, member, amount, false);
+    }
+
+    public JamiahWallet credit(Jamiah jamiah, UserProfile member, BigDecimal amount, boolean reserveForPayment) {
+        if (amount == null || amount.compareTo(ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Positive amount required");
+        }
+        JamiahWallet wallet = lock(jamiah, member);
+        if (Boolean.TRUE.equals(wallet.getLockedForPayments())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Wallet is locked for outgoing payments");
+        }
+        BigDecimal balance = Optional.ofNullable(wallet.getBalance()).orElse(ZERO);
+        wallet.setBalance(balance.add(amount));
+        if (reserveForPayment) {
+            BigDecimal reserved = Optional.ofNullable(wallet.getReservedBalance()).orElse(ZERO);
+            wallet.setReservedBalance(reserved.add(amount));
+        }
+        return walletRepository.save(wallet);
+    }
+
+    public Map<Long, JamiahWallet> transfer(Jamiah jamiah,
+                                            Map<UserProfile, BigDecimal> outgoing,
+                                            UserProfile recipient) {
+        if (outgoing == null || outgoing.isEmpty()) {
+            return Map.of();
+        }
+        if (recipient == null || recipient.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipient profile incomplete");
+        }
+        Map<Long, JamiahWallet> updated = new LinkedHashMap<>();
+        BigDecimal totalIncoming = ZERO;
+        for (Map.Entry<UserProfile, BigDecimal> entry : outgoing.entrySet()) {
+            UserProfile payer = entry.getKey();
+            BigDecimal amount = entry.getValue();
+            if (payer == null || payer.getId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payer profile incomplete");
+            }
+            if (amount == null || amount.compareTo(ZERO) <= 0) {
+                continue;
+            }
+            JamiahWallet payerWallet = lock(jamiah, payer);
+            if (Boolean.TRUE.equals(payerWallet.getLockedForPayments())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Wallet is locked for outgoing payments");
+            }
+            BigDecimal reserved = Optional.ofNullable(payerWallet.getReservedBalance()).orElse(ZERO);
+            if (reserved.compareTo(amount) < 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Reserved balance insufficient for transfer");
+            }
+            BigDecimal balance = Optional.ofNullable(payerWallet.getBalance()).orElse(ZERO);
+            if (balance.compareTo(amount) < 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Wallet balance insufficient for transfer");
+            }
+            payerWallet.setReservedBalance(reserved.subtract(amount));
+            payerWallet.setBalance(balance.subtract(amount));
+            payerWallet = walletRepository.save(payerWallet);
+            updated.put(payer.getId(), payerWallet);
+            totalIncoming = totalIncoming.add(amount);
+        }
+
+        if (totalIncoming.compareTo(ZERO) > 0) {
+            JamiahWallet recipientWallet = lock(jamiah, recipient);
+            if (Boolean.TRUE.equals(recipientWallet.getLockedForPayouts())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Wallet is locked for payouts");
+            }
+            BigDecimal balance = Optional.ofNullable(recipientWallet.getBalance()).orElse(ZERO);
+            recipientWallet.setBalance(balance.add(totalIncoming));
+            recipientWallet = walletRepository.save(recipientWallet);
+            updated.put(recipient.getId(), recipientWallet);
+        }
+        return updated;
+    }
+
+    public JamiahWallet getOrCreateWallet(Jamiah jamiah, UserProfile member) {
+        if (jamiah == null || member == null || member.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member profile incomplete");
+        }
+        return walletRepository
+                .findByJamiah_IdAndMember_Id(jamiah.getId(), member.getId())
+                .map(wallet -> {
+                    wallet.setJamiah(jamiah);
+                    wallet.setMember(member);
+                    if (wallet.getReservedBalance() == null) {
+                        wallet.setReservedBalance(ZERO);
+                    }
+                    if (wallet.getLockedForPayments() == null) {
+                        wallet.setLockedForPayments(false);
+                    }
+                    if (wallet.getLockedForPayouts() == null) {
+                        wallet.setLockedForPayouts(false);
+                    }
+                    return wallet;
+                })
+                .orElseGet(() -> walletRepository.save(createWalletEntity(jamiah, member)));
+    }
+
+    public Map<Long, JamiahWallet> findAllByMembers(Jamiah jamiah, Collection<Long> memberIds) {
+        if (memberIds == null || memberIds.isEmpty()) {
+            return Map.of();
+        }
+        List<JamiahWallet> wallets = walletRepository
+                .findAllByJamiah_IdAndMember_IdIn(jamiah.getId(), new ArrayList<>(memberIds));
+        return wallets.stream().collect(Collectors.toMap(JamiahWallet::getMemberId, wallet -> {
+            wallet.setJamiah(jamiah);
+            return wallet;
+        }));
+    }
+
     public JamiahWallet lock(String jamiahPublicId, String callerUid) {
         Jamiah jamiah = resolveJamiah(jamiahPublicId);
         if (callerUid == null) {
@@ -117,8 +252,10 @@ public class WalletService {
         UserProfile member = ensureMembership(callerUid, jamiahWithMembers);
         JamiahWallet wallet = lock(jamiahWithMembers, member);
         BigDecimal balance = Optional.ofNullable(wallet.getBalance()).orElse(ZERO);
-        if (balance.compareTo(amount) < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient balance");
+        BigDecimal reserved = Optional.ofNullable(wallet.getReservedBalance()).orElse(ZERO);
+        BigDecimal available = balance.subtract(reserved);
+        if (available.compareTo(amount) < 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient available balance");
         }
         if (wallet.getStripeAccountId() == null || wallet.getStripeAccountId().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Wallet is not connected to Stripe");
@@ -193,6 +330,9 @@ public class WalletService {
         wallet.setJamiah(jamiah);
         wallet.setMember(member);
         wallet.setBalance(ZERO);
+        wallet.setReservedBalance(ZERO);
+        wallet.setLockedForPayments(false);
+        wallet.setLockedForPayouts(false);
         return wallet;
     }
 
@@ -208,8 +348,27 @@ public class WalletService {
         } else {
             wallet.setJamiah(jamiah);
             wallet.setMember(member);
+            if (wallet.getReservedBalance() == null) {
+                wallet.setReservedBalance(ZERO);
+            }
+            if (wallet.getLockedForPayments() == null) {
+                wallet.setLockedForPayments(false);
+            }
+            if (wallet.getLockedForPayouts() == null) {
+                wallet.setLockedForPayouts(false);
+            }
         }
         return wallet;
+    }
+
+    private void ensureWalletAvailability(JamiahWallet wallet, BigDecimal amount) {
+        BigDecimal balance = Optional.ofNullable(wallet.getBalance()).orElse(ZERO);
+        BigDecimal reserved = Optional.ofNullable(wallet.getReservedBalance()).orElse(ZERO);
+        BigDecimal available = balance.subtract(reserved);
+        if (available.compareTo(amount) < 0) {
+            throw new ResponseStatusException(HttpStatus.PRECONDITION_REQUIRED,
+                    "Wallet top-up required before confirming payment");
+        }
     }
 
     private Account ensureStripeAccount(JamiahWallet wallet, Jamiah jamiah, UserProfile member) {
@@ -258,10 +417,13 @@ public class WalletService {
         response.setMemberId(member.getId());
         response.setMemberUid(member.getUid());
         response.setBalance(Optional.ofNullable(wallet.getBalance()).orElse(ZERO));
+        response.setReservedBalance(Optional.ofNullable(wallet.getReservedBalance()).orElse(ZERO));
         response.setUpdatedAt(wallet.getUpdatedAt());
         response.setStripeAccountId(wallet.getStripeAccountId());
         response.setKycStatus(wallet.getKycStatus());
         response.setStripeSandboxId(stripePaymentProvider.getSandboxId());
+        response.setLockedForPayments(Boolean.TRUE.equals(wallet.getLockedForPayments()));
+        response.setLockedForPayouts(Boolean.TRUE.equals(wallet.getLockedForPayouts()));
 
         Account effectiveAccount = account;
         if (effectiveAccount == null && wallet.getStripeAccountId() != null) {

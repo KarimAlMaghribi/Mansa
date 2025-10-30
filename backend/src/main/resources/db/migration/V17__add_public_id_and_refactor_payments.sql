@@ -9,9 +9,8 @@ ALTER TABLE jamiah
 ALTER TABLE jamiah
     ADD CONSTRAINT uk_jamiah_public_id UNIQUE (public_id);
 
-ALTER TABLE jamiah_payments
-    ADD COLUMN jamiah_id BIGINT,
-    ADD COLUMN payer_uid VARCHAR(255);
+ALTER TABLE jamiah_payments ADD COLUMN jamiah_id BIGINT;
+ALTER TABLE jamiah_payments ADD COLUMN payer_uid VARCHAR(255);
 
 UPDATE jamiah_payments jp
 SET jamiah_id = (SELECT jc.jamiah_id FROM jamiah_cycles jc WHERE jc.id = jp.cycle_id),
