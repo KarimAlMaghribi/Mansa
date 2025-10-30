@@ -2,7 +2,11 @@ package com.example.backend.payment;
 
 import com.stripe.exception.AuthenticationException;
 import com.stripe.exception.StripeException;
+import com.stripe.model.Account;
+import com.stripe.model.AccountLink;
+import com.stripe.model.AccountSession;
 import com.stripe.model.PaymentIntent;
+import com.stripe.model.Transfer;
 import com.stripe.net.Authenticator;
 import com.stripe.net.BearerTokenAuthenticator;
 import com.stripe.net.RequestOptions;
@@ -57,6 +61,26 @@ public class StripePaymentProvider {
 
     public PaymentIntent retrievePaymentIntent(String paymentIntentId) throws StripeException {
         return PaymentIntent.retrieve(paymentIntentId, requestOptions);
+    }
+
+    public Account createAccount(Map<String, Object> params) throws StripeException {
+        return Account.create(params, requestOptions);
+    }
+
+    public Account retrieveAccount(String accountId) throws StripeException {
+        return Account.retrieve(accountId, requestOptions);
+    }
+
+    public AccountLink createAccountLink(Map<String, Object> params) throws StripeException {
+        return AccountLink.create(params, requestOptions);
+    }
+
+    public AccountSession createAccountSession(Map<String, Object> params) throws StripeException {
+        return AccountSession.create(params, requestOptions);
+    }
+
+    public Transfer createTransfer(Map<String, Object> params) throws StripeException {
+        return Transfer.create(params, requestOptions);
     }
 
     public String getSandboxId() {
