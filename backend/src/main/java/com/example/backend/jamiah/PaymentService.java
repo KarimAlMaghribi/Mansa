@@ -209,7 +209,7 @@ public class PaymentService {
         return toDto(payment, payer, expectedAmount);
     }
 
-    public PaymentConfirmationDto confirmPayment(Long paymentId, String paymentMethodId, String callerUid) {
+    public PaymentConfirmationDto confirmPayment(Long paymentId, String callerUid) {
         if (callerUid == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
@@ -232,16 +232,9 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment has not been initiated");
         }
 
-        if (paymentMethodId == null || paymentMethodId.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "payment_method is required");
-        }
-
-        Map<String, Object> confirmParams = new HashMap<>();
-        confirmParams.put("payment_method", paymentMethodId);
-
         PaymentIntent paymentIntent;
         try {
-            paymentIntent = stripePaymentProvider.confirmPaymentIntent(payment.getStripePaymentIntentId(), confirmParams);
+            paymentIntent = stripePaymentProvider.retrievePaymentIntent(payment.getStripePaymentIntentId());
         } catch (StripeException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
         }

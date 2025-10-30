@@ -23,9 +23,8 @@ public class PaymentController {
 
     @PostMapping("/{paymentId}/confirm")
     public PaymentConfirmationDto confirm(@PathVariable Long paymentId,
-                                          @RequestParam(name = "payment_method") String paymentMethodId,
                                           @RequestParam String uid) {
-        return paymentService.confirmPayment(paymentId, paymentMethodId, uid);
+        return paymentService.confirmPayment(paymentId, uid);
     }
 
     @PostMapping("/confirm-receipt")
