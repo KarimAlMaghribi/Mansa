@@ -59,15 +59,6 @@ public class StripePaymentProvider {
         return PaymentIntent.retrieve(paymentIntentId, requestOptions);
     }
 
-    public PaymentIntent confirmPaymentIntent(String paymentIntentId, Map<String, Object> params)
-            throws StripeException {
-        PaymentIntent paymentIntent = PaymentIntent.retrieve(paymentIntentId, getRequestOptions());
-        if (params == null || params.isEmpty()) {
-            return paymentIntent.confirm(getRequestOptions());
-        }
-        return paymentIntent.confirm(params, getRequestOptions());
-    }
-
     public String getSandboxId() {
         return sandboxId;
     }

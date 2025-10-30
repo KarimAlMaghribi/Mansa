@@ -105,12 +105,13 @@ interface PaymentConfirmationResponse {
 
 interface StripePaymentFormProps {
   amount: number;
+  clientSecret: string;
   onCancel: () => void;
-  onConfirm: (paymentMethodId: string) => Promise<void>;
+  onSuccess: () => Promise<void>;
   onError: (message: string) => void;
 }
 
-const StripePaymentForm: React.FC<StripePaymentFormProps> = ({ amount, onCancel, onConfirm, onError }) => {
+const StripePaymentForm: React.FC<StripePaymentFormProps> = ({ amount, clientSecret, onCancel, onSuccess, onError }) => {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -120,6 +121,10 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({ amount, onCancel,
     if (!stripe || !elements) {
       return;
     }
+    if (!clientSecret) {
+      onError('Ungültiger Zahlungsstatus. Bitte versuche es erneut.');
+      return;
+    }
     const card = elements.getElement(CardElement);
     if (!card) {
       onError('Kartenelement konnte nicht initialisiert werden.');
@@ -127,15 +132,21 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({ amount, onCancel,
     }
     setSubmitting(true);
     try {
-      const result = await stripe.createPaymentMethod({
-        type: 'card',
-        card,
+      const result = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card,
+        },
       });
-      if (result.error || !result.paymentMethod?.id) {
-        onError(result.error?.message || 'Stripe-Zahlung fehlgeschlagen.');
+      if (result.error) {
+        onError(result.error.message || 'Stripe-Zahlung fehlgeschlagen.');
         return;
       }
-      await onConfirm(result.paymentMethod.id);
+      const paymentIntent = result.paymentIntent;
+      if (!paymentIntent || paymentIntent.status !== 'succeeded') {
+        onError('Stripe-Zahlung konnte nicht bestätigt werden.');
+        return;
+      }
+      await onSuccess();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Stripe-Zahlung fehlgeschlagen.';
       onError(message);
@@ -604,9 +615,9 @@ export const Payments: React.FC = () => {
       .catch(err => setSnackbar({ message: err.message, severity: 'error' }));
   };
 
-  const finalizePayment = async (paymentMethodId: string) => {
+  const finalizePayment = async () => {
     if (!activePayment || !currentUid) return;
-    const params = new URLSearchParams({ uid: currentUid, payment_method: paymentMethodId });
+    const params = new URLSearchParams({ uid: currentUid });
     const response = await fetch(`${API_BASE_URL}/api/payments/${activePayment.id}/confirm?${params.toString()}`, {
       method: 'POST',
     });
@@ -885,9 +896,10 @@ export const Payments: React.FC = () => {
             <Elements stripe={stripePromise} options={{ clientSecret: paymentClientSecret }}>
               <StripePaymentForm
                 amount={dialogAmount}
+                clientSecret={paymentClientSecret}
                 onCancel={closePaymentDialog}
                 onError={message => setSnackbar({ message, severity: 'error' })}
-                onConfirm={finalizePayment}
+                onSuccess={finalizePayment}
               />
             </Elements>
           )}
