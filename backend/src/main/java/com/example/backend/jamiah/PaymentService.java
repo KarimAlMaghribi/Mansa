@@ -107,15 +107,14 @@ public class PaymentService {
                 if (stripeAmount == null || stripeAmount != expectedStripeAmount) {
                     Map<String, Object> params = new HashMap<>();
                     params.put("amount", expectedStripeAmount);
+                    params.put("payment_method_types", List.of("card"));
                     paymentIntent = stripePaymentProvider.updatePaymentIntent(payment.getStripePaymentIntentId(), params);
                 }
             } else {
                 Map<String, Object> params = new HashMap<>();
                 params.put("amount", toStripeAmount(expectedAmount));
                 params.put("currency", DEFAULT_CURRENCY);
-                Map<String, Object> automatic = new HashMap<>();
-                automatic.put("enabled", true);
-                params.put("automatic_payment_methods", automatic);
+                params.put("payment_method_types", List.of("card"));
                 Map<String, String> metadata = new HashMap<>();
                 metadata.put("jamiahId", jamiah.getId().toString());
                 metadata.put("cycleId", cycle.getId().toString());
