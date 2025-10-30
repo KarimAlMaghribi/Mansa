@@ -1,15 +1,26 @@
 import React from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, IconButton, Tooltip } from '@mui/material';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
+  IconButton,
+  Tooltip,
+  Box,
+} from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 interface InviteCodeDialogProps {
   open: boolean;
   code: string | null;
   expiry: string | null;
+  link: string | null;
   onClose: () => void;
 }
 
-export const InviteCodeDialog: React.FC<InviteCodeDialogProps> = ({ open, code, expiry, onClose }) => {
+export const InviteCodeDialog: React.FC<InviteCodeDialogProps> = ({ open, code, expiry, link, onClose }) => {
   const [remaining, setRemaining] = React.useState<number>(0);
 
   React.useEffect(() => {
@@ -30,25 +41,52 @@ export const InviteCodeDialog: React.FC<InviteCodeDialogProps> = ({ open, code, 
     return `${hours}:${minutes}:${seconds}`;
   };
 
-  const handleCopy = () => {
-    if (code) {
-      navigator.clipboard.writeText(code);
+  const copyToClipboard = (value: string | null) => {
+    if (value) {
+      void navigator.clipboard.writeText(value);
     }
   };
 
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Einladungscode</DialogTitle>
-      <DialogContent sx={{ textAlign: 'center' }}>
-        <Typography variant="h5" align="center" sx={{ wordBreak: 'break-all', mb: 1 }}>
-          {code ?? '...'}
-        </Typography>
-        {code && (
-          <Tooltip title="Code kopieren">
-            <IconButton onClick={handleCopy} size="small">
-              <ContentCopyIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+      <DialogTitle>Einladung teilen</DialogTitle>
+      <DialogContent sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+          <Typography variant="subtitle2" color="textSecondary">
+            Einladungscode
+          </Typography>
+          <Typography variant="h5" align="center" sx={{ wordBreak: 'break-all' }}>
+            {code ?? '...'}
+          </Typography>
+          {code && (
+            <Tooltip title="Code kopieren">
+              <IconButton onClick={() => copyToClipboard(code)} size="small">
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+        {link && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+            <Typography variant="subtitle2" color="textSecondary">
+              Einladungslink
+            </Typography>
+            <Typography
+              variant="body1"
+              sx={{ wordBreak: 'break-all' }}
+              component="a"
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {link}
+            </Typography>
+            <Tooltip title="Link kopieren">
+              <IconButton onClick={() => copyToClipboard(link)} size="small">
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
         )}
         {expiry && (
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
