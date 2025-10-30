@@ -117,6 +117,69 @@ class PaymentServiceUnitTest {
     }
 
     @Test
+    void confirmPaymentCreatesWalletForPayerWithoutExistingWallet() throws Exception {
+        Long paymentId = 43L;
+        String callerUid = "payer-uid";
+
+        JamiahPayment payment = new JamiahPayment();
+        payment.setId(paymentId);
+        payment.setPayerUid(callerUid);
+        payment.setCycleId(201L);
+        payment.setJamiahId(21L);
+        payment.setStripePaymentIntentId("pi_test_wallet");
+
+        when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(JamiahPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Jamiah jamiah = new Jamiah();
+        jamiah.setId(21L);
+        jamiah.setRateAmount(new BigDecimal("10"));
+        jamiah.setOwnerId(callerUid);
+
+        Jamiah jamiahWithMembers = new Jamiah();
+        jamiahWithMembers.setId(21L);
+        jamiahWithMembers.setRateAmount(new BigDecimal("10"));
+        jamiahWithMembers.setOwnerId(callerUid);
+        UserProfile memberProfile = new UserProfile();
+        memberProfile.setUid(callerUid);
+        jamiahWithMembers.getMembers().add(memberProfile);
+
+        JamiahCycle cycle = new JamiahCycle();
+        cycle.setId(201L);
+        cycle.setJamiah(jamiah);
+
+        when(cycleRepository.findById(201L)).thenReturn(Optional.of(cycle));
+        when(jamiahRepository.findById(21L)).thenReturn(Optional.of(jamiah));
+        when(jamiahRepository.findWithMembersById(21L)).thenReturn(Optional.of(jamiahWithMembers));
+
+        PaymentIntent paymentIntent = mock(PaymentIntent.class);
+        when(paymentIntent.getStatus()).thenReturn("succeeded");
+        when(paymentIntent.getAmount()).thenReturn(1000L);
+        when(paymentIntent.getCurrency()).thenReturn("eur");
+        when(stripePaymentProvider.retrievePaymentIntent("pi_test_wallet")).thenReturn(paymentIntent);
+
+        UserProfile payerProfile = new UserProfile();
+        payerProfile.setUid(callerUid);
+        setUserProfileId(payerProfile, 77L);
+        when(userRepository.findByUid(callerUid)).thenReturn(Optional.of(payerProfile));
+
+        when(walletRepository.findById(77L)).thenReturn(Optional.empty());
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentConfirmationDto confirmation = paymentService.confirmPayment(paymentId, callerUid);
+
+        ArgumentCaptor<Wallet> walletCaptor = ArgumentCaptor.forClass(Wallet.class);
+        verify(walletRepository).save(walletCaptor.capture());
+        Wallet savedWallet = walletCaptor.getValue();
+
+        assertEquals(77L, savedWallet.getMemberId());
+        assertEquals(payerProfile, savedWallet.getMember());
+        assertEquals(new BigDecimal("10"), savedWallet.getBalance());
+        assertEquals(new BigDecimal("10"), confirmation.getWallet().getBalance());
+        assertEquals(callerUid, confirmation.getWallet().getMemberId());
+    }
+
+    @Test
     void initiatePaymentCreatesIntentWithCardPaymentMethodType() throws Exception {
         Long paymentId = 7L;
         String callerUid = "payer-uid";
