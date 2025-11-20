@@ -16,10 +16,13 @@ REACT_APP_FIREBASE_STORAGE_BUCKET
 REACT_APP_FIREBASE_MESSAGING_SENDER_ID
 REACT_APP_FIREBASE_APP_ID
 REACT_APP_FIREBASE_MEASUREMENT_ID
+REACT_APP_ANALYTICS_ALLOWED_HOSTS
 REACT_APP_BACKEND_URL
 ```
 
 `REACT_APP_BACKEND_URL` should point to the deployed backend, for example `https://mansa-backend-982712811758.europe-west3.run.app`.
+
+`REACT_APP_FIREBASE_MEASUREMENT_ID` should only be configured for production deployments. Pair it with `REACT_APP_ANALYTICS_ALLOWED_HOSTS` to list comma-separated hostnames (for example `mansa.web.app,mansa.firebaseapp.com`). Analytics will initialize only when both variables are set **and** the current host matches an allowed value, preventing GA cookie prompts in local or staging environments.
 
 Ensure that the `.env` file is **not** committed to version control. The included `.gitignore` already excludes it for safety.
 
