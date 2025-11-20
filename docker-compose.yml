@@ -8,6 +8,11 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/mansa
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: password
+      STRIPE_API_KEY: ${STRIPE_API_KEY:-sk_test_placeholder}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
+      STRIPE_SANDBOX_ID: ${STRIPE_SANDBOX_ID:-sbx_placeholder}
+      STRIPE_CONNECT_ACCOUNT_RETURN_URL: ${STRIPE_CONNECT_ACCOUNT_RETURN_URL:-https://app.mansa.local/payments/stripe/return}
+      STRIPE_CONNECT_ACCOUNT_REFRESH_URL: ${STRIPE_CONNECT_ACCOUNT_REFRESH_URL:-https://app.mansa.local/payments/stripe/refresh}
     depends_on:
       - db
   frontend:
