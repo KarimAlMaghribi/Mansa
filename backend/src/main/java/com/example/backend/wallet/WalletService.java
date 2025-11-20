@@ -43,6 +43,7 @@ public class WalletService {
     private final StripeAccountStatusUpdater stripeAccountStatusUpdater;
     private final String defaultAccountReturnUrl;
     private final String defaultAccountRefreshUrl;
+    private final String publishableKey;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -53,7 +54,8 @@ public class WalletService {
                          StripePaymentProvider stripePaymentProvider,
                          StripeAccountStatusUpdater stripeAccountStatusUpdater,
                          @Value("${stripe.connect.account-return-url:}") String defaultAccountReturnUrl,
-                         @Value("${stripe.connect.account-refresh-url:}") String defaultAccountRefreshUrl) {
+                         @Value("${stripe.connect.account-refresh-url:}") String defaultAccountRefreshUrl,
+                         @Value("${stripe.publishable-key:}") String publishableKey) {
         this.jamiahRepository = jamiahRepository;
         this.walletRepository = walletRepository;
         this.userRepository = userRepository;
@@ -61,6 +63,7 @@ public class WalletService {
         this.stripeAccountStatusUpdater = stripeAccountStatusUpdater;
         this.defaultAccountReturnUrl = normalizeUrl(defaultAccountReturnUrl);
         this.defaultAccountRefreshUrl = normalizeUrl(defaultAccountRefreshUrl);
+        this.publishableKey = publishableKey;
     }
 
     public WalletStatusResponse createWallet(String jamiahPublicId,
@@ -479,6 +482,7 @@ public class WalletService {
         response.setBalance(Optional.ofNullable(wallet.getBalance()).orElse(ZERO));
         response.setReservedBalance(Optional.ofNullable(wallet.getReservedBalance()).orElse(ZERO));
         response.setUpdatedAt(wallet.getUpdatedAt());
+        response.setPublishableKey(publishableKey);
 
         String effectiveReturnUrl = resolveReturnUrl(returnUrl);
         String effectiveRefreshUrl = resolveRefreshUrl(refreshUrl);

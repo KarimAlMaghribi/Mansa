@@ -16,6 +16,7 @@ public class WalletStatusResponse {
     private boolean requiresOnboarding;
     private String onboardingUrl;
     private String accountSessionClientSecret;
+    private String publishableKey;
     private String stripeSandboxId;
     private boolean lockedForPayments;
     private boolean lockedForPayouts;
@@ -117,6 +118,14 @@ public class WalletStatusResponse {
 
     public void setAccountSessionClientSecret(String accountSessionClientSecret) {
         this.accountSessionClientSecret = accountSessionClientSecret;
+    }
+
+    public String getPublishableKey() {
+        return publishableKey;
+    }
+
+    public void setPublishableKey(String publishableKey) {
+        this.publishableKey = publishableKey;
     }
 
     public String getStripeSandboxId() {
