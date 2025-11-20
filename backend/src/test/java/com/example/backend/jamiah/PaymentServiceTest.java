@@ -14,6 +14,7 @@ import com.example.backend.wallet.JamiahWallet;
 import com.example.backend.wallet.JamiahWalletRepository;
 import com.example.backend.wallet.WalletService;
 import com.stripe.model.Account;
+import com.stripe.model.PaymentIntent;
 import com.stripe.model.Transfer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -52,6 +54,8 @@ public class PaymentServiceTest {
     @MockBean
     StripePaymentProvider stripePaymentProvider;
 
+    private final AtomicInteger paymentIntentCounter = new AtomicInteger();
+
     @BeforeEach
     void setupStripeMocks() throws Exception {
         Account account = org.mockito.Mockito.mock(Account.class);
@@ -63,7 +67,26 @@ public class PaymentServiceTest {
                 .thenReturn(account);
         org.mockito.Mockito.when(stripePaymentProvider.createTransfer(org.mockito.Mockito.any()))
                 .thenReturn(org.mockito.Mockito.mock(Transfer.class));
+        org.mockito.Mockito.when(stripePaymentProvider.createPaymentIntent(org.mockito.Mockito.any()))
+                .thenAnswer(invocation -> {
+                    PaymentIntent paymentIntent = org.mockito.Mockito.mock(PaymentIntent.class);
+                    String id = "pi_test_" + paymentIntentCounter.incrementAndGet();
+                    org.mockito.Mockito.when(paymentIntent.getId()).thenReturn(id);
+                    org.mockito.Mockito.when(paymentIntent.getClientSecret()).thenReturn(id + "_secret");
+                    org.mockito.Mockito.when(paymentIntent.getStatus()).thenReturn("succeeded");
+                    return paymentIntent;
+                });
+        org.mockito.Mockito.when(stripePaymentProvider.retrievePaymentIntent(org.mockito.Mockito.any()))
+                .thenAnswer(invocation -> {
+                    PaymentIntent paymentIntent = org.mockito.Mockito.mock(PaymentIntent.class);
+                    String id = String.valueOf(invocation.getArgument(0));
+                    org.mockito.Mockito.when(paymentIntent.getId()).thenReturn(id);
+                    org.mockito.Mockito.when(paymentIntent.getClientSecret()).thenReturn(id + "_secret");
+                    org.mockito.Mockito.when(paymentIntent.getStatus()).thenReturn("succeeded");
+                    return paymentIntent;
+                });
         org.mockito.Mockito.when(stripePaymentProvider.getSandboxId()).thenReturn(null);
+        org.mockito.Mockito.when(stripePaymentProvider.isConfigured()).thenReturn(true);
     }
 
     private String newUid() {

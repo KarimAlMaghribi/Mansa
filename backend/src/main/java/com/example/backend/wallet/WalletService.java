@@ -633,6 +633,11 @@ public class WalletService {
         if (effectiveAccount != null) {
             boolean detailsSubmitted = Boolean.TRUE.equals(effectiveAccount.getDetailsSubmitted());
             requiresOnboarding = !detailsSubmitted;
+            if (requiresOnboarding && stripePaymentProvider.isConfigured()
+                    && (effectiveRefreshUrl == null || effectiveReturnUrl == null)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Return and refresh URLs are required for Stripe onboarding");
+            }
             if (requiresOnboarding && effectiveRefreshUrl != null && effectiveReturnUrl != null) {
                 Map<String, Object> params = new HashMap<>();
                 params.put("account", effectiveAccount.getId());
