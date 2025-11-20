@@ -23,6 +23,9 @@ public class WalletStatusResponse {
     private Boolean stripeChargesEnabled;
     private Boolean stripePayoutsEnabled;
     private String stripeDisabledReason;
+    private String paymentIntentId;
+    private String paymentIntentClientSecret;
+    private String paymentIntentStatus;
 
     public Long getJamiahId() {
         return jamiahId;
@@ -174,5 +177,29 @@ public class WalletStatusResponse {
 
     public void setStripeDisabledReason(String stripeDisabledReason) {
         this.stripeDisabledReason = stripeDisabledReason;
+    }
+
+    public String getPaymentIntentId() {
+        return paymentIntentId;
+    }
+
+    public void setPaymentIntentId(String paymentIntentId) {
+        this.paymentIntentId = paymentIntentId;
+    }
+
+    public String getPaymentIntentClientSecret() {
+        return paymentIntentClientSecret;
+    }
+
+    public void setPaymentIntentClientSecret(String paymentIntentClientSecret) {
+        this.paymentIntentClientSecret = paymentIntentClientSecret;
+    }
+
+    public String getPaymentIntentStatus() {
+        return paymentIntentStatus;
+    }
+
+    public void setPaymentIntentStatus(String paymentIntentStatus) {
+        this.paymentIntentStatus = paymentIntentStatus;
     }
 }

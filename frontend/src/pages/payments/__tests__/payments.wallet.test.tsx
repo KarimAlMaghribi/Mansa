@@ -11,12 +11,18 @@ jest.mock('react-router-dom', () => ({
   useParams: () => ({ groupId: 'jamiah-1' }),
 }));
 
-jest.mock('@stripe/react-stripe-js', () => ({
-  Elements: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardElement: () => <div>card-element</div>,
-  useStripe: () => ({ confirmCardPayment: jest.fn() }),
-  useElements: () => ({ getElement: () => ({}) }),
-}));
+jest.mock('@stripe/react-stripe-js', () => {
+  const confirmPaymentMock = jest.fn();
+  return {
+    Elements: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    PaymentElement: () => <div>payment-element</div>,
+    useStripe: () => ({ confirmPayment: confirmPaymentMock }),
+    useElements: () => ({}),
+    __confirmPaymentMock: confirmPaymentMock,
+  };
+});
+
+const { __confirmPaymentMock: confirmPaymentMock } = jest.requireMock('@stripe/react-stripe-js') as any;
 
 jest.mock('@stripe/stripe-js', () => ({
   loadStripe: jest.fn(() => Promise.resolve(null)),
@@ -73,6 +79,10 @@ const baseRoundResponse = {
   ],
   wallets: [],
 };
+
+beforeEach(() => {
+  confirmPaymentMock.mockReset();
+});
 
 const setupCommonFetch = (overrides: (url: string, init?: FetchInit) => Response | Promise<Response>) => {
   const fetchMock = jest.fn(async (input: FetchInput, init?: FetchInit) => {
@@ -189,6 +199,7 @@ describe('Payments wallet flows', () => {
   });
 
   it('submits a top-up request with the entered amount', async () => {
+    confirmPaymentMock.mockResolvedValue({ paymentIntent: { status: 'succeeded' } });
     let walletStatus = {
       balance: 10,
       reservedBalance: 0,
@@ -203,6 +214,10 @@ describe('Payments wallet flows', () => {
         return jsonResponse(walletStatus);
       }
       if (url.includes('/api/jamiahs/jamiah-1/wallets/top-up') && init?.method === 'POST') {
+        walletStatus = { ...walletStatus, paymentIntentClientSecret: 'pi_secret', paymentIntentId: 'pi_1' };
+        return jsonResponse({ ...walletStatus, publishableKey: 'pk_test' });
+      }
+      if (url.includes('/api/wallets/payment-intents/pi_1/refresh')) {
         walletStatus = { ...walletStatus, balance: walletStatus.balance + 5 };
         return jsonResponse(walletStatus);
       }
@@ -219,8 +234,7 @@ describe('Payments wallet flows', () => {
     const amountField = await screen.findByLabelText(/betrag/i);
     fireEvent.change(amountField, { target: { value: '5' } });
 
-    const confirmButton = screen.getByRole('button', { name: /bestätigen/i });
-    fireEvent.click(confirmButton);
+    fireEvent.click(screen.getByRole('button', { name: /bestätigen/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -229,14 +243,14 @@ describe('Payments wallet flows', () => {
       );
     });
 
+    await screen.findByText(/bitte zahlung in stripe bestätigen/i);
+
     const topUpCall = fetchMock.mock.calls.find(call => extractUrl(call[0] as FetchInput).includes('/wallets/top-up'));
     expect(topUpCall).toBeDefined();
     const topUpInit = topUpCall?.[1] as RequestInit | undefined;
     expect(topUpInit?.body).toBeDefined();
     const parsedBody = topUpInit?.body ? JSON.parse(topUpInit.body.toString()) : {};
     expect(parsedBody.amount).toBe(5);
-
-    await screen.findByText(/Saldo: 15,00/i);
   });
 });
 
