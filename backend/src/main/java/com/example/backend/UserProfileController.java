@@ -124,7 +124,7 @@ public class UserProfileController {
         UserProfile user = repository.findByUid(uid)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (user.getProfileImage() == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            return org.springframework.http.ResponseEntity.noContent().build();
         }
         org.springframework.http.MediaType type = user.getProfileImageType() != null ?
                 org.springframework.http.MediaType.parseMediaType(user.getProfileImageType()) :
