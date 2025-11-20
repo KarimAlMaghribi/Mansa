@@ -9,6 +9,7 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.Account;
 import com.stripe.model.AccountLink;
 import com.stripe.model.AccountSession;
+import com.stripe.model.PaymentIntent;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
@@ -20,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -39,6 +41,7 @@ public class WalletService {
     private final JamiahRepository jamiahRepository;
     private final JamiahWalletRepository walletRepository;
     private final UserProfileRepository userRepository;
+    private final WalletTopUpRepository walletTopUpRepository;
     private final StripePaymentProvider stripePaymentProvider;
     private final StripeAccountStatusUpdater stripeAccountStatusUpdater;
     private final String defaultAccountReturnUrl;
@@ -51,6 +54,7 @@ public class WalletService {
     public WalletService(JamiahRepository jamiahRepository,
                          JamiahWalletRepository walletRepository,
                          UserProfileRepository userRepository,
+                         WalletTopUpRepository walletTopUpRepository,
                          StripePaymentProvider stripePaymentProvider,
                          StripeAccountStatusUpdater stripeAccountStatusUpdater,
                          @Value("${stripe.connect.account-return-url:}") String defaultAccountReturnUrl,
@@ -59,6 +63,7 @@ public class WalletService {
         this.jamiahRepository = jamiahRepository;
         this.walletRepository = walletRepository;
         this.userRepository = userRepository;
+        this.walletTopUpRepository = walletTopUpRepository;
         this.stripePaymentProvider = stripePaymentProvider;
         this.stripeAccountStatusUpdater = stripeAccountStatusUpdater;
         this.defaultAccountReturnUrl = normalizeUrl(defaultAccountReturnUrl);
@@ -99,12 +104,46 @@ public class WalletService {
         }
         Jamiah jamiahWithMembers = jamiahRepository.findWithMembersById(jamiah.getId()).orElse(jamiah);
         UserProfile member = ensureMembership(callerUid, jamiahWithMembers);
+        if (!stripePaymentProvider.isConfigured()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stripe is not configured");
+        }
         JamiahWallet wallet = lock(jamiahWithMembers, member);
-        BigDecimal balance = Optional.ofNullable(wallet.getBalance()).orElse(ZERO);
-        wallet.setBalance(balance.add(amount));
-        walletRepository.save(wallet);
+        Map<String, Object> params = new HashMap<>();
+        params.put("amount", toStripeAmount(amount));
+        params.put("currency", DEFAULT_CURRENCY);
+        params.put("payment_method_types", List.of("card"));
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("jamiahId", jamiahWithMembers.getId().toString());
+        metadata.put("jamiahPublicId", jamiahWithMembers.getPublicId() != null
+                ? jamiahWithMembers.getPublicId().toString() : "");
+        metadata.put("memberId", member.getId().toString());
+        metadata.put("memberUid", member.getUid());
+        params.put("metadata", metadata);
+        if (jamiahWithMembers.getName() != null && !jamiahWithMembers.getName().isBlank()) {
+            params.put("description", String.format("Wallet-Aufladung für %s", jamiahWithMembers.getName()));
+        }
+        PaymentIntent paymentIntent;
+        try {
+            paymentIntent = stripePaymentProvider.createPaymentIntent(params);
+        } catch (StripeException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
+        }
+        WalletTopUp topUp = new WalletTopUp();
+        topUp.setJamiahId(jamiahWithMembers.getId());
+        topUp.setMemberId(member.getId());
+        topUp.setAmount(amount);
+        topUp.setCurrency(DEFAULT_CURRENCY);
+        topUp.setStripePaymentIntentId(paymentIntent.getId());
+        topUp.setPaymentIntentStatus(paymentIntent.getStatus());
+        walletTopUpRepository.save(topUp);
+        wallet = applyPendingTopUps(jamiahWithMembers, member, wallet);
         Account account = ensureStripeAccount(wallet, jamiahWithMembers, member);
-        return buildStatus(jamiahWithMembers, member, wallet, account, returnUrl, refreshUrl, createDashboardSession);
+        WalletStatusResponse response = buildStatus(jamiahWithMembers, member, wallet, account, returnUrl, refreshUrl,
+                createDashboardSession);
+        response.setPaymentIntentClientSecret(paymentIntent.getClientSecret());
+        response.setPaymentIntentId(paymentIntent.getId());
+        response.setPaymentIntentStatus(paymentIntent.getStatus());
+        return response;
     }
 
     public void ensureBalance(Jamiah jamiah, UserProfile member, BigDecimal amount) {
@@ -326,8 +365,29 @@ public class WalletService {
         JamiahWallet wallet = walletRepository
                 .findByJamiah_IdAndMember_Id(jamiahWithMembers.getId(), member.getId())
                 .orElseGet(() -> walletRepository.save(createWalletEntity(jamiahWithMembers, member)));
+        wallet = applyPendingTopUps(jamiahWithMembers, member, wallet);
         Account account = ensureStripeAccount(wallet, jamiahWithMembers, member);
-        return buildStatus(jamiahWithMembers, member, wallet, account, returnUrl, refreshUrl, createDashboardSession);
+        WalletStatusResponse response = buildStatus(jamiahWithMembers, member, wallet, account, returnUrl, refreshUrl,
+                createDashboardSession);
+        attachLatestTopUp(jamiahWithMembers, member, response);
+        return response;
+    }
+
+    public WalletStatusResponse refreshPaymentIntent(String paymentIntentId) {
+        WalletTopUp topUp = walletTopUpRepository.findByStripePaymentIntentId(paymentIntentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        Jamiah jamiah = jamiahRepository.findById(topUp.getJamiahId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        UserProfile member = userRepository.findById(topUp.getMemberId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        JamiahWallet wallet = walletRepository
+                .findByJamiah_IdAndMember_Id(jamiah.getId(), member.getId())
+                .orElseGet(() -> walletRepository.save(createWalletEntity(jamiah, member)));
+        wallet = updateTopUpFromStripe(topUp, jamiah, member, wallet);
+        Account account = ensureStripeAccount(wallet, jamiah, member);
+        WalletStatusResponse response = buildStatus(jamiah, member, wallet, account, null, null, false);
+        attachLatestTopUp(jamiah, member, response);
+        return response;
     }
 
     private Jamiah resolveJamiah(String publicId) {
@@ -391,6 +451,52 @@ public class WalletService {
                 wallet.setLockedForPayouts(false);
             }
         }
+        return wallet;
+    }
+
+    private JamiahWallet applyPendingTopUps(Jamiah jamiah, UserProfile member, JamiahWallet wallet) {
+        List<WalletTopUp> pendingTopUps = walletTopUpRepository
+                .findAllByJamiahIdAndMemberIdAndAppliedFalse(jamiah.getId(), member.getId());
+        for (WalletTopUp topUp : pendingTopUps) {
+            wallet = updateTopUpFromStripe(topUp, jamiah, member, wallet);
+        }
+        return wallet;
+    }
+
+    private JamiahWallet updateTopUpFromStripe(WalletTopUp topUp,
+                                               Jamiah jamiah,
+                                               UserProfile member,
+                                               JamiahWallet wallet) {
+        PaymentIntent paymentIntent;
+        try {
+            paymentIntent = stripePaymentProvider.retrievePaymentIntent(topUp.getStripePaymentIntentId());
+        } catch (StripeException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
+        }
+        String status = paymentIntent.getStatus();
+        topUp.setPaymentIntentStatus(status);
+        boolean success = "succeeded".equalsIgnoreCase(status);
+        boolean canceled = "canceled".equalsIgnoreCase(status) || "requires_payment_method".equalsIgnoreCase(status)
+                || "payment_failed".equalsIgnoreCase(status);
+        if (success && !Boolean.TRUE.equals(topUp.getApplied())) {
+            wallet = lock(jamiah, member);
+            BigDecimal balance = Optional.ofNullable(wallet.getBalance()).orElse(ZERO);
+            wallet.setBalance(balance.add(Optional.ofNullable(topUp.getAmount()).orElse(ZERO)));
+            wallet = walletRepository.save(wallet);
+            topUp.setApplied(true);
+            topUp.setRolledBack(false);
+            topUp.setAppliedAt(Instant.now());
+        } else if (canceled && Boolean.TRUE.equals(topUp.getApplied()) && !Boolean.TRUE.equals(topUp.getRolledBack())) {
+            wallet = lock(jamiah, member);
+            BigDecimal balance = Optional.ofNullable(wallet.getBalance()).orElse(ZERO);
+            wallet.setBalance(balance.subtract(Optional.ofNullable(topUp.getAmount()).orElse(ZERO)));
+            wallet = walletRepository.save(wallet);
+            topUp.setRolledBack(true);
+        } else if (canceled) {
+            topUp.setApplied(true);
+            topUp.setRolledBack(true);
+        }
+        walletTopUpRepository.save(topUp);
         return wallet;
     }
 
@@ -557,6 +663,14 @@ public class WalletService {
         }
         response.setRequiresOnboarding(requiresOnboarding);
         return response;
+    }
+
+    private void attachLatestTopUp(Jamiah jamiah, UserProfile member, WalletStatusResponse response) {
+        walletTopUpRepository.findFirstByJamiahIdAndMemberIdOrderByCreatedAtDesc(jamiah.getId(), member.getId())
+                .ifPresent(topUp -> {
+                    response.setPaymentIntentId(topUp.getStripePaymentIntentId());
+                    response.setPaymentIntentStatus(topUp.getPaymentIntentStatus());
+                });
     }
 
     private String resolveReturnUrl(String override) {

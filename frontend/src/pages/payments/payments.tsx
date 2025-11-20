@@ -29,7 +29,7 @@ import {
 import EuroIcon from '@mui/icons-material/Euro';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LaunchIcon from '@mui/icons-material/Launch';
-import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
+import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { API_BASE_URL } from '../../constants/api';
 import { useAuth } from '../../context/AuthContext';
@@ -106,6 +106,9 @@ interface WalletStatus {
   stripeChargesEnabled?: boolean;
   stripePayoutsEnabled?: boolean;
   stripeDisabledReason?: string;
+  paymentIntentId?: string;
+  paymentIntentClientSecret?: string;
+  paymentIntentStatus?: string;
 }
 
 interface WalletHistoryEntry {
@@ -183,17 +186,11 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({ amount, clientSec
       onError('Ungültiger Zahlungsstatus. Bitte versuche es erneut.');
       return;
     }
-    const card = elements.getElement(CardElement);
-    if (!card) {
-      onError('Kartenelement konnte nicht initialisiert werden.');
-      return;
-    }
     setSubmitting(true);
     try {
-      const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card,
-        },
+      const result = await stripe.confirmPayment({
+        elements,
+        redirect: 'if_required',
       });
       if (result.error) {
         onError(result.error.message || 'Stripe-Zahlung fehlgeschlagen.');
@@ -219,7 +216,7 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({ amount, clientSec
         Betrag: {amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
       </Typography>
       <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, mb: 2 }}>
-        <CardElement options={{ hidePostalCode: true }} />
+        <PaymentElement />
       </Box>
       <DialogActions sx={{ px: 0 }}>
         <Button onClick={onCancel} disabled={submitting}>Abbrechen</Button>
@@ -553,6 +550,9 @@ export const Payments: React.FC = () => {
 
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [walletStripePromise, setWalletStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [topUpClientSecret, setTopUpClientSecret] = useState<string | null>(null);
+  const [topUpPublishableKey, setTopUpPublishableKey] = useState<string | null>(null);
+  const [topUpPaymentIntentId, setTopUpPaymentIntentId] = useState<string | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentClientSecret, setPaymentClientSecret] = useState<string | null>(null);
   const [activePayment, setActivePayment] = useState<Payment | null>(null);
@@ -693,6 +693,9 @@ export const Payments: React.FC = () => {
     stripeChargesEnabled: typeof data.stripeChargesEnabled === 'boolean' ? data.stripeChargesEnabled : undefined,
     stripePayoutsEnabled: typeof data.stripePayoutsEnabled === 'boolean' ? data.stripePayoutsEnabled : undefined,
     stripeDisabledReason: typeof data.stripeDisabledReason === 'string' ? data.stripeDisabledReason : undefined,
+    paymentIntentId: data.paymentIntentId || undefined,
+    paymentIntentClientSecret: data.paymentIntentClientSecret || undefined,
+    paymentIntentStatus: data.paymentIntentStatus || undefined,
   }), []);
 
   useEffect(() => {
@@ -991,6 +994,9 @@ export const Payments: React.FC = () => {
     setWalletActionState(null);
     setWalletActionError(null);
     setWalletActionAmount('');
+    setTopUpClientSecret(null);
+    setTopUpPublishableKey(null);
+    setTopUpPaymentIntentId(null);
   };
 
   const handleWalletActionSubmit = async () => {
@@ -1028,8 +1034,26 @@ export const Payments: React.FC = () => {
       const status = mapWalletStatus(data);
       mergeStatusIntoWallets(status, currentUid);
       pushWalletHistory(status);
+      if (walletActionState.mode === 'top-up') {
+        const publishableKey = status.publishableKey || topUpPublishableKey || process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+        if (!publishableKey) {
+          throw new Error('Kein Stripe-Publishable-Key konfiguriert.');
+        }
+        if (!status.paymentIntentClientSecret) {
+          throw new Error('Stripe-PaymentIntent konnte nicht erstellt werden.');
+        }
+        const promise = walletStripePromise ?? loadStripe(publishableKey);
+        if (!walletStripePromise) {
+          setWalletStripePromise(promise);
+        }
+        setTopUpPublishableKey(publishableKey);
+        setTopUpClientSecret(status.paymentIntentClientSecret);
+        setTopUpPaymentIntentId(status.paymentIntentId || null);
+        setSnackbar({ message: 'Bitte Zahlung in Stripe bestätigen.', severity: 'info' });
+        return;
+      }
       setSnackbar({
-        message: walletActionState.mode === 'top-up' ? 'Wallet erfolgreich aufgeladen.' : 'Auszahlung erfolgreich veranlasst.',
+        message: 'Auszahlung erfolgreich veranlasst.',
         severity: 'success',
       });
       setWalletActionState(null);
@@ -1040,6 +1064,75 @@ export const Payments: React.FC = () => {
     } finally {
       setWalletActionSubmitting(false);
     }
+  };
+
+  const handleTopUpConfirmation = useCallback(async (stripe: Stripe | null, elements: any) => {
+    if (!stripe || !elements) {
+      setWalletActionError('Stripe konnte nicht geladen werden.');
+      return;
+    }
+    setWalletActionSubmitting(true);
+    try {
+      const currentUrl = typeof window !== 'undefined' ? window.location.href : undefined;
+      const result = await stripe.confirmPayment({
+        elements,
+        redirect: 'if_required',
+        confirmParams: currentUrl ? { return_url: currentUrl } : undefined,
+      });
+      if (result.error) {
+        throw new Error(result.error.message || 'Stripe-Zahlung fehlgeschlagen.');
+      }
+      const paymentIntent = result.paymentIntent;
+      if (!paymentIntent || paymentIntent.status !== 'succeeded') {
+        throw new Error('Zahlung wurde nicht abgeschlossen.');
+      }
+      if (topUpPaymentIntentId) {
+        try {
+          await fetch(`${API_BASE_URL}/api/wallets/payment-intents/${topUpPaymentIntentId}/refresh`, { method: 'POST' });
+        } catch (err) {
+          console.warn('Konnte PaymentIntent nicht synchronisieren', err);
+        }
+      }
+      if (currentUid) {
+        await fetchWalletStatus(currentUid, { recordHistory: true, silent: true });
+      }
+      await fetchWalletData({ recordHistory: false });
+      setSnackbar({ message: 'Wallet erfolgreich aufgeladen.', severity: 'success' });
+      closeWalletActionDialog();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Wallet-Aufladung fehlgeschlagen.';
+      setWalletActionError(message);
+    } finally {
+      setWalletActionSubmitting(false);
+    }
+  }, [closeWalletActionDialog, currentUid, fetchWalletData, fetchWalletStatus, topUpPaymentIntentId]);
+
+  const TopUpConfirmationContent: React.FC = () => {
+    const stripe = useStripe();
+    const elements = useElements();
+    return (
+      <>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Bestätige die Aufladung in Stripe. Der Betrag wird deinem Wallet nach erfolgreicher Zahlung gutgeschrieben.
+            </Typography>
+            <PaymentElement />
+            {walletActionError && <Alert severity="error">{walletActionError}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeWalletActionDialog} disabled={walletActionSubmitting}>Abbrechen</Button>
+          <Button
+            onClick={() => handleTopUpConfirmation(stripe, elements)}
+            variant="contained"
+            disabled={walletActionSubmitting}
+          >
+            {walletActionSubmitting ? <CircularProgress size={18} /> : 'Zahlung bestätigen'}
+          </Button>
+        </DialogActions>
+      </>
+    );
   };
 
   const handleRefreshWalletStatus = useCallback((uid?: string) => {
@@ -1478,30 +1571,39 @@ export const Payments: React.FC = () => {
         <DialogTitle>
           {walletActionState?.mode === 'withdraw' ? 'Auszahlung anfordern' : 'Wallet aufladen'}
         </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            <TextField
-              label="Betrag"
-              type="number"
-              value={walletActionAmount}
-              onChange={event => setWalletActionAmount(event.target.value)}
-              fullWidth
-              inputProps={{ min: 0, step: 0.01 }}
-            />
-            {walletActionError && (
-              <Alert severity="error">{walletActionError}</Alert>
-            )}
-            <Typography variant="body2" color="text.secondary">
-              Der Vorgang startet eine Stripe-Wallet-Transaktion. Du wirst ggf. zu Stripe weitergeleitet, um den Vorgang abzuschließen.
-            </Typography>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeWalletActionDialog} disabled={walletActionSubmitting}>Abbrechen</Button>
-          <Button onClick={handleWalletActionSubmit} variant="contained" disabled={walletActionSubmitting}>
-            {walletActionSubmitting ? <CircularProgress size={18} /> : 'Bestätigen'}
-          </Button>
-        </DialogActions>
+        {walletActionState?.mode === 'top-up' && topUpClientSecret && walletStripePromise ? (
+          <Elements stripe={walletStripePromise} options={{ clientSecret: topUpClientSecret }}>
+            <TopUpConfirmationContent />
+          </Elements>
+        ) : (
+          <>
+            <DialogContent>
+              <Stack spacing={2} sx={{ pt: 1 }}>
+                <TextField
+                  label="Betrag"
+                  type="number"
+                  value={walletActionAmount}
+                  onChange={event => setWalletActionAmount(event.target.value)}
+                  fullWidth
+                  inputProps={{ min: 0, step: 0.01 }}
+                  disabled={walletActionSubmitting}
+                />
+                {walletActionError && (
+                  <Alert severity="error">{walletActionError}</Alert>
+                )}
+                <Typography variant="body2" color="text.secondary">
+                  Der Vorgang startet eine Stripe-Wallet-Transaktion. Du wirst ggf. zu Stripe weitergeleitet, um den Vorgang abzuschließen.
+                </Typography>
+              </Stack>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeWalletActionDialog} disabled={walletActionSubmitting}>Abbrechen</Button>
+              <Button onClick={handleWalletActionSubmit} variant="contained" disabled={walletActionSubmitting}>
+                {walletActionSubmitting ? <CircularProgress size={18} /> : 'Bestätigen'}
+              </Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
 
       <Dialog open={paymentDialogOpen} onClose={closePaymentDialog} fullWidth maxWidth="sm">
