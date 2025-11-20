@@ -46,6 +46,18 @@ public class WalletController {
                 Boolean.TRUE.equals(request.getCreateDashboardSession()));
     }
 
+    @PostMapping("/top-up/confirm")
+    public WalletStatusResponse confirmTopUp(@PathVariable("jamiahId") String jamiahId,
+                                             @RequestParam String uid,
+                                             @Valid @RequestBody ConfirmTopUpRequest request) {
+        return walletService.confirmTopUp(jamiahId,
+                uid,
+                request.getPaymentIntentId(),
+                request.getReturnUrl(),
+                request.getRefreshUrl(),
+                Boolean.TRUE.equals(request.getCreateDashboardSession()));
+    }
+
     @PostMapping("/withdraw")
     public WalletStatusResponse withdraw(@PathVariable("jamiahId") String jamiahId,
                                          @RequestParam String uid,
@@ -109,6 +121,19 @@ public class WalletController {
 
         public void setAmount(BigDecimal amount) {
             this.amount = amount;
+        }
+    }
+
+    public static class ConfirmTopUpRequest extends CreateWalletRequest {
+        @NotNull
+        private String paymentIntentId;
+
+        public String getPaymentIntentId() {
+            return paymentIntentId;
+        }
+
+        public void setPaymentIntentId(String paymentIntentId) {
+            this.paymentIntentId = paymentIntentId;
         }
     }
 }

@@ -16,6 +16,10 @@ public class WalletStatusResponse {
     private boolean requiresOnboarding;
     private String onboardingUrl;
     private String accountSessionClientSecret;
+    private String paymentIntentClientSecret;
+    private String paymentIntentId;
+    private String paymentIntentStatus;
+    private String stripePublishableKey;
     private String stripeSandboxId;
     private boolean lockedForPayments;
     private boolean lockedForPayouts;
@@ -117,6 +121,38 @@ public class WalletStatusResponse {
 
     public void setAccountSessionClientSecret(String accountSessionClientSecret) {
         this.accountSessionClientSecret = accountSessionClientSecret;
+    }
+
+    public String getPaymentIntentClientSecret() {
+        return paymentIntentClientSecret;
+    }
+
+    public void setPaymentIntentClientSecret(String paymentIntentClientSecret) {
+        this.paymentIntentClientSecret = paymentIntentClientSecret;
+    }
+
+    public String getPaymentIntentId() {
+        return paymentIntentId;
+    }
+
+    public void setPaymentIntentId(String paymentIntentId) {
+        this.paymentIntentId = paymentIntentId;
+    }
+
+    public String getPaymentIntentStatus() {
+        return paymentIntentStatus;
+    }
+
+    public void setPaymentIntentStatus(String paymentIntentStatus) {
+        this.paymentIntentStatus = paymentIntentStatus;
+    }
+
+    public String getStripePublishableKey() {
+        return stripePublishableKey;
+    }
+
+    public void setStripePublishableKey(String stripePublishableKey) {
+        this.stripePublishableKey = stripePublishableKey;
     }
 
     public String getStripeSandboxId() {
