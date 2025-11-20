@@ -222,6 +222,26 @@ public class WalletService {
                 .orElseGet(() -> walletRepository.save(createWalletEntity(jamiah, member)));
     }
 
+    public JamiahWallet provisionWallet(Jamiah jamiah, UserProfile member) {
+        JamiahWallet wallet = getOrCreateWallet(jamiah, member);
+        Account account = ensureStripeAccount(wallet, jamiah, member);
+        if (account == null && wallet.getStripeAccountId() != null) {
+            walletRepository.save(wallet);
+        }
+        return wallet;
+    }
+
+    public void provisionWallets(Jamiah jamiah, Collection<UserProfile> members) {
+        if (jamiah == null || members == null || members.isEmpty()) {
+            return;
+        }
+        for (UserProfile member : members) {
+            if (member != null && member.getId() != null) {
+                provisionWallet(jamiah, member);
+            }
+        }
+    }
+
     public Map<Long, JamiahWallet> findAllByMembers(Jamiah jamiah, Collection<Long> memberIds) {
         if (memberIds == null || memberIds.isEmpty()) {
             return Map.of();
@@ -384,15 +404,21 @@ public class WalletService {
     private Account ensureStripeAccount(JamiahWallet wallet, Jamiah jamiah, UserProfile member) {
         String walletAccountId = normalize(wallet.getStripeAccountId());
         String jamiahAccountId = normalize(jamiah.getStripeAccountId());
+        boolean walletUpdated = false;
         if (!stripePaymentProvider.isConfigured()) {
             if (jamiahAccountId != null && !jamiahAccountId.equals(walletAccountId)) {
                 wallet.setStripeAccountId(jamiahAccountId);
+                walletUpdated = true;
+            }
+            if (walletUpdated) {
+                walletRepository.save(wallet);
             }
             return null;
         }
         if (jamiahAccountId != null) {
             if (!jamiahAccountId.equals(walletAccountId)) {
                 wallet.setStripeAccountId(jamiahAccountId);
+                walletUpdated = true;
             }
             try {
                 Account account = stripePaymentProvider.retrieveAccount(jamiahAccountId);
