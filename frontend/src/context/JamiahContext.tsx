@@ -238,8 +238,13 @@ export const JamiahProvider: React.FC<JamiahProviderProps> = ({ groupId, childre
           const activeCycle = data[data.length - 1];
           setCycle(activeCycle);
           if (activeCycle?.id) {
+            if (!currentUid) {
+              setPayments([]);
+              return;
+            }
+
             const paymentsResponse = await fetch(
-              `${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${activeCycle.id}/payments`
+              `${API_BASE_URL}/api/jamiahs/${groupId}/cycles/${activeCycle.id}/payments?uid=${encodeURIComponent(currentUid)}`
             );
             if (paymentsResponse.ok) {
               const paymentsData = await paymentsResponse.json();
