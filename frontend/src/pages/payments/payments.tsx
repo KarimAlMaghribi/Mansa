@@ -1159,18 +1159,27 @@ export const Payments: React.FC = () => {
       setSnackbar({ message: 'Kein Wallet gefunden.', severity: 'error' });
       return;
     }
-    if (!walletStatus.accountSessionClientSecret) {
-      setSnackbar({ message: 'Kein Stripe-Session-Link verfügbar. Bitte lade den Wallet-Status neu.', severity: 'error' });
-      fetchWalletStatus(currentUid, { dashboardSession: true, recordHistory: true });
-      return;
-    }
-    const publishableKey = walletStatus.publishableKey || process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
-    if (!publishableKey) {
-      setSnackbar({ message: 'Kein Stripe-Publishable-Key konfiguriert.', severity: 'error' });
-      return;
-    }
     setWalletDashboardOpening(true);
     try {
+      let status = walletStatus;
+      if (!status.accountSessionClientSecret) {
+        setSnackbar({ message: 'Kein Stripe-Session-Link verfügbar. Bitte lade den Wallet-Status neu.', severity: 'error' });
+        const refreshedStatus = await fetchWalletStatus(currentUid, { dashboardSession: true, recordHistory: true });
+        if (refreshedStatus) {
+          status = refreshedStatus;
+        }
+      }
+
+      const clientSecret = status.accountSessionClientSecret;
+      if (!clientSecret) {
+        return;
+      }
+
+      const publishableKey = status.publishableKey || process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+      if (!publishableKey) {
+        setSnackbar({ message: 'Kein Stripe-Publishable-Key konfiguriert.', severity: 'error' });
+        return;
+      }
       const promise = walletStripePromise ?? loadStripe(publishableKey);
       if (!walletStripePromise) {
         setWalletStripePromise(promise);
@@ -1179,7 +1188,7 @@ export const Payments: React.FC = () => {
       if (!stripe || !(stripe as any).connect) {
         throw new Error('Stripe konnte nicht initialisiert werden.');
       }
-      const connectInstance = await (stripe as any).connect({ clientSecret: walletStatus.accountSessionClientSecret });
+      const connectInstance = await (stripe as any).connect({ clientSecret });
       if (connectInstance?.createLoginLink) {
         const loginLink = await connectInstance.createLoginLink();
         if (loginLink?.url) {
