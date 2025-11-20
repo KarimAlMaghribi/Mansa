@@ -28,6 +28,7 @@ import {
 } from '@mui/material';
 import EuroIcon from '@mui/icons-material/Euro';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import LaunchIcon from '@mui/icons-material/Launch';
 import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { API_BASE_URL } from '../../constants/api';
@@ -98,6 +99,7 @@ interface WalletStatus {
   requiresOnboarding?: boolean;
   onboardingUrl?: string;
   accountSessionClientSecret?: string;
+  publishableKey?: string;
   stripeSandboxId?: string;
   lockedForPayments?: boolean;
   lockedForPayouts?: boolean;
@@ -538,6 +540,7 @@ export const Payments: React.FC = () => {
   const [walletStatusByMember, setWalletStatusByMember] = useState<Record<string, WalletStatus>>({});
   const [walletStatusLoading, setWalletStatusLoading] = useState(false);
   const [creatingWallet, setCreatingWallet] = useState(false);
+  const [walletDashboardOpening, setWalletDashboardOpening] = useState(false);
   const [walletActionState, setWalletActionState] = useState<{ open: boolean; mode: 'top-up' | 'withdraw' } | null>(null);
   const [walletActionAmount, setWalletActionAmount] = useState('');
   const [walletActionError, setWalletActionError] = useState<string | null>(null);
@@ -549,6 +552,7 @@ export const Payments: React.FC = () => {
   const [loadingWallets, setLoadingWallets] = useState(false);
 
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [walletStripePromise, setWalletStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentClientSecret, setPaymentClientSecret] = useState<string | null>(null);
   const [activePayment, setActivePayment] = useState<Payment | null>(null);
@@ -682,6 +686,7 @@ export const Payments: React.FC = () => {
     requiresOnboarding: data.requiresOnboarding != null ? Boolean(data.requiresOnboarding) : undefined,
     onboardingUrl: data.onboardingUrl || undefined,
     accountSessionClientSecret: data.accountSessionClientSecret || undefined,
+    publishableKey: data.publishableKey || undefined,
     stripeSandboxId: data.stripeSandboxId || undefined,
     lockedForPayments: data.lockedForPayments != null ? Boolean(data.lockedForPayments) : undefined,
     lockedForPayouts: data.lockedForPayouts != null ? Boolean(data.lockedForPayouts) : undefined,
@@ -749,7 +754,7 @@ export const Payments: React.FC = () => {
         params.set('returnUrl', currentUrl);
         params.set('refreshUrl', currentUrl);
       }
-      if (options.dashboardSession) {
+      if (options.dashboardSession || isCurrentUser) {
         params.set('dashboardSession', 'true');
       }
       const response = await fetch(`${API_BASE_URL}/api/jamiahs/${groupId}/wallets/status?${params.toString()}`);
@@ -1041,7 +1046,7 @@ export const Payments: React.FC = () => {
     if (!uid) {
       return;
     }
-    fetchWalletStatus(uid, { recordHistory: uid === currentUid });
+    fetchWalletStatus(uid, { recordHistory: uid === currentUid, dashboardSession: uid === currentUid });
   }, [currentUid, fetchWalletStatus]);
 
   const handleStartOnboarding = () => {
@@ -1051,6 +1056,48 @@ export const Payments: React.FC = () => {
     }
     window.open(walletStatus.onboardingUrl, '_blank', 'noopener,noreferrer');
   };
+
+  const handleOpenStripeDashboard = useCallback(async () => {
+    if (!walletStatus || !currentUid) {
+      setSnackbar({ message: 'Kein Wallet gefunden.', severity: 'error' });
+      return;
+    }
+    if (!walletStatus.accountSessionClientSecret) {
+      setSnackbar({ message: 'Kein Stripe-Session-Link verfügbar. Bitte lade den Wallet-Status neu.', severity: 'error' });
+      fetchWalletStatus(currentUid, { dashboardSession: true, recordHistory: true });
+      return;
+    }
+    const publishableKey = walletStatus.publishableKey || process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+    if (!publishableKey) {
+      setSnackbar({ message: 'Kein Stripe-Publishable-Key konfiguriert.', severity: 'error' });
+      return;
+    }
+    setWalletDashboardOpening(true);
+    try {
+      const promise = walletStripePromise ?? loadStripe(publishableKey);
+      if (!walletStripePromise) {
+        setWalletStripePromise(promise);
+      }
+      const stripe = await promise;
+      if (!stripe || !(stripe as any).connect) {
+        throw new Error('Stripe konnte nicht initialisiert werden.');
+      }
+      const connectInstance = await (stripe as any).connect({ clientSecret: walletStatus.accountSessionClientSecret });
+      if (connectInstance?.createLoginLink) {
+        const loginLink = await connectInstance.createLoginLink();
+        if (loginLink?.url) {
+          window.open(loginLink.url, '_blank', 'noopener,noreferrer');
+          return;
+        }
+      }
+      throw new Error('Stripe-Wallet-Dashboard konnte nicht geöffnet werden.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Stripe-Wallet konnte nicht geöffnet werden.';
+      setSnackbar({ message, severity: 'error' });
+    } finally {
+      setWalletDashboardOpening(false);
+    }
+  }, [currentUid, fetchWalletStatus, walletStatus, walletStripePromise]);
 
   const handleReceiptConfirm = () => {
     if (!groupId || !round || !currentUid) return;
@@ -1307,6 +1354,18 @@ export const Payments: React.FC = () => {
                   </Button>
                 </Stack>
               </Box>
+              {!walletStatusLoading && walletStatus && !walletStatus.accountSessionClientSecret && (
+                <Alert
+                  severity="warning"
+                  action={(
+                    <Button color="inherit" size="small" onClick={() => handleRefreshWalletStatus(currentUid || '')}>
+                      Erneut laden
+                    </Button>
+                  )}
+                >
+                  Kein Stripe-Dashboard-Token verfügbar. Bitte lade den Wallet-Status neu.
+                </Alert>
+              )}
               {walletStatusLoading ? (
                 <Box display="flex" justifyContent="center" py={2}>
                   <CircularProgress />
@@ -1365,7 +1424,20 @@ export const Payments: React.FC = () => {
                         Onboarding öffnen
                       </Button>
                     )}
+                    <Button
+                      variant="text"
+                      onClick={handleOpenStripeDashboard}
+                      color="secondary"
+                      startIcon={<LaunchIcon />}
+                      disabled={walletDashboardOpening || walletStatusLoading}
+                    >
+                      Stripe-Wallet öffnen
+                    </Button>
                   </Stack>
+                  <Typography variant="caption" color="text.secondary">
+                    Der Button öffnet eine Stripe-Express-Session, um Wallet-Einstellungen oder Auszahlungen direkt bei Stripe zu
+                    verwalten. Falls kein Link geladen wird, nutze „Status aktualisieren“ und versuche es erneut.
+                  </Typography>
                   {walletStatusHistory.length > 0 && (
                     <Box>
                       <Typography variant="subtitle2" gutterBottom>
