@@ -17,7 +17,12 @@ export const GroupDetails = () => {
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [motivation, setMotivation] = useState('');
   const [isMember, setIsMember] = useState(false);
+  const [walletProvisioned, setWalletProvisioned] = useState(false);
   const { status: joinStatus, refresh: refreshJoinStatus, loading: statusLoading } = useJoinStatus(id, user?.uid);
+
+  useEffect(() => {
+    setWalletProvisioned(false);
+  }, [id, user?.uid]);
 
   useEffect(() => {
     if (!id) return;
@@ -69,6 +74,40 @@ export const GroupDetails = () => {
         return statusLoading ? <Chip label="Status wird geladen" size="small" /> : null;
     }
   }, [statusState, statusLoading, user]);
+
+  useEffect(() => {
+    const joined = statusState === 'owner' || statusState === 'member' || statusState === 'accepted';
+    if (!id || !user || walletProvisioned || !joined) {
+      return;
+    }
+    const currentUrl = typeof window !== 'undefined' ? window.location.href : undefined;
+    const params = new URLSearchParams({ uid: user.uid });
+    if (currentUrl) {
+      params.set('returnUrl', currentUrl);
+      params.set('refreshUrl', currentUrl);
+    }
+    const provision = async () => {
+      try {
+        const statusRes = await fetch(`${API_BASE_URL}/api/jamiahs/${id}/wallets/status?${params.toString()}`);
+        if (statusRes.status === 404) {
+          const payload: Record<string, unknown> = { createDashboardSession: true };
+          if (currentUrl) {
+            payload.returnUrl = currentUrl;
+            payload.refreshUrl = currentUrl;
+          }
+          await fetch(`${API_BASE_URL}/api/jamiahs/${id}/wallets?uid=${encodeURIComponent(user.uid)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        }
+        setWalletProvisioned(true);
+      } catch (err) {
+        console.error('[group-details] Wallet provisioning failed', err);
+      }
+    };
+    void provision();
+  }, [id, statusState, user, walletProvisioned]);
 
   return (
     <Box p={4} maxWidth={600} mx="auto">

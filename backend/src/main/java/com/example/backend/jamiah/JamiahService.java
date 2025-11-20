@@ -27,6 +27,7 @@ public class JamiahService {
     private final com.example.backend.UserProfileRepository userRepository;
     private final JamiahCycleRepository cycleRepository;
     private final JamiahJoinRequestRepository joinRequestRepository;
+    private final com.example.backend.wallet.WalletService walletService;
 
     private static final Logger log = LoggerFactory.getLogger(JamiahService.class);
 
@@ -43,12 +44,14 @@ public class JamiahService {
                          JamiahMapper mapper,
                          com.example.backend.UserProfileRepository userRepository,
                          JamiahCycleRepository cycleRepository,
-                         JamiahJoinRequestRepository joinRequestRepository) {
+                         JamiahJoinRequestRepository joinRequestRepository,
+                         com.example.backend.wallet.WalletService walletService) {
         this.repository = repository;
         this.mapper = mapper;
         this.userRepository = userRepository;
         this.cycleRepository = cycleRepository;
         this.joinRequestRepository = joinRequestRepository;
+        this.walletService = walletService;
     }
 
     public List<JamiahDto> findAll() {
@@ -81,6 +84,7 @@ public class JamiahService {
             user.getJamiahs().add(entity);
         }
         Jamiah saved = repository.save(entity);
+        provisionWallets(saved);
         return mapper.toDto(saved);
     }
 
@@ -99,6 +103,7 @@ public class JamiahService {
             user.getJamiahs().add(j);
         }
         Jamiah saved = repository.save(j);
+        provisionWallets(saved);
         return mapper.toDto(saved);
     }
 
@@ -208,6 +213,7 @@ public class JamiahService {
             entity.getMembers().add(user);
             user.getJamiahs().add(entity);
             repository.save(entity);
+            provisionWallets(entity);
         }
         return mapper.toDto(entity);
     }
@@ -229,6 +235,7 @@ public class JamiahService {
             entity.getMembers().add(user);
             user.getJamiahs().add(entity);
             repository.save(entity);
+            provisionWallets(entity);
         }
         return mapper.toDto(entity);
     }
@@ -310,6 +317,7 @@ public class JamiahService {
             jamiah.getMembers().add(req.getUser());
             req.getUser().getJamiahs().add(jamiah);
             repository.save(jamiah);
+            provisionWallets(jamiah);
         } else {
             req.setStatus(JamiahJoinRequest.Status.REJECTED);
         }
@@ -401,6 +409,14 @@ public class JamiahService {
         }
     }
 
+    private void provisionWallets(Jamiah jamiah) {
+        if (jamiah == null || walletService == null) {
+            return;
+        }
+        Jamiah withMembers = repository.findWithMembersById(jamiah.getId()).orElse(jamiah);
+        walletService.provisionWallets(withMembers, new java.util.ArrayList<>(withMembers.getMembers()));
+    }
+
     private Jamiah getByPublicId(String publicId) {
         java.util.UUID uuid = null;
         try {
@@ -464,6 +480,7 @@ public class JamiahService {
             jamiah.setStartDate(LocalDate.now());
             repository.save(jamiah);
         }
+        provisionWallets(withMembers);
         JamiahCycle cycle = new JamiahCycle();
         cycle.setJamiah(jamiah);
         cycle.setCycleNumber(1);
