@@ -603,6 +603,8 @@ public class WalletService {
         response.setStripeAccountId(accountId);
         response.setKycStatus(wallet.getKycStatus());
         response.setStripeSandboxId(stripePaymentProvider.getSandboxId());
+        boolean stripeConfigured = stripePaymentProvider.isConfigured();
+        response.setStripeConfigured(stripeConfigured);
         boolean manualPaymentsLock = Boolean.TRUE.equals(wallet.getLockedForPayments());
         boolean manualPayoutsLock = Boolean.TRUE.equals(wallet.getLockedForPayouts());
         boolean stripePayoutsLock = Boolean.TRUE.equals(jamiah.getStripeAccountPayoutsLocked());
@@ -612,8 +614,14 @@ public class WalletService {
         response.setStripePayoutsEnabled(jamiah.getStripeAccountPayoutsEnabled());
         response.setStripeDisabledReason(jamiah.getStripeAccountDisabledReason());
 
+        if (!stripeConfigured) {
+            response.setRequiresOnboarding(false);
+            response.setStatusMessage("Stripe ist nicht konfiguriert. Bitte kontaktiere die Administration für die Einrichtung.");
+            return response;
+        }
+
         Account effectiveAccount = account;
-        if (effectiveAccount == null && accountId != null && stripePaymentProvider.isConfigured()) {
+        if (effectiveAccount == null && accountId != null) {
             try {
                 effectiveAccount = stripePaymentProvider.retrieveAccount(accountId);
                 stripeAccountStatusUpdater.applyAccountState(jamiah, effectiveAccount, List.of(wallet));
