@@ -26,10 +26,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 @Transactional
@@ -128,6 +130,25 @@ public class PaymentServiceTest {
 
     private void assertBigDecimalEquals(String expected, BigDecimal actual) {
         assertEquals(0, new BigDecimal(expected).compareTo(actual));
+    }
+
+    @Test
+    void walletTopUpCreatesPaymentIntentWithTransferData() {
+        String ownerUid = newUid();
+        createUser(ownerUid, "owner");
+
+        JamiahDto created = createJamiah(ownerUid);
+        loadJamiah(created.getId());
+
+        walletService.topUp(created.getId().toString(), ownerUid, new BigDecimal("5"), null, null, false);
+
+        org.mockito.ArgumentCaptor<Map<String, Object>> captor = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(stripePaymentProvider).createPaymentIntent(captor.capture());
+
+        Map<String, Object> params = captor.getValue();
+        assertEquals("acct_test", params.get("on_behalf_of"));
+        Map<?, ?> transferData = (Map<?, ?>) params.get("transfer_data");
+        assertEquals("acct_test", transferData.get("destination"));
     }
 
     @Test

@@ -108,10 +108,22 @@ public class WalletService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stripe is not configured");
         }
         JamiahWallet wallet = lock(jamiahWithMembers, member);
+        Account account = ensureStripeAccount(wallet, jamiahWithMembers, member);
+        String stripeAccountId = normalize(wallet.getStripeAccountId());
+        if (stripeAccountId == null && account != null) {
+            stripeAccountId = normalize(account.getId());
+        }
+        if (stripeAccountId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Stripe account missing for wallet");
+        }
         Map<String, Object> params = new HashMap<>();
         params.put("amount", toStripeAmount(amount));
         params.put("currency", DEFAULT_CURRENCY);
         params.put("payment_method_types", List.of("card"));
+        Map<String, Object> transferData = new HashMap<>();
+        transferData.put("destination", stripeAccountId);
+        params.put("transfer_data", transferData);
+        params.put("on_behalf_of", stripeAccountId);
         Map<String, String> metadata = new HashMap<>();
         metadata.put("jamiahId", jamiahWithMembers.getId().toString());
         metadata.put("jamiahPublicId", jamiahWithMembers.getPublicId() != null
@@ -137,7 +149,6 @@ public class WalletService {
         topUp.setPaymentIntentStatus(paymentIntent.getStatus());
         walletTopUpRepository.save(topUp);
         wallet = applyPendingTopUps(jamiahWithMembers, member, wallet);
-        Account account = ensureStripeAccount(wallet, jamiahWithMembers, member);
         WalletStatusResponse response = buildStatus(jamiahWithMembers, member, wallet, account, returnUrl, refreshUrl,
                 createDashboardSession);
         response.setPaymentIntentClientSecret(paymentIntent.getClientSecret());
