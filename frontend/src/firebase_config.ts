@@ -2,7 +2,6 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -16,7 +15,24 @@ const firebaseConfig = {
 
 // Initialisiere Firebase
 const app = initializeApp(firebaseConfig);
-getAnalytics(app); // optional
+
+const analyticsMeasurementId = process.env.REACT_APP_FIREBASE_MEASUREMENT_ID;
+const analyticsAllowedHosts = (process.env.REACT_APP_ANALYTICS_ALLOWED_HOSTS || "")
+  .split(",")
+  .map((host) => host.trim())
+  .filter(Boolean);
+
+const isApprovedAnalyticsHost =
+  typeof window !== "undefined" &&
+  analyticsAllowedHosts.some((host) => host === window.location.host);
+
+if (analyticsMeasurementId && isApprovedAnalyticsHost) {
+  import("firebase/analytics")
+    .then(({ getAnalytics }) => getAnalytics(app))
+    .catch(() => {
+      // Ignore analytics initialization errors to avoid impacting the app in non-critical environments
+    });
+}
 
 // Exporte für Nutzung im Projekt
 export const auth = getAuth(app);
