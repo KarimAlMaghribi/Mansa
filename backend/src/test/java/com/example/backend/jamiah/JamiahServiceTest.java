@@ -6,9 +6,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.web.server.ResponseStatusException;
 import com.example.backend.UserProfile;
 import com.example.backend.UserProfileRepository;
+import com.example.backend.wallet.WalletService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,8 +23,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@org.springframework.test.context.TestPropertySource(properties = {
+        "spring.datasource.url=jdbc:h2:mem:jamiahservicetest;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
+})
 @Import({JamiahService.class, JamiahMapperImpl.class})
 class JamiahServiceTest {
+
+    @MockBean
+    private WalletService walletService;
 
     @Autowired
     private JamiahService service;
