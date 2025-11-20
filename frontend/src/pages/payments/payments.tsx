@@ -101,6 +101,8 @@ interface WalletStatus {
   accountSessionClientSecret?: string;
   publishableKey?: string;
   stripeSandboxId?: string;
+  stripeConfigured?: boolean;
+  statusMessage?: string;
   lockedForPayments?: boolean;
   lockedForPayouts?: boolean;
   stripeChargesEnabled?: boolean;
@@ -688,6 +690,8 @@ export const Payments: React.FC = () => {
     accountSessionClientSecret: data.accountSessionClientSecret || undefined,
     publishableKey: data.publishableKey || undefined,
     stripeSandboxId: data.stripeSandboxId || undefined,
+    stripeConfigured: data.stripeConfigured != null ? Boolean(data.stripeConfigured) : undefined,
+    statusMessage: typeof data.statusMessage === 'string' ? data.statusMessage : undefined,
     lockedForPayments: data.lockedForPayments != null ? Boolean(data.lockedForPayments) : undefined,
     lockedForPayouts: data.lockedForPayouts != null ? Boolean(data.lockedForPayouts) : undefined,
     stripeChargesEnabled: typeof data.stripeChargesEnabled === 'boolean' ? data.stripeChargesEnabled : undefined,
@@ -1296,7 +1300,16 @@ export const Payments: React.FC = () => {
     );
   }
 
-  if (walletStatus?.requiresOnboarding) {
+  if (walletStatus?.stripeConfigured === false) {
+    statusAlerts.push(
+      <Alert key="wallet-stripe-config" severity="info">
+        {walletStatus.statusMessage
+          || 'Stripe ist derzeit nicht eingerichtet. Bitte kontaktiere die Administration für die Einrichtung.'}
+      </Alert>,
+    );
+  }
+
+  if (walletStatus?.requiresOnboarding && walletStatus?.stripeConfigured !== false) {
     statusAlerts.push(
       <Alert
         key="wallet-onboarding"
@@ -1489,7 +1502,8 @@ export const Payments: React.FC = () => {
                       </Typography>
                     )}
                     <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
-                      {walletStatus?.requiresOnboarding && <Chip label="Onboarding offen" size="small" color="warning" />}
+                      {walletStatus?.requiresOnboarding && walletStatus?.stripeConfigured !== false
+                        && <Chip label="Onboarding offen" size="small" color="warning" />}
                       {walletStatus?.kycStatus && !walletStatus?.requiresOnboarding && (
                         <Chip label={`KYC: ${walletStatus.kycStatus}`} size="small" color="success" />
                       )}
@@ -1512,7 +1526,7 @@ export const Payments: React.FC = () => {
                     >
                       Auszahlen
                     </Button>
-                    {walletStatus?.onboardingUrl && (
+                    {walletStatus?.onboardingUrl && walletStatus?.stripeConfigured !== false && (
                       <Button variant="text" onClick={handleStartOnboarding} color="secondary">
                         Onboarding öffnen
                       </Button>

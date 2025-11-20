@@ -18,6 +18,8 @@ public class WalletStatusResponse {
     private String accountSessionClientSecret;
     private String publishableKey;
     private String stripeSandboxId;
+    private boolean stripeConfigured = true;
+    private String statusMessage;
     private boolean lockedForPayments;
     private boolean lockedForPayouts;
     private Boolean stripeChargesEnabled;
@@ -137,6 +139,22 @@ public class WalletStatusResponse {
 
     public void setStripeSandboxId(String stripeSandboxId) {
         this.stripeSandboxId = stripeSandboxId;
+    }
+
+    public boolean isStripeConfigured() {
+        return stripeConfigured;
+    }
+
+    public void setStripeConfigured(boolean stripeConfigured) {
+        this.stripeConfigured = stripeConfigured;
+    }
+
+    public String getStatusMessage() {
+        return statusMessage;
+    }
+
+    public void setStatusMessage(String statusMessage) {
+        this.statusMessage = statusMessage;
     }
 
     public boolean isLockedForPayments() {

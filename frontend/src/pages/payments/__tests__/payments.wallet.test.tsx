@@ -198,6 +198,34 @@ describe('Payments wallet flows', () => {
     openSpy.mockRestore();
   });
 
+  it('shows setup hint when stripe is not configured', async () => {
+    const walletStatus = {
+      balance: 0,
+      reservedBalance: 0,
+      requiresOnboarding: false,
+      stripeConfigured: false,
+      statusMessage: 'Stripe ist nicht konfiguriert.',
+    };
+
+    setupCommonFetch((url, init) => {
+      if (url.includes('/api/jamiahs/jamiah-1/wallets?uid=member-1')) {
+        return jsonResponse([{ memberId: 'member-1', balance: walletStatus.balance, reserved: walletStatus.reservedBalance }]);
+      }
+      if (url.includes('/api/jamiahs/jamiah-1/wallets/status')) {
+        return jsonResponse(walletStatus);
+      }
+      return jsonResponse([]);
+    });
+
+    await act(async () => {
+      render(<Payments />);
+    });
+
+    expect(await screen.findByText(walletStatus.statusMessage)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /onboarding öffnen/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /onboarding starten/i })).toBeNull();
+  });
+
   it('submits a top-up request with the entered amount', async () => {
     confirmPaymentMock.mockResolvedValue({ paymentIntent: { status: 'succeeded' } });
     let walletStatus = {
