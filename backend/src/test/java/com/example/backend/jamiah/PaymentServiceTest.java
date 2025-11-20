@@ -133,7 +133,7 @@ public class PaymentServiceTest {
     }
 
     @Test
-    void walletTopUpCreatesPaymentIntentWithTransferData() {
+    void walletTopUpCreatesPaymentIntentWithTransferData() throws Exception {
         String ownerUid = newUid();
         createUser(ownerUid, "owner");
 
