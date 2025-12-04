@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -76,6 +77,7 @@ public class JamiahService {
     public JamiahDto create(JamiahDto dto, String uid) {
         validateParameters(dto);
         Jamiah entity = mapper.toEntity(dto);
+        applyPaymentSettings(entity, dto);
         entity.setStartDate(null); // ensure cycle not started on creation
         if (uid != null) {
             com.example.backend.UserProfile user = userRepository.findByUid(uid)
@@ -94,6 +96,7 @@ public class JamiahService {
     public JamiahDto createJamiah(String ownerUid, JamiahDto dto) {
         validateParameters(dto);
         Jamiah j = mapper.toEntity(dto);
+        applyPaymentSettings(j, dto);
         j.setStartDate(null); // ensure cycle not started on creation
         j.setOwnerId(ownerUid);
         if (ownerUid != null) {
@@ -121,6 +124,7 @@ public class JamiahService {
         entity.setRateAmount(dto.getRateAmount());
         entity.setRateInterval(dto.getRateInterval());
         entity.setStartDate(dto.getStartDate());
+        applyPaymentSettings(entity, dto);
         return mapper.toDto(repository.save(entity));
     }
 
@@ -138,6 +142,7 @@ public class JamiahService {
         entity.setRateAmount(dto.getRateAmount());
         entity.setRateInterval(dto.getRateInterval());
         entity.setStartDate(dto.getStartDate());
+        applyPaymentSettings(entity, dto);
         return mapper.toDto(repository.save(entity));
     }
 
@@ -522,5 +527,43 @@ public class JamiahService {
         if (dto.getIsPublic() == null) {
             throw new IllegalArgumentException("isPublic must not be null");
         }
+        String paymentMethod = normalizePaymentMethod(dto.getPaymentMethod());
+        if (paymentMethod == null && dto.getStripeFeeConsentAccepted() == null) {
+            dto.setStripeFeeConsentAccepted(true);
+            if (dto.getStripeFeeConsentAcceptedAt() == null) {
+                dto.setStripeFeeConsentAcceptedAt(Instant.now());
+            }
+        }
+        paymentMethod = paymentMethod == null ? "STRIPE" : paymentMethod;
+        dto.setPaymentMethod(paymentMethod);
+        if (isStripePaymentMethod(paymentMethod) && !Boolean.TRUE.equals(dto.getStripeFeeConsentAccepted())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Stripe fee consent must be accepted when using Stripe payments");
+        }
+    }
+
+    private void applyPaymentSettings(Jamiah entity, JamiahDto dto) {
+        entity.setPaymentMethod(normalizePaymentMethod(dto.getPaymentMethod()));
+        if (Boolean.TRUE.equals(dto.getStripeFeeConsentAccepted())) {
+            entity.setStripeFeeConsentAccepted(true);
+            Instant acceptedAt = dto.getStripeFeeConsentAcceptedAt();
+            if (acceptedAt == null) {
+                acceptedAt = Instant.now();
+            }
+            if (entity.getStripeFeeConsentAcceptedAt() == null || acceptedAt.isAfter(entity.getStripeFeeConsentAcceptedAt())) {
+                entity.setStripeFeeConsentAcceptedAt(acceptedAt);
+            }
+        } else {
+            entity.setStripeFeeConsentAccepted(false);
+            entity.setStripeFeeConsentAcceptedAt(null);
+        }
+    }
+
+    private String normalizePaymentMethod(String paymentMethod) {
+        return paymentMethod == null ? null : paymentMethod.trim();
+    }
+
+    private boolean isStripePaymentMethod(String paymentMethod) {
+        return paymentMethod == null || "STRIPE".equalsIgnoreCase(paymentMethod.trim());
     }
 }

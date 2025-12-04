@@ -9,6 +9,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -68,6 +69,15 @@ public class Jamiah {
     private String invitationCode;
 
     private LocalDate invitationExpiry;
+
+    @Column(name = "payment_method")
+    private String paymentMethod;
+
+    @Column(name = "stripe_fee_consent_accepted")
+    private Boolean stripeFeeConsentAccepted;
+
+    @Column(name = "stripe_fee_consent_accepted_at")
+    private Instant stripeFeeConsentAcceptedAt;
 
     @Column(name = "stripe_account_id")
     private String stripeAccountId;

@@ -85,7 +85,11 @@ public class WalletService {
         JamiahWallet wallet = walletRepository
                 .findByJamiah_IdAndMember_Id(jamiahWithMembers.getId(), member.getId())
                 .orElseGet(() -> walletRepository.save(createWalletEntity(jamiahWithMembers, member)));
-        Account account = ensureStripeAccount(wallet, jamiahWithMembers, member);
+        Account account = null;
+        if (isStripePaymentMethod(jamiahWithMembers)) {
+            ensureStripeConsent(jamiahWithMembers);
+            account = ensureStripeAccount(wallet, jamiahWithMembers, member);
+        }
         return buildStatus(jamiahWithMembers, member, wallet, account, returnUrl, refreshUrl, createDashboardSession);
     }
 
@@ -103,6 +107,7 @@ public class WalletService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         Jamiah jamiahWithMembers = jamiahRepository.findWithMembersById(jamiah.getId()).orElse(jamiah);
+        ensureStripeMethodAllowed(jamiahWithMembers);
         UserProfile member = ensureMembership(callerUid, jamiahWithMembers);
         if (!stripePaymentProvider.isConfigured()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stripe is not configured");
@@ -277,7 +282,11 @@ public class WalletService {
 
     public JamiahWallet provisionWallet(Jamiah jamiah, UserProfile member) {
         JamiahWallet wallet = getOrCreateWallet(jamiah, member);
-        Account account = ensureStripeAccount(wallet, jamiah, member);
+        Account account = null;
+        if (isStripePaymentMethod(jamiah)) {
+            ensureStripeConsent(jamiah);
+            account = ensureStripeAccount(wallet, jamiah, member);
+        }
         if (account == null && wallet.getStripeAccountId() != null) {
             walletRepository.save(wallet);
         }
@@ -522,6 +531,9 @@ public class WalletService {
     }
 
     private Account ensureStripeAccount(JamiahWallet wallet, Jamiah jamiah, UserProfile member) {
+        if (!isStripePaymentMethod(jamiah)) {
+            return null;
+        }
         String walletAccountId = normalize(wallet.getStripeAccountId());
         String jamiahAccountId = normalize(jamiah.getStripeAccountId());
         boolean walletUpdated = false;
@@ -535,6 +547,7 @@ public class WalletService {
             }
             return null;
         }
+        ensureStripeConsent(jamiah);
         if (jamiahAccountId != null) {
             if (!jamiahAccountId.equals(walletAccountId)) {
                 wallet.setStripeAccountId(jamiahAccountId);
@@ -582,6 +595,26 @@ public class WalletService {
         } catch (StripeException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, ex.getMessage(), ex);
         }
+    }
+
+    private boolean isStripePaymentMethod(Jamiah jamiah) {
+        return jamiah == null || jamiah.getPaymentMethod() == null
+                || "STRIPE".equalsIgnoreCase(jamiah.getPaymentMethod().trim());
+    }
+
+    private void ensureStripeConsent(Jamiah jamiah) {
+        if (!Boolean.TRUE.equals(jamiah.getStripeFeeConsentAccepted())) {
+            throw new ResponseStatusException(HttpStatus.PRECONDITION_REQUIRED,
+                    "Stripe fee consent is required for Stripe payments");
+        }
+    }
+
+    private void ensureStripeMethodAllowed(Jamiah jamiah) {
+        if (!isStripePaymentMethod(jamiah)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Stripe payments are not enabled for this Jamiah");
+        }
+        ensureStripeConsent(jamiah);
     }
 
     private WalletStatusResponse buildStatus(Jamiah jamiah,
