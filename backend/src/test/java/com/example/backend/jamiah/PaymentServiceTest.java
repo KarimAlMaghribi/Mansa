@@ -81,7 +81,7 @@ public class PaymentServiceTest {
         org.mockito.Mockito.when(stripePaymentProvider.retrievePaymentIntent(org.mockito.Mockito.any()))
                 .thenAnswer(invocation -> {
                     PaymentIntent paymentIntent = org.mockito.Mockito.mock(PaymentIntent.class);
-                    String id = String.valueOf(invocation.getArgument(0));
+                    String id = invocation.getArgument(0, String.class);
                     org.mockito.Mockito.when(paymentIntent.getId()).thenReturn(id);
                     org.mockito.Mockito.when(paymentIntent.getClientSecret()).thenReturn(id + "_secret");
                     org.mockito.Mockito.when(paymentIntent.getStatus()).thenReturn("succeeded");

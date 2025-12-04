@@ -5,6 +5,7 @@ import lombok.Data;
 
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -48,4 +49,10 @@ public class JamiahDto {
     private String invitationCode;
 
     private LocalDate invitationExpiry;
+
+    private String paymentMethod;
+
+    private Boolean stripeFeeConsentAccepted;
+
+    private Instant stripeFeeConsentAcceptedAt;
 }

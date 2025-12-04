@@ -24,7 +24,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @org.springframework.test.context.TestPropertySource(properties = {
-        "spring.datasource.url=jdbc:h2:mem:jamiahservicetest;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
+        "spring.datasource.url=jdbc:h2:mem:jamiahservicetest;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+        "spring.flyway.url=jdbc:h2:mem:jamiahservicetest;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
 })
 @Import({JamiahService.class, JamiahMapperImpl.class})
 class JamiahServiceTest {
