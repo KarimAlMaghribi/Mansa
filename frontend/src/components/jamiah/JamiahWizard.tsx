@@ -3,7 +3,14 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
+  FormControlLabel,
   List,
   ListItem,
   ListItemText,
@@ -36,6 +43,8 @@ type FieldErrorMap = Partial<Record<keyof Jamiah | 'global', string>>;
 const normalizeInitialValue = (value: Partial<Jamiah>): Partial<Jamiah> => ({
   rateInterval: 'MONTHLY',
   isPublic: false,
+  paymentMethod: 'PAYPAL',
+  stripeAdminFeeAccepted: false,
   ...value,
   startDate: value.startDate ? value.startDate.substring(0, 10) : undefined,
 });
@@ -54,12 +63,16 @@ export const JamiahWizard: React.FC<JamiahWizardProps> = ({
   const [formData, setFormData] = useState<Partial<Jamiah>>(() => normalizeInitialValue(initialValue));
   const [errors, setErrors] = useState<FieldErrorMap>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [stripeModalOpen, setStripeModalOpen] = useState(false);
+  const [pendingPaymentMethod, setPendingPaymentMethod] = useState<Jamiah['paymentMethod'] | null>(null);
+  const [stripeConsentChecked, setStripeConsentChecked] = useState(false);
 
   useEffect(() => {
     setFormData(normalizeInitialValue(initialValue));
     setActiveStep(0);
     setErrors({});
     setSubmitError(null);
+    setStripeConsentChecked(Boolean(initialValue.stripeAdminFeeAccepted));
   }, [initialValue]);
 
   const currentStepTitle = useMemo(() => steps[activeStep] ?? steps[0], [activeStep]);
@@ -73,9 +86,15 @@ export const JamiahWizard: React.FC<JamiahWizardProps> = ({
     const stepFields: (keyof FieldErrorMap)[] = [];
 
     if (stepIndex === 0) {
-      stepFields.push('name');
+      stepFields.push('name', 'paymentMethod', 'stripeAdminFeeAccepted');
       if (!formData.name || formData.name.trim().length === 0) {
         newErrors.name = 'Name ist erforderlich';
+      }
+      if (!formData.paymentMethod) {
+        newErrors.paymentMethod = 'Bezahlmethode auswählen';
+      }
+      if (formData.paymentMethod === 'STRIPE_CARD_KLARNA' && !formData.stripeAdminFeeAccepted) {
+        newErrors.stripeAdminFeeAccepted = 'Bitte die 2% Admin-Gebühr bestätigen';
       }
     }
 
@@ -150,6 +169,36 @@ export const JamiahWizard: React.FC<JamiahWizardProps> = ({
     }
   };
 
+  const handlePaymentMethodChange = (value: Jamiah['paymentMethod']) => {
+    if (value === 'STRIPE_CARD_KLARNA' && !formData.stripeAdminFeeAccepted) {
+      setPendingPaymentMethod(value);
+      setStripeConsentChecked(false);
+      setStripeModalOpen(true);
+      return;
+    }
+    updateField('paymentMethod', value);
+    if (value !== 'STRIPE_CARD_KLARNA') {
+      updateField('stripeAdminFeeAccepted', false);
+    }
+  };
+
+  const confirmStripeSelection = () => {
+    if (pendingPaymentMethod !== 'STRIPE_CARD_KLARNA') {
+      setStripeModalOpen(false);
+      return;
+    }
+    updateField('paymentMethod', 'STRIPE_CARD_KLARNA');
+    updateField('stripeAdminFeeAccepted', true);
+    setStripeModalOpen(false);
+    setPendingPaymentMethod(null);
+  };
+
+  const cancelStripeSelection = () => {
+    setStripeModalOpen(false);
+    setPendingPaymentMethod(null);
+    setStripeConsentChecked(false);
+  };
+
   const renderStepContent = () => {
     switch (activeStep) {
       case 0:
@@ -181,6 +230,22 @@ export const JamiahWizard: React.FC<JamiahWizardProps> = ({
               <MenuItem value="private">Privat (nur mit Einladung)</MenuItem>
               <MenuItem value="public">Öffentlich (sichtbar für alle)</MenuItem>
             </TextField>
+            <TextField
+              select
+              label="Bezahlmethode"
+              value={formData.paymentMethod ?? 'PAYPAL'}
+              onChange={e => handlePaymentMethodChange(e.target.value as Jamiah['paymentMethod'])}
+              error={Boolean(errors.paymentMethod || errors.stripeAdminFeeAccepted)}
+              helperText={errors.paymentMethod ?? errors.stripeAdminFeeAccepted ?? ''}
+            >
+              <MenuItem value="PAYPAL">PayPal</MenuItem>
+              <MenuItem value="STRIPE_CARD_KLARNA">Stripe (Karte/Klarna)</MenuItem>
+            </TextField>
+            {formData.paymentMethod === 'STRIPE_CARD_KLARNA' && (
+              <Alert severity="info">
+                Bei Nutzung von Stripe fällt eine Admin-Gebühr von 2% pro Transaktion an.
+              </Alert>
+            )}
           </Stack>
         );
       case 1:
@@ -259,6 +324,24 @@ export const JamiahWizard: React.FC<JamiahWizardProps> = ({
                     secondary={formData.isPublic ? 'Öffentlich' : 'Privat'}
                   />
                 </ListItem>
+                <ListItem>
+                  <ListItemText
+                    primary="Bezahlmethode"
+                    secondary={
+                      formData.paymentMethod === 'STRIPE_CARD_KLARNA'
+                        ? 'Stripe (Karte/Klarna)'
+                        : 'PayPal'
+                    }
+                  />
+                </ListItem>
+                {formData.paymentMethod === 'STRIPE_CARD_KLARNA' && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Admin-Gebühr akzeptiert"
+                      secondary={formData.stripeAdminFeeAccepted ? 'Ja' : 'Nein'}
+                    />
+                  </ListItem>
+                )}
                 <Divider component="li" sx={{ my: 1 }} />
                 <ListItem>
                   <ListItemText
@@ -351,6 +434,40 @@ export const JamiahWizard: React.FC<JamiahWizardProps> = ({
           </Button>
         )}
       </Stack>
+
+      <Dialog open={stripeModalOpen} onClose={cancelStripeSelection} maxWidth="sm" fullWidth>
+        <DialogTitle>Stripe auswählen</DialogTitle>
+        <DialogContent>
+          <DialogContentText mb={2}>
+            Bei Zahlung über Stripe (Karte/Klarna) fällt eine Admin-Gebühr von 2% auf jede
+            Transaktion an. Bitte bestätige, dass du diese Gebühr akzeptierst, bevor du fortfährst.
+          </DialogContentText>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={stripeConsentChecked}
+                onChange={e => setStripeConsentChecked(e.target.checked)}
+              />
+            }
+            label="Ich akzeptiere die 2% Admin-Gebühr für Stripe-Zahlungen"
+          />
+          {errors.stripeAdminFeeAccepted && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {errors.stripeAdminFeeAccepted}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cancelStripeSelection}>Abbrechen</Button>
+          <Button
+            variant="contained"
+            onClick={confirmStripeSelection}
+            disabled={!stripeConsentChecked}
+          >
+            Zustimmen und Stripe nutzen
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
