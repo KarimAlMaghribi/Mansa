@@ -13,4 +13,6 @@ export interface Jamiah {
   rateAmount?: number;
   rateInterval?: 'WEEKLY' | 'MONTHLY';
   startDate?: string;
+  paymentMethod?: 'PAYPAL' | 'STRIPE_CARD_KLARNA';
+  stripeAdminFeeAccepted?: boolean;
 }
